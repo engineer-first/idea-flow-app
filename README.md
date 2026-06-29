@@ -1,5 +1,9 @@
 # idea-flow-app
 
+## スクラム運用
+
+- [学校スクラム開発のホワイトボードとGitHub Projects連携](docs/whiteboard-github-projects.md)
+
 ## ドキュメントのフォーマット
 
 Markdown の整形には VS Code 拡張 [Markdown All in One](https://marketplace.visualstudio.com/items?itemName=yzhang.markdown-all-in-one) を使用します（テーブルの列幅を全角文字幅を考慮して自動で揃えてくれます）。
