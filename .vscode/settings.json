@@ -1,0 +1,18 @@
+{
+  // Markdown は Markdown All in One (MAIO) で整形する。
+  // MAIO のテーブル整形は全角(East Asian Width)を考慮するため、日本語混じりの表でも列が揃う。
+  "[markdown]": {
+    "editor.defaultFormatter": "yzhang.markdown-all-in-one",
+    "editor.formatOnSave": true,
+    // 行末スペースは Markdown では改行(hard break)の意味を持つため削らない
+    "files.trimTrailingWhitespace": false
+  },
+  // テーブル整形を明示的に有効化（既定で true だが、リポジトリ側で固定しておく）
+  "markdown.extension.tableFormatter.enabled": true,
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  // この拡張を開発メンバーへ推奨表示する
+  "extensions.recommendations": [
+    "yzhang.markdown-all-in-one"
+  ]
+}
