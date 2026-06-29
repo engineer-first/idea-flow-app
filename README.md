@@ -2,7 +2,7 @@
 
 ## スクラム運用
 
-- [学校スクラム開発のホワイトボードとGitHub Projects連携](docs/whiteboard-github-projects.md)
+- [学校スクラム開発のホワイトボードとGitHub Projects連携](docs/scrum/whiteboard-github-projects.md)
 
 ## ドキュメントのフォーマット
 

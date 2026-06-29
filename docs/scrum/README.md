@@ -1,6 +1,8 @@
-# docs
+# スクラム運用ドキュメント
 
 このディレクトリは、学校スクラム開発で使うホワイトボード、GitHub Issues / Projects、AI向け文脈の参照先を迷わず確認するための場所です。
+
+アプリ仕様や設計資料は`docs/`直下または別の仕様用ディレクトリに置き、このディレクトリにはスクラム運用に関する文書だけを置きます。
 
 PBI、デモゴール、実装タスク、進捗状態の正本はGitHub Issues / Projectsです。物理ホワイトボードはチームで話すための場として使い、MarkdownにPBI本文やデモゴール本文を二重管理しません。
 
@@ -10,19 +12,17 @@ PBI、デモゴール、実装タスク、進捗状態の正本はGitHub Issues 
 | -------------------------------------------------------------- | ----------------------------------------------- |
 | [whiteboard-github-projects.md](whiteboard-github-projects.md) | 物理ホワイトボードとGitHub Projectsの連携ルール |
 | [sprints.md](sprints.md)                                       | スプリント期間と管理理由                        |
-| [prd.md](prd.md)                                               | プロダクトの目的、ユーザー、成功条件            |
-| [screen-flow.md](screen-flow.md)                               | 画面フローを書くための空ファイル                |
 
 ## 正本
 
-| 対象           | 正本                               |
-| -------------- | ---------------------------------- |
-| PBI            | `type:PBI`、`label:pbi` のGitHub Issue |
+| 対象           | 正本                                              |
+| -------------- | ------------------------------------------------- |
+| PBI            | `type:PBI`、`label:pbi` のGitHub Issue            |
 | デモゴール     | `type:DemoGoal`、`label:demo-goal` のGitHub Issue |
-| 実装タスク     | GitHub Issue                       |
-| 進捗状態       | GitHub Projectの`Board Column`     |
-| スプリント対象 | `sprint-1`から`sprint-4`のGitHubラベル |
-| ホワイトボード | チームで話すための短い見出し       |
+| 実装タスク     | GitHub Issue                                      |
+| 進捗状態       | GitHub Projectの`Board Column`                    |
+| スプリント対象 | `sprint-1`から`sprint-4`のGitHubラベル            |
+| ホワイトボード | チームで話すための短い見出し                      |
 
 PBI、デモゴール、スプリントタスク、バグを作るときは、GitHub Issue作成画面のテンプレートを使います。分類は`title`、`labels`、`type`、`assignees`で揃えます。
 

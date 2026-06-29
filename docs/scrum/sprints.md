@@ -13,12 +13,12 @@
 
 ## ラベル対応
 
-| Sprint | GitHubラベル |
-| --- | --- |
-| Sprint 1 | `sprint-1` |
-| Sprint 2 | `sprint-2` |
-| Sprint 3 | `sprint-3` |
-| Sprint 4 | `sprint-4` |
+| Sprint   | GitHubラベル |
+| -------- | ------------ |
+| Sprint 1 | `sprint-1`   |
+| Sprint 2 | `sprint-2`   |
+| Sprint 3 | `sprint-3`   |
+| Sprint 4 | `sprint-4`   |
 
 ## 管理方針
 
