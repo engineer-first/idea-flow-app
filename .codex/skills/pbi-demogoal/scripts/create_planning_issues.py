@@ -258,10 +258,6 @@ def set_project_status(item_id, project_id_value, status_field_id, status_option
         set_project_option(item_id, project_id_value, status_field_id, status_option_id)
 
 
-def update_issue_body(repo, issue_number, body):
-    run(["gh", "issue", "edit", str(issue_number), "--repo", repo, "--body-file", "-"], input_text=body)
-
-
 def render_dry_run(spec):
     pbi = spec["pbi"]
     demo_title = demo_issue_title(pbi)
