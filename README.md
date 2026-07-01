@@ -39,8 +39,10 @@ npm run dev
 | --- | --- |
 | `npm run dev` | 開発サーバーを起動 |
 | `npm run build` | 本番ビルド |
-| `npm run lint` | biome による静的解析 |
-| `npm run format` | biome によるformat |
+| `npm run start` | 本番ビルドの起動 |
+| `npm run lint` | Biome による静的解析 (lint + format チェック) |
+| `npm run lint:fix` | Biome の自動修正 (lint + format) |
+| `npm run format` | Biome でファイルを一括フォーマット |
 
 Node.js のバージョンは `mise.toml` で LTS に固定しています。CI でも同じ mise 設定を使用しています。
 
