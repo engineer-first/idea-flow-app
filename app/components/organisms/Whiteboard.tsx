@@ -47,7 +47,8 @@ export function Whiteboard() {
     setNotes((current) => [...current, note]);
     setInput("");
     setSelectedId(note.id);
-    setEditingId(note.id);
+    setEditingId(null);
+    setBoardClickPosition(null);
   };
 
   const addNoteAtPosition = (position: Position) => {
