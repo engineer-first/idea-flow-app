@@ -25,7 +25,8 @@
     "enabled": true,
     "domains": {
       "next": "recommended",
-      "react": "recommended"
+      "react": "recommended",
+      "test": "recommended"
     }
   },
   "javascript": {
