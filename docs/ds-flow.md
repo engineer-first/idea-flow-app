@@ -64,7 +64,7 @@ G --> H
 
 subgraph H["⑧ 成果物の出力"]
 direction TB
-H1[ステップ1<br>成果物一覧表示"]
+H1[ステップ1<br>成果物一覧表示]
 H2[ステップ2<br>Markdown・PDF・PNG出力]
 
 H1 --> H2
