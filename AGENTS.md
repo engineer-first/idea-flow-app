@@ -1,11 +1,12 @@
 # エージェント指示
 
 - このファイルをリポジトリ全体の真実として扱う。
-- `CLAUDE.md` は `AGENTS.md` への symlink として維持する。
+- `CLAUDE.md` と `.github/copilot-instructions.md` は `AGENTS.md` への symlink として維持する。
 - 指示は短く、最新に保ち、重複させない。
 - すべてのアプリケーションコードで TypeScript strict mode を使う。
 - 公開境界では明示的な型を優先する。
 - コンパイラ、lint、テスト設定を緩めて通そうとしない。
+- コードレビューのコメント、説明、提案、要約は日本語で書く。
 - 振る舞いを変更するときはTDD に従う。
 - テストは原則として Vitest を使う。
 - 例外は `supabase test db` や pgTAP など、このファイルで専用ツールを明記している場合だけにする。
