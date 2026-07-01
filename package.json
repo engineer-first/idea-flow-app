@@ -11,9 +11,14 @@
     "format": "biome format --write",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "test:coverage": "vitest run --passWithNoTests --coverage"
+    "test:coverage": "vitest run --passWithNoTests --coverage",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "seed:dev-users": "node scripts/seed-dev-users.mjs"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.110.0",
     "next": "16.2.9",
     "react": "19.2.4",
     "react-dom": "19.2.4"
@@ -29,6 +34,7 @@
     "@vitejs/plugin-react": "^6.0.3",
     "@vitest/coverage-v8": "^4.1.9",
     "jsdom": "^29.1.1",
+    "supabase": "^2.109.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.9"
