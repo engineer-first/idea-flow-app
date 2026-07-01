@@ -45,6 +45,8 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.redirect(`${origin}${redirectTo}`);
     }
+
+    console.error("Failed to exchange code for session:", error.message);
   }
 
   return NextResponse.redirect(
