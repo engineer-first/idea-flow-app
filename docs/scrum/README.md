@@ -15,26 +15,26 @@ PBI、デモゴール、実装タスク、進捗状態の正本はGitHub Issues 
 
 ## 正本
 
-| 対象           | 正本                                              |
-| -------------- | ------------------------------------------------- |
-| PBI            | `type:PBI`、`label:pbi` のGitHub Issue            |
-| デモゴール     | `type:DemoGoal`、`label:demo-goal` のGitHub Issue |
-| 実装タスク     | GitHub Issue                                      |
-| 進捗状態       | GitHub Projectの`Board Column`                    |
-| スプリント対象 | `sprint-1`から`sprint-4`のGitHubラベル            |
-| ホワイトボード | チームで話すための短い見出し                      |
+| 対象           | 正本                          |
+| -------------- | ----------------------------- |
+| PBI            | `type:PBI`のGitHub Issue      |
+| デモゴール     | `type:DemoGoal`のGitHub Issue |
+| 実装タスク     | GitHub Issue                  |
+| 進捗状態       | GitHub Projectの`Status`      |
+| スプリント対象 | GitHub Milestone              |
+| ホワイトボード | チームで話すための短い見出し  |
 
-PBI、デモゴール、スプリントタスク、バグを作るときは、GitHub Issue作成画面のテンプレートを使います。分類は`title`、`labels`、`type`、`assignees`で揃えます。
+PBI、デモゴール、スプリントタスク、バグを作るときは、GitHub Issue作成画面のテンプレートを使います。分類は`title`、`type`、`assignees`で揃えます。
 
-現在のテンプレートはSprint 2期間用に`sprint-2`ラベルを付けます。次のスプリントに入るときは、テンプレート内の`sprint-2`を次のスプリントラベルに変更します。
+スプリント対象は、Issue作成後にGitHub Milestoneで管理します。
 
 ## よく使うリンク
 
-| 用途                                    | URL                                                                                                                                                         |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GitHub Project                          | [idea-flow-app Project](https://github.com/orgs/engineer-first/projects/3)                                                                                  |
-| openの実装タスクだけを見る              | [open task issues](https://github.com/engineer-first/idea-flow-app/issues?q=is%3Aissue%20state%3Aopen%20label%3Atask)                                       |
-| PBIとデモゴールを除いたopen Issueを見る | [open issues without pbi/demo-goal](https://github.com/engineer-first/idea-flow-app/issues?q=is%3Aissue%20state%3Aopen%20-label%3Apbi%20-label%3Ademo-goal) |
+| 用途                                    | URL                                                                                                                                                     |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GitHub Project                          | [idea-flow-app Project](https://github.com/orgs/engineer-first/projects/3)                                                                              |
+| openの実装タスクだけを見る              | [open task issues](https://github.com/engineer-first/idea-flow-app/issues?q=is%3Aissue%20state%3Aopen%20type%3ATask)                                    |
+| PBIとデモゴールを除いたopen Issueを見る | [open issues without PBI/DemoGoal](https://github.com/engineer-first/idea-flow-app/issues?q=is%3Aissue%20state%3Aopen%20-type%3APBI%20-type%3ADemoGoal) |
 
 標準のIssues一覧にはPBIやデモゴールも表示されます。実装中の作業を見るときは、上の`openの実装タスクだけを見る`リンクを使います。
 
@@ -48,13 +48,13 @@ PBI、デモゴール、スプリントタスク、バグを作るときは、Gi
 
 ```text
 PBI-08 ログイン体験
-DE-08-01 Googleログインボタン表示
+DEMO-08 ログイン体験
 #12 Googleログインボタン
 ```
 
 長い説明、受け入れ条件、技術メモはIssue本文に書きます。
 
-`ToDo`、`Doing`、`Wait`、`Done`は、スプリントタスクの付箋を動かす場所です。独立した「スプリントタスク」列は作りません。
+`Todo`、`Doing`、`Done`は、スプリントタスクとバグの付箋を動かす場所です。独立した「スプリントタスク」列は作りません。
 
 ## ホワイトボード写真
 
@@ -64,13 +64,13 @@ IssueとProjectを正にして、人がIssue状態に合わせて物理付箋を
 
 ## スプリント識別
 
-スプリント対象かどうかは、GitHubラベルで管理します。
+スプリント対象かどうかは、GitHub Milestoneで管理します。
 
-Projectフィールドの手動設定を減らすため、`sprint-1`、`sprint-2`、`sprint-3`、`sprint-4`ラベルを使います。
+Projectフィールドやラベルを増やさず、`Sprint 1`、`Sprint 2`、`Sprint 3`、`Sprint 4`のmilestoneを使います。
 
 ## AIに依頼しやすい問い
 
-- `GitHub ProjectとPBI Issue、デモゴールIssueを見て、レビュー前のリスクを整理してください`
+- `GitHub ProjectとPBI Issue、デモゴールIssueを見て、レビュー前の確認事項を整理してください`
 - `PBI IssueとデモゴールIssueを見て、まだIssue化されていないタスクを洗い出してください`
-- `WaitになっているIssueを見て、今日確認すべきことを短くまとめてください`
+- `DoingのIssueを見て、今日確認すべきことを短くまとめてください`
 - `DoneのIssueから、スプリントレビューで話す順番を提案してください`
