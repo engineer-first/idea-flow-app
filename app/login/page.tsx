@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { signInWithGoogle, signInWithPassword } from "@/app/auth/actions";
+import { getCurrentUser } from "@/lib/supabase/auth";
 import { isDevAuthEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
-import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -14,15 +14,10 @@ type LoginPageProps = {
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
 
-  if (isSupabaseConfigured()) {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
-    if (user) {
-      redirect("/");
-    }
+  if (user) {
+    redirect("/");
   }
 
   const showDevAuth = isDevAuthEnabled();
