@@ -1,4 +1,4 @@
-import { Whiteboard } from "./components/organisms/Whiteboard";
+import { Whiteboard } from "./components/organisms/whiteboard";
 
 export default function Home() {
   return <Whiteboard />;

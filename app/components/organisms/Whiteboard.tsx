@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { nanoid } from "nanoid";
-import { NoteForm } from "../molecules/NoteForm";
-import { Note } from "../molecules/Note";
+import { NoteForm } from "../molecules/note-form";
+import { Note } from "../molecules/note";
 import type { Note as NoteType, Position } from "../../types/idea";
 
 const initialPosition = { left: 24, top: 24 };
