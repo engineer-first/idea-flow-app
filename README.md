@@ -61,17 +61,19 @@ npm run dev
 
 ### よく使うコマンド
 
-| コマンド                 | 説明                                          |
-| ------------------------ | --------------------------------------------- |
-| `npm run dev`            | 開発サーバーを起動                            |
-| `npm run supabase:start` | ローカルSupabaseを起動                        |
-| `npm run seed:dev-users` | 開発用固定ユーザーを作成・更新                |
-| `npm run build`          | 本番ビルド                                    |
-| `npm run lint`           | Biome による静的解析 (lint + format チェック) |
-| `npm run fix`            | Biome の自動修正 (lint + format)              |
-| `npm run format`         | Biome でファイルを一括フォーマット            |
-| `npm run test`           | ユニットテストを実行 (CI でも実行)            |
-| `npm run test:coverage`  | ユニットテストを実行しカバレッジを表示        |
+| コマンド                            | 説明                                                     |
+| ----------------------------------- | -------------------------------------------------------- |
+| `npm run dev`                       | 開発サーバーを起動                                       |
+| `npm run supabase:start`            | ローカルSupabaseを起動                                   |
+| `npm run supabase:stop`             | ローカルSupabaseを停止                                   |
+| `npm run supabase:stop --no-backup` | ローカルSupabaseの完全停止(データをすべて削除して初期化) |
+| `npm run seed:dev-users`            | 開発用固定ユーザーを作成・更新                           |
+| `npm run build`                     | 本番ビルド                                               |
+| `npm run lint`                      | Biome による静的解析 (lint + format チェック)            |
+| `npm run fix`                       | Biome の自動修正 (lint + format)                         |
+| `npm run format`                    | Biome でファイルを一括フォーマット                       |
+| `npm run test`                      | ユニットテストを実行 (CI でも実行)                       |
+| `npm run test:coverage`             | ユニットテストを実行しカバレッジを表示                   |
 
 Node.js のバージョンは `mise.toml` で LTS に固定しています。CI でも同じ mise 設定を使用しています。
 
