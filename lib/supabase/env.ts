@@ -20,7 +20,7 @@ export function getSupabaseEnv() {
 
 export function isDevAuthEnabled() {
   return (
-    process.env.NODE_ENV !== "production" &&
+    process.env.NODE_ENV === "development" &&
     process.env.NEXT_PUBLIC_ENABLE_DEV_AUTH === "true"
   );
 }
