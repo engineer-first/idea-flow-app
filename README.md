@@ -57,7 +57,7 @@ npm run dev
 | `member@example.test` | `password` |
 | `viewer@example.test` | `password` |
 
-ローカルSupabaseでGoogle認証も確認する場合は、Google Cloud側に`http://127.0.0.1:54321/auth/v1/callback`をAuthorized redirect URIとして登録し、`supabase/config.toml`の`[auth.external.google]`を`enabled = true`に変更してから、Google client id / secretを環境変数に設定してSupabaseを再起動します。
+ローカルSupabaseでGoogle認証を確認する場合は、[ローカルSupabaseでのGoogle認証設定手順](docs/local-supabase-google-auth.md)を参照してください。
 
 ### よく使うコマンド
 
