@@ -4,9 +4,10 @@
 flowchart TD
 
 A[① ルーム作成・参加]
-B[② 自己紹介]
+B[② 自己紹介（任意）]
 
 A --> B
+A -.スキップ.-> C
 B --> C
 
 subgraph C["③ 課題整理（Map）"]
