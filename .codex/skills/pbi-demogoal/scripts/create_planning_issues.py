@@ -30,6 +30,24 @@ def require_list(value, field):
     return value
 
 
+def require_object(value, field):
+    if not isinstance(value, dict):
+        raise ValueError(f"{field} must be an object")
+    return value
+
+
+def require_string(value, field):
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{field} must be a non-empty string")
+    return value
+
+
+def require_optional_string(value, field):
+    if value is None:
+        return None
+    return require_string(value, field)
+
+
 def bullet_list(items):
     items = require_list(items, "list field")
     return "\n".join(f"- {item}" for item in items) if items else "-"
@@ -86,23 +104,31 @@ def demo_body(spec, pbi_number, pbi_title):
 
 
 def validate_spec(spec):
+    require_object(spec, "spec")
     for key in ["repo", "project_owner", "project_number", "pbi", "demo_goals"]:
         if key not in spec:
             raise ValueError(f"Missing required field: {key}")
+    require_string(spec["repo"], "repo")
+    require_string(spec["project_owner"], "project_owner")
+    require_optional_string(spec.get("demo_overview"), "demo_overview")
+    require_optional_string(spec.get("milestone"), "milestone")
 
-    pbi = spec["pbi"]
+    pbi = require_object(spec["pbi"], "pbi")
     for key in ["id", "title", "story"]:
-        if key not in pbi or not isinstance(pbi[key], str) or not pbi[key].strip():
+        if key not in pbi:
             raise ValueError(f"pbi.{key} is required")
+        require_string(pbi[key], f"pbi.{key}")
     require_list(pbi.get("acceptance"), "pbi.acceptance")
     require_list(pbi.get("memo"), "pbi.memo")
 
     if not isinstance(spec["demo_goals"], list) or not spec["demo_goals"]:
         raise ValueError("demo_goals must be a non-empty list")
     for index, demo in enumerate(spec["demo_goals"]):
+        require_object(demo, f"demo_goals[{index}]")
         for key in ["title", "goal"]:
-            if key not in demo or not isinstance(demo[key], str) or not demo[key].strip():
+            if key not in demo:
                 raise ValueError(f"demo_goals[{index}].{key} is required")
+            require_string(demo[key], f"demo_goals[{index}].{key}")
         require_list(demo.get("checks"), f"demo_goals[{index}].checks")
         require_list(demo.get("risks"), f"demo_goals[{index}].risks")
 
@@ -140,7 +166,7 @@ def find_project_item_id(project_number, project_owner, issue_number):
             "--format",
             "json",
             "--limit",
-            "200",
+            "1000",
         ]
     )
     for item in json.loads(output)["items"]:
@@ -225,10 +251,11 @@ def set_project_option(item_id, project_id_value, field_id, option_id):
 
 
 def set_project_status(item_id, project_id_value, status_field_id, status_option_id):
-    set_project_option(item_id, project_id_value, status_field_id, status_option_id)
     # The built-in "Item added to project" workflow may briefly reset new items to Todo.
-    time.sleep(2)
-    set_project_option(item_id, project_id_value, status_field_id, status_option_id)
+    for delay in [0, 2, 5, 10]:
+        if delay:
+            time.sleep(delay)
+        set_project_option(item_id, project_id_value, status_field_id, status_option_id)
 
 
 def update_issue_body(repo, issue_number, body):
@@ -251,7 +278,7 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Render issue bodies without creating issues")
     args = parser.parse_args()
 
-    spec = json.loads(args.spec.read_text())
+    spec = json.loads(args.spec.read_text(encoding="utf-8"))
     validate_spec(spec)
 
     if args.dry_run:
