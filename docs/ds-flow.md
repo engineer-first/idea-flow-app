@@ -4,13 +4,10 @@
 flowchart TD
 
 A[① ルーム作成・参加]
-B[② 自己紹介（任意）]
 
-A --> B
-A -.スキップ.-> C
-B --> C
+A --> C
 
-subgraph C["③ 課題整理（Map）"]
+subgraph C["② 課題整理（Map）"]
 direction TB
 C1[ステップ1<br>課題を書き出す]
 C2[ステップ2<br>共有・分類]
@@ -22,7 +19,7 @@ end
 
 C --> D
 
-subgraph D["④ 問いの作成（HMW）"]
+subgraph D["③ 問いの作成（HMW）"]
 direction TB
 D1[ステップ1<br>HMWを作成する]
 D2[ステップ2<br>共有・分類]
@@ -34,7 +31,7 @@ end
 
 D --> E
 
-subgraph E["⑤ アイデア発想（Sketch）"]
+subgraph E["④ アイデア発想（Sketch）"]
 direction TB
 E1[ステップ1<br>アイデアを書き出す]
 E2[ステップ2<br>共有・分類]
@@ -44,7 +41,7 @@ end
 
 E --> F
 
-subgraph F["⑥ アイデア評価・決定（Decide）"]
+subgraph F["⑤ アイデア評価・決定（Decide）"]
 direction TB
 F1[ステップ1<br>アイデアを整理する]
 F2[ステップ2<br>価値 × 実現しやすさで評価]
@@ -56,14 +53,14 @@ end
 
 F --> G
 
-subgraph G["⑦ ペルソナ作成"]
+subgraph G["⑥ ペルソナ作成"]
 direction TB
 G1[ステップ1<br>ペルソナを作成する]
 end
 
 G --> H
 
-subgraph H["⑧ 成果物の出力"]
+subgraph H["⑦ 成果物の出力"]
 direction TB
 H1[ステップ1<br>成果物一覧表示]
 H2[ステップ2<br>Markdown・PDF・PNG出力]
