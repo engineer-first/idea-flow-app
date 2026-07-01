@@ -47,10 +47,7 @@ Create a temporary JSON file outside the skill folder, for example under `/tmp`.
     {
       "title": "GitHubリポジトリでソースコードが管理されている",
       "goal": "GitHubリポジトリを開くと、アプリケーションのソースコードが管理されていることを確認できる。",
-      "checks": ["GitHubリポジトリにアプリケーションのソースコードが存在する"],
-      "risks": [
-        "ソースコード以外に必要な設定や手順がREADMEへ反映されないと、開発開始に必要な情報が不足する"
-      ]
+      "checks": ["GitHubリポジトリにアプリケーションのソースコードが存在する"]
     }
   ]
 }

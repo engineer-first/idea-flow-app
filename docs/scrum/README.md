@@ -70,7 +70,7 @@ Projectフィールドやラベルを増やさず、`Sprint 1`、`Sprint 2`、`S
 
 ## AIに依頼しやすい問い
 
-- `GitHub ProjectとPBI Issue、デモゴールIssueを見て、レビュー前のリスクを整理してください`
+- `GitHub ProjectとPBI Issue、デモゴールIssueを見て、レビュー前の確認事項を整理してください`
 - `PBI IssueとデモゴールIssueを見て、まだIssue化されていないタスクを洗い出してください`
 - `DoingのIssueを見て、今日確認すべきことを短くまとめてください`
 - `DoneのIssueから、スプリントレビューで話す順番を提案してください`

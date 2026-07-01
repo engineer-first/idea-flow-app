@@ -81,16 +81,14 @@ def pbi_body(pbi):
 
 
 def demo_section(index, demo):
-    parts = [
-        f"### {index}. {demo['title']}",
-        demo["goal"],
-        "確認観点:",
-        bullet_list(demo.get("checks")),
-    ]
-    risks = require_list(demo.get("risks"), "demo_goals[].risks")
-    if risks:
-        parts.extend(["リスク:", bullet_list(risks)])
-    return "\n\n".join(parts)
+    return "\n\n".join(
+        [
+            f"### {index}. {demo['title']}",
+            demo["goal"],
+            "確認観点:",
+            bullet_list(demo.get("checks")),
+        ]
+    )
 
 
 def demo_body(spec, pbi_number, pbi_title):
@@ -130,7 +128,6 @@ def validate_spec(spec):
                 raise ValueError(f"demo_goals[{index}].{key} is required")
             require_string(demo[key], f"demo_goals[{index}].{key}")
         require_list(demo.get("checks"), f"demo_goals[{index}].checks")
-        require_list(demo.get("risks"), f"demo_goals[{index}].risks")
 
 
 def create_issue(repo, title, body, issue_type, milestone=None):
