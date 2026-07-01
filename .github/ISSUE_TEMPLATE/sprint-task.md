@@ -2,7 +2,6 @@
 name: Sprint task
 about: スプリント中に実装するタスク
 title: "[Task] "
-labels: 
 type: Task
 assignees: ""
 ---

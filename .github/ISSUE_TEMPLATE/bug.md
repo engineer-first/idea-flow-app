@@ -2,7 +2,6 @@
 name: Bug
 about: 不具合や想定外の挙動
 title: "[Bug] "
-labels: 
 type: Bug
 assignees: ""
 ---

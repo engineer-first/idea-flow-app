@@ -1,6 +1,6 @@
 # スプリント期間
 
-このファイルは、GitHubの`sprint-*`ラベルと、チーム内で話しているスプリント番号を対応させるための参照です。
+このファイルは、GitHub Milestoneと、チーム内で話しているスプリント番号を対応させるための参照です。
 
 ## スプリント一覧
 
@@ -11,14 +11,14 @@
 | Sprint 3 | 2026-07-06(月) から 2026-07-13(月) |
 | Sprint 4 | 2026-07-14(火) から 2026-07-24(金) |
 
-## ラベル対応
+## Milestone対応
 
-| Sprint   | GitHubラベル |
-| -------- | ------------ |
-| Sprint 1 | `sprint-1`   |
-| Sprint 2 | `sprint-2`   |
-| Sprint 3 | `sprint-3`   |
-| Sprint 4 | `sprint-4`   |
+| Sprint   | GitHub Milestone |
+| -------- | ---------------- |
+| Sprint 1 | `Sprint 1`       |
+| Sprint 2 | `Sprint 2`       |
+| Sprint 3 | `Sprint 3`       |
+| Sprint 4 | `Sprint 4`       |
 
 ## 管理方針
 

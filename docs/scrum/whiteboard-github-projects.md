@@ -18,15 +18,15 @@
 
 GitHub Issueの右側に表示される`Projects`欄は、そのIssueがGitHub Projectに追加されていることを表します。
 
-`Status`や`Board Column`は、GitHub Project側のフィールドです。Issueごとに値を設定すると、Issue詳細画面の`Projects`欄にも表示されます。
+`Status`は、GitHub Project側のフィールドです。Issueごとに値を設定すると、Issue詳細画面の`Projects`欄にも表示されます。
 
 この欄は、Issue本文とは別にProject上の分類や状態を確認するための場所です。
 
-Issue作成時の分類は、Issueテンプレートの`title`、`labels`、`type`、`assignees`を使います。PBIは`type:PBI`、デモゴールは`type:DemoGoal`で分類します。
+Issue作成時の分類は、Issueテンプレートの`title`、`type`、`assignees`を使います。PBIは`type:PBI`、デモゴールは`type:DemoGoal`で分類します。
 
-スプリントは`sprint-*`ラベルで管理します。PBIやデモゴールの本文はIssue本文を正とし、Projectには専用の長文フィールドを作りません。
+スプリントはGitHub Milestoneで管理します。PBIやデモゴールの本文はIssue本文を正とし、Projectには専用の長文フィールドを作りません。
 
-Projectで手動設定する独自フィールドは、ボードの列を決める`Board Column`だけにします。
+Projectのボード列は`Status`で管理します。`PBI`と`Demo Goal`も`Status`の選択肢として扱い、スプリントタスクとバグは`Todo`、`Doing`、`Done`を移動します。
 
 ## ホワイトボードの列
 
@@ -35,13 +35,12 @@ Projectで手動設定する独自フィールドは、ボードの列を決め�
 | 列         | 意味                                     |
 | ---------- | ---------------------------------------- |
 | PBI        | スプリントで扱うプロダクトバックログ項目 |
-| ToDo       | まだ着手していないスプリントタスクIssue  |
+| Todo       | まだ着手していないスプリントタスクIssue  |
 | Doing      | 現在作業中のスプリントタスクIssue        |
-| Wait       | レビュー待ち、質問待ち、外部要因待ち     |
 | Done       | 完了してレビューで説明できるIssue        |
 | デモゴール | レビューで見せたい成果やシナリオ         |
 
-ToDo / Doing / Wait / Doneが、スプリントタスクの付箋を動かす場所です。必要に応じて列を増やしてもよいですが、GitHub Projectで管理できる範囲に留めます。
+Todo / Doing / Doneが、スプリントタスクとバグの付箋を動かす場所です。PBIとデモゴールは、それぞれ`Status=PBI`、`Status=Demo Goal`の列に置きます。
 
 ## 付箋とGitHub Issueの対応ルール
 
@@ -56,18 +55,17 @@ PBI-13 開発テーマ比較
 PBI-08 ログイン体験
 ```
 
-ユーザー価値、受け入れ条件、関連デモゴールはPBI Issue本文に書きます。
+ユーザー価値と受け入れ条件はPBI Issue本文に書きます。
 
 ### デモゴール付箋
 
 デモゴール付箋には、デモゴールIDと短いタイトルだけを書きます。
 
 ```text
-DE-08-01 Googleログインボタン表示
-DE-08-02 Google認証後トップ画面へ遷移
+DEMO-08 ログイン体験
 ```
 
-`DE-08-01`は、`PBI-08`に紐づく1つ目のデモゴールという意味です。デモ手順、完了条件、リスクはデモゴールIssue本文に書きます。
+`DEMO-08`は、`PBI-08`に紐づく統合デモゴールという意味です。複数の確認したい状態、デモ手順、完了条件、リスクは1つのデモゴールIssue本文にまとめて書きます。
 
 ### スプリントタスク付箋
 
