@@ -1,10 +1,12 @@
-#デザインスプリント画面フロー
+# デザインスプリント画面フロー
 
 ```mermaid
 flowchart TD
 
+A[① ルーム作成・参加]
 B[② 自己紹介]
 
+A --> B
 B --> C
 
 subgraph C["③ 課題整理（Map）"]
@@ -56,15 +58,14 @@ F --> G
 subgraph G["⑦ ペルソナ作成"]
 direction TB
 G1[ステップ1<br>ペルソナを作成する]
-
 end
 
 G --> H
 
 subgraph H["⑧ 成果物の出力"]
 direction TB
-H1[ステップ1<br>成果物一覧表示]
-H2[ステップ2<br>Markdown・PDF・PNG出力](発展予定)
+H1[ステップ1<br>成果物一覧表示"]
+H2[ステップ2<br>Markdown・PDF・PNG出力]
 
 H1 --> H2
 end
