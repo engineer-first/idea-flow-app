@@ -33,11 +33,39 @@ npm run dev
 
 ブラウザで [http://localhost:3000](http://localhost:3000) を開いて動作を確認できます。
 
+### 認証のローカル開発
+
+MVP本番のログインはGoogle認証のみを想定しています。ローカル開発では、Google認証に加えて固定のメール/パスワードユーザーでログインできます。
+
+```bash
+cp .env.example .env.local
+npm run supabase:start
+npx supabase status -o env
+
+# 表示されたローカルのpublishable key / service_role keyを.env.localに反映してから実行
+npm run seed:dev-users
+npm run dev
+```
+
+開発用ログインは`NEXT_PUBLIC_ENABLE_DEV_AUTH=true`かつproduction以外の環境でだけ表示されます。
+
+固定ユーザー:
+
+| メール | パスワード |
+| --- | --- |
+| `owner@example.test` | `password` |
+| `member@example.test` | `password` |
+| `viewer@example.test` | `password` |
+
+ローカルSupabaseでGoogle認証も確認する場合は、Google Cloud側に`http://127.0.0.1:54321/auth/v1/callback`をAuthorized redirect URIとして登録し、`supabase/config.toml`の`[auth.external.google]`を`enabled = true`に変更してから、Google client id / secretを環境変数に設定してSupabaseを再起動します。
+
 ### よく使うコマンド
 
 | コマンド | 説明 |
 | --- | --- |
 | `npm run dev` | 開発サーバーを起動 |
+| `npm run supabase:start` | ローカルSupabaseを起動 |
+| `npm run seed:dev-users` | 開発用固定ユーザーを作成・更新 |
 | `npm run build` | 本番ビルド |
 | `npm run lint` | Biome による静的解析 (lint + format チェック) |
 | `npm run fix` | Biome の自動修正 (lint + format) |
@@ -64,4 +92,3 @@ Markdown の整形には VS Code 拡張 [Markdown All in One](https://marketplac
 | ファイル名 | `kebab-case` | `idea-card.tsx`, `use-idea-list.ts`, `format-date.ts` |
 | 関数名 | `camelCase` | `getUserName` |
 | スキーマ名 (型・zod) | `PascalCase` | `User`, `Idea`, `IdeaStatus` |
-
