@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import { signOut } from "@/app/auth/actions";
+import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
 
