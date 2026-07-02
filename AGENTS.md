@@ -1,9 +1,7 @@
 # エージェント指示
 
 - このファイルをリポジトリ全体の真実として扱う。
-- `CLAUDE.md` は `AGENTS.md` への symlink として維持する。
 - 指示は短く、最新に保ち、重複させない。
-- すべてのアプリケーションコードで TypeScript strict mode を使う。
 - 公開境界では明示的な型を優先する。
 - コンパイラ、lint、テスト設定を緩めて通そうとしない。
 - コードレビューのコメント、説明、提案、要約は日本語で書く。
@@ -55,14 +53,12 @@
 - fixture、handler、builder はコンポーネントファイルの外に置く。
 - UI がデータに依存する場合は loading、empty、success、error 状態をテストする。
 
-## API とサーバー処理（Route Handler / Server Action + Supabase）
+## API とサーバー処理（Route Handler / Server Action）
 
 - API 境界には Route Handler または Server Action を使う。
 - API 境界で入力を検証する。
 - API 境界で認可を強制する。
-- Supabase service role key をブラウザコードに公開しない。
 - API レスポンスは型付けし、最小限に保つ。
-- データベースエラーを漏らさず、明示的なエラー状態を優先する。
 
 ## データベースとセキュリティ（Supabase）
 
@@ -76,8 +72,6 @@
 ## 境界ルール
 
 - UI、Server Actions、Route Handlers、Supabase 呼び出しの境界を常に意識する。
-- データベースセキュリティルールを UI コンポーネントに入れない。
 - ブラウザコードに service role secret や特権的なデータベースアクセスを含めない。
 - 外部データアクセスは型付き API 境界、または MSW handler のモックを経由させる。
 - API とサーバーサイド TypeScript のテストには Vitest を使う。
-- unauthorized、forbidden、invalid input、success、database error の各経路をテストする。
