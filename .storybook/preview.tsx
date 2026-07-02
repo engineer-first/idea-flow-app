@@ -1,3 +1,4 @@
+import { withThemeByClassName } from "@storybook/addon-themes";
 import type { Preview } from "@storybook/nextjs-vite";
 import "../app/globals.css";
 
@@ -9,21 +10,13 @@ const preview: Preview = {
     theme: {
       name: "Theme",
       defaultValue: "light",
-      toolbar: {
-        icon: "paintbrush",
-        items: [
-          { value: "light", title: "Light" },
-          { value: "dark", title: "Dark" },
-        ],
-      },
     },
   },
   decorators: [
-    (Story, context) => {
-      const theme = context.globals.theme;
-      document.documentElement.classList.toggle("dark", theme === "dark");
-      return <Story />;
-    },
+    withThemeByClassName({
+      themes: { light: "", dark: "dark" },
+      defaultTheme: "light",
+    }),
   ],
   async beforeAll() {
     if (typeof window === "undefined") return;

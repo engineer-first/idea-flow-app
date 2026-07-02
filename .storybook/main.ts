@@ -5,6 +5,10 @@ const config: StorybookConfig = {
   stories: ["../app/**/*.stories.@(ts|tsx)"],
   addons: ["@storybook/addon-themes", "@storybook/addon-docs"],
   staticDirs: ["../public"],
+  viteFinal: (config) => ({
+    ...config,
+    envPrefix: ["VITE_", "STORYBOOK_", "NEXT_PUBLIC_"],
+  }),
 };
 
 export default config;
