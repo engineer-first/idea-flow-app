@@ -14,6 +14,9 @@
 
 - [mise](https://mise.jdx.dev/)（Node.js のバージョン管理に使用）
 - Git
+- [Docker](https://www.docker.com/)（ローカルSupabaseの起動に使用。認証のローカル開発を行う場合のみ必要）
+
+Supabase CLI自体は `devDependencies` にnpmパッケージとして含まれているため、別途インストールは不要です（`npm run supabase:start` 等で自動的にローカルのCLIが使われます）。
 
 ### 手順
 
