@@ -1,7 +1,7 @@
 # エージェント指示
 
 - このファイルをリポジトリ全体の真実として扱う。
-- `CLAUDE.md` と `.github/copilot-instructions.md` は `AGENTS.md` への symlink として維持する。
+- `CLAUDE.md` は `AGENTS.md` への symlink として維持する。
 - 指示は短く、最新に保ち、重複させない。
 - すべてのアプリケーションコードで TypeScript strict mode を使う。
 - 公開境界では明示的な型を優先する。
