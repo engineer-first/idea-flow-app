@@ -50,21 +50,4 @@ F4[ステップ4<br>アイデアを決定]
 
 F1 --> F2 --> F3 --> F4
 end
-
-F --> G
-
-subgraph G["⑥ ペルソナ作成"]
-direction TB
-G1[ステップ1<br>ペルソナを作成する]
-end
-
-G --> H
-
-subgraph H["⑦ 成果物の出力"]
-direction TB
-H1[ステップ1<br>成果物一覧表示]
-H2[ステップ2<br>Markdown・PDF・PNG出力]
-
-H1 --> H2
-end
 ```
