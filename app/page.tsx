@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { signOut } from "@/app/auth/actions";
+import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
@@ -30,7 +31,9 @@ export default async function Home() {
       <p>ログイン済みです。</p>
       <p>{user.email}</p>
       <form action={signOut}>
-        <button type="submit">ログアウト</button>
+        <Button type="submit" variant="destructive">
+          ログアウト
+        </Button>
       </form>
     </main>
   );
