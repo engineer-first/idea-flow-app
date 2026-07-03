@@ -14,6 +14,9 @@
 
 - [mise](https://mise.jdx.dev/)（Node.js のバージョン管理に使用）
 - Git
+- [Docker](https://www.docker.com/)（ローカルSupabaseの起動に使用。認証のローカル開発を行う場合のみ必要）
+
+Supabase CLI自体は `devDependencies` にnpmパッケージとして含まれているため、別途インストールは不要です（`npm run supabase:start` 等で自動的にローカルのCLIが使われます）。
 
 ### 手順
 
@@ -27,23 +30,62 @@ mise install
 # 依存関係のインストール
 npm ci
 
+# 環境設定ファイルをコピー (MSW などを切り替える)
+cp .env.example .env.local
+
 # 開発サーバーの起動
 npm run dev
 ```
 
 ブラウザで [http://localhost:3000](http://localhost:3000) を開いて動作を確認できます。
 
+### 認証のローカル開発
+
+MVP本番のログインはGoogle認証のみを想定しています。ローカル開発では、Google認証に加えて固定のメール/パスワードユーザーでログインできます。
+
+```bash
+cp .env.example .env.local
+npm run supabase:start
+npx supabase status -o env
+
+# 表示されたローカルのpublishable key / service_role keyを.env.localに反映してから実行
+npm run seed:dev-users
+npm run dev
+```
+
+開発用ログインは`NEXT_PUBLIC_ENABLE_DEV_AUTH=true`かつproduction以外の環境でだけ表示されます。
+
+固定ユーザー:
+
+| メール                | パスワード |
+| --------------------- | ---------- |
+| `owner@example.test`  | `password` |
+| `member@example.test` | `password` |
+| `viewer@example.test` | `password` |
+
+ローカルSupabaseでGoogle認証を確認する場合は、[ローカルSupabaseでのGoogle認証設定手順](docs/local-supabase-google-auth.md)を参照してください。
+
 ### よく使うコマンド
 
-| コマンド | 説明 |
-| --- | --- |
-| `npm run dev` | 開発サーバーを起動 |
-| `npm run build` | 本番ビルド |
-| `npm run lint` | Biome による静的解析 (lint + format チェック) |
-| `npm run fix` | Biome の自動修正 (lint + format) |
-| `npm run format` | Biome でファイルを一括フォーマット |
-| `npm run test` | ユニットテストを実行 (CI でも実行) |
-| `npm run test:coverage` | ユニットテストを実行しカバレッジを表示 |
+| コマンド                            | 説明                                                     |
+| ----------------------------------- | -------------------------------------------------------- |
+| `npm run dev`                       | 開発サーバーを起動                                       |
+| `npm run supabase:start`            | ローカルSupabaseを起動                                   |
+| `npm run supabase:stop`             | ローカルSupabaseを停止                                   |
+| `npm run supabase:stop --no-backup` | ローカルSupabaseの完全停止(データをすべて削除して初期化) |
+| `npm run seed:dev-users`            | 開発用固定ユーザーを作成・更新                           |
+| `npm run build`                     | 本番ビルド                                               |
+| `npm run lint`                      | Biome による静的解析 (lint + format チェック)            |
+| `npm run fix`                       | Biome の自動修正 (lint + format)                         |
+| `npm run format`                    | Biome でファイルを一括フォーマット                       |
+| `npm run test`                      | ユニットテストを実行 (CI でも実行)                       |
+| `npm run test:coverage`             | ユニットテストを実行しカバレッジを表示                   |
+
+### MSW (Mock Service Worker)
+
+- **ブラウザ (dev)** は `.env.local` の `NEXT_PUBLIC_USE_MSW` で制御します
+  - 有効化: `NEXT_PUBLIC_USE_MSW=true` をセット
+  - 無効化: `false` にする (または行ごと削除)
 
 Node.js のバージョンは `mise.toml` で LTS に固定しています。CI でも同じ mise 設定を使用しています。
 
@@ -59,9 +101,8 @@ Markdown の整形には VS Code 拡張 [Markdown All in One](https://marketplac
 
 ## 命名規則
 
-| 対象 | 規則 | 例 |
-| --- | --- | --- |
-| ファイル名 | `kebab-case` | `idea-card.tsx`, `use-idea-list.ts`, `format-date.ts` |
-| 関数名 | `camelCase` | `getUserName` |
-| スキーマ名 (型・zod) | `PascalCase` | `User`, `Idea`, `IdeaStatus` |
-
+| 対象                 | 規則         | 例                                                    |
+| -------------------- | ------------ | ----------------------------------------------------- |
+| ファイル名           | `kebab-case` | `idea-card.tsx`, `use-idea-list.ts`, `format-date.ts` |
+| 関数名               | `camelCase`  | `getUserName`                                         |
+| スキーマ名 (型・zod) | `PascalCase` | `User`, `Idea`, `IdeaStatus`                          |

@@ -8,7 +8,8 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
-    include: ["app/**/*.{test,spec}.{ts,tsx}", ".claude/hooks/**/*.spec.ts"],
+    setupFiles: ["./vitest.setup.ts"],
+    include: ["app/**/*.{test,spec}.{ts,tsx}"],".claude/hooks/**/*.spec.ts"],
     coverage: {
       provider: "v8",
       reporter: ["text"],

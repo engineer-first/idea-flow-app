@@ -1,0 +1,2 @@
+-- Application data seeds will be added with the first app tables.
+-- Auth users are created by `npm run seed:dev-users`.
