@@ -57,6 +57,10 @@ if [[ "$BASENAME" == "CLAUDE.md" ]]; then
   deny "Refusing to edit CLAUDE.md directly. Edit AGENTS.md and keep CLAUDE.md as a symlink to AGENTS.md."
 fi
 
+if [[ "$BASENAME" == ".env" || "$BASENAME" == .env.* ]] && [[ "$BASENAME" != ".env.example" ]]; then
+  deny "Refusing to edit ${BASENAME}. Secret files must be edited by a human. Update .env.example for template changes."
+fi
+
 if [[ "$BASENAME" == tsconfig*.json ]]; then
   if grep -Eq '"strict"[[:space:]]*:[[:space:]]*false' <<<"$NEW_TEXT"; then
     deny "Refusing to disable TypeScript strict mode."
