@@ -89,6 +89,13 @@ npm run dev
 
 Node.js のバージョンは `mise.toml` で LTS に固定しています。CI でも同じ mise 設定を使用しています。
 
+### MCP サーバー (Claude Code などのエージェント向け)
+
+`.mcp.json` でプロジェクト共通の MCP サーバーを定義しています。
+
+- **playwright** — 実ブラウザでの UI 確認・スクリーンショット取得に使用します
+- **supabase** — ローカル Supabase の MCP エンドポイント (`http://localhost:54321/mcp`) に接続します。`npm run supabase:start` で起動中のみ利用できます
+
 ## スクラム運用
 
 - [学校スクラム開発のホワイトボードと GitHub Projects 連携](docs/scrum/whiteboard-github-projects.md)
