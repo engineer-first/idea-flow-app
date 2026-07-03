@@ -1,12 +1,17 @@
 import { redirect } from "next/navigation";
 import { signOut } from "@/app/auth/actions";
+import { createRoom, joinRoom } from "@/app/rooms/actions";
 import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
 export const dynamic = "force-dynamic";
 
-export default async function Home() {
+type HomeProps = {
+  searchParams: Promise<{ error?: string }>;
+};
+
+export default async function Home({ searchParams }: HomeProps) {
   if (!isSupabaseConfigured()) {
     return (
       <main>
@@ -19,6 +24,7 @@ export default async function Home() {
     );
   }
 
+  const params = await searchParams;
   const user = await getCurrentUser();
 
   if (!user) {
@@ -35,6 +41,35 @@ export default async function Home() {
           ログアウト
         </Button>
       </form>
+
+      {params.error ? <p role="alert">{params.error}</p> : null}
+
+      <hr />
+
+      <section>
+        <h2>ルームを作成</h2>
+        <form action={createRoom}>
+          <Button type="submit">ルームを作成</Button>
+        </form>
+      </section>
+
+      <section>
+        <h2>招待コードで参加</h2>
+        <form action={joinRoom}>
+          <label htmlFor="code">
+            招待コード
+            <input
+              id="code"
+              name="code"
+              type="text"
+              maxLength={6}
+              placeholder="AB12CD"
+              required
+            />
+          </label>
+          <Button type="submit">参加する</Button>
+        </form>
+      </section>
     </main>
   );
 }
