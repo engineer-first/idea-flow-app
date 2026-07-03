@@ -13,7 +13,7 @@ case "$FILE" in
 esac
 
 case "$FILE" in
-  */node_modules/*|*/.next/*|*/coverage/*|*/public/*|*/package-lock.json)
+  */node_modules/*|*/.next/*|*/coverage/*|*/public/*|*/package-lock.json|*/AGENTS.md)
     exit 0
     ;;
 esac
