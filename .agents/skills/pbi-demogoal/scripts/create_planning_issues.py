@@ -81,14 +81,16 @@ def pbi_body(pbi):
 
 
 def demo_section(index, demo):
-    return "\n\n".join(
-        [
-            f"### {index}. {demo['title']}",
-            demo["goal"],
-            "確認観点:",
-            bullet_list(demo.get("checks")),
-        ]
-    )
+    parts = [
+        f"### {index}. {demo['title']}",
+        demo["goal"],
+        "確認観点:",
+        bullet_list(demo.get("checks")),
+    ]
+    risks = demo.get("risks")
+    if risks:
+        parts.extend(["リスク:", bullet_list(risks)])
+    return "\n\n".join(parts)
 
 
 def demo_body(spec, pbi_number, pbi_title):
@@ -97,6 +99,9 @@ def demo_body(spec, pbi_number, pbi_title):
     parts = ["## デモゴール", overview]
     for index, demo in enumerate(spec["demo_goals"], start=1):
         parts.append(demo_section(index, demo))
+    not_doing = spec.get("not_doing")
+    if not_doing:
+        parts.extend(["## やらないこと", bullet_list(not_doing)])
     parts.extend(["## 関連PBI", f"- #{pbi_number} {pbi_title}"])
     return "\n\n".join(parts)
 
@@ -119,6 +124,8 @@ def validate_spec(spec):
     require_list(pbi.get("acceptance"), "pbi.acceptance")
     require_list(pbi.get("memo"), "pbi.memo")
 
+    require_list(spec.get("not_doing"), "not_doing")
+
     if not isinstance(spec["demo_goals"], list) or not spec["demo_goals"]:
         raise ValueError("demo_goals must be a non-empty list")
     for index, demo in enumerate(spec["demo_goals"]):
@@ -128,6 +135,7 @@ def validate_spec(spec):
                 raise ValueError(f"demo_goals[{index}].{key} is required")
             require_string(demo[key], f"demo_goals[{index}].{key}")
         require_list(demo.get("checks"), f"demo_goals[{index}].checks")
+        require_list(demo.get("risks"), f"demo_goals[{index}].risks")
 
 
 def create_issue(repo, title, body, issue_type, milestone=None):

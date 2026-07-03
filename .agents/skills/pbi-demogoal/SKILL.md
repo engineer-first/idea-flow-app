@@ -1,6 +1,6 @@
 ---
 name: pbi-demogoal
-description: Create idea-flow-app PBI and consolidated DemoGoal GitHub Issues only. Use when Codex needs to add one product backlog item and one PBI-linked demo goal issue to engineer-first/idea-flow-app and place them in the GitHub Project with the correct Issue Type, milestone, and Status board column. Do not use for sprint task or bug issue creation.
+description: Create idea-flow-app PBI and consolidated DemoGoal GitHub Issues only. Use when adding one product backlog item and one PBI-linked demo goal issue to engineer-first/idea-flow-app, placing them in the GitHub Project with the correct Issue Type, milestone, and Status board column. Do not use for sprint task or bug issue creation.
 ---
 
 # PBI DemoGoal
@@ -69,7 +69,7 @@ Notes:
 
 ## Script
 
-The script lives outside this skill folder because the Claude Code equivalent (`.claude/skills/pbi-demogoal/`) shares the same implementation. Run from the repository root:
+This skill and the Codex skill (`.codex/skills/pbi-demogoal/`) share the same script so a fix only needs to happen once. Run from the repository root:
 
 ```bash
 python3 .agents/skills/pbi-demogoal/scripts/create_planning_issues.py --dry-run /tmp/idea-flow-spec.json
