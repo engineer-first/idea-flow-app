@@ -21,6 +21,17 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/verify-on-stop.sh",
+            "timeout": 300
+          }
+        ]
+      }
     ]
   }
 }

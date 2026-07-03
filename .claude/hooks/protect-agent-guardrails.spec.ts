@@ -40,6 +40,46 @@ describe("protect-agent-guardrails hook", () => {
     expect(result.stderr).toContain("Refusing to edit CLAUDE.md directly");
   });
 
+  it("denies edits to .env", () => {
+    const result = runHook({
+      file_path: "/repo/.env",
+      content: "SUPABASE_SECRET_KEY=secret",
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("Refusing to edit .env");
+  });
+
+  it("denies edits to .env.local", () => {
+    const result = runHook({
+      file_path: "/repo/.env.local",
+      new_string: "SUPABASE_SECRET_KEY=changed",
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("Refusing to edit .env.local");
+  });
+
+  it("denies writes to other .env variants", () => {
+    const result = runHook({
+      file_path: "/repo/.env.production",
+      content: "SECRET=value",
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("Refusing to edit .env.production");
+  });
+
+  it("allows edits to .env.example", () => {
+    const result = runHook({
+      file_path: "/repo/.env.example",
+      content: "NEXT_PUBLIC_SUPABASE_URL=",
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe("");
+  });
+
   it("denies disabling TypeScript strict mode", () => {
     const result = runHook({
       file_path: "/repo/tsconfig.json",
