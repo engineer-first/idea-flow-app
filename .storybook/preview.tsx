@@ -14,7 +14,7 @@ const preview: Preview = {
   ],
   async beforeAll() {
     if (typeof window === "undefined") return;
-    if (process.env.NEXT_PUBLIC_USE_MSW !== "true") return;
+    if (import.meta.env.NEXT_PUBLIC_USE_MSW !== "true") return;
     try {
       const { worker } = await import("../app/mocks/browser");
       await worker.start({
