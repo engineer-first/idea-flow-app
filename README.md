@@ -30,6 +30,9 @@ mise install
 # 依存関係のインストール
 npm ci
 
+# 環境設定ファイルをコピー (MSW などを切り替える)
+cp .env.example .env.local
+
 # 開発サーバーの起動
 npm run dev
 ```
@@ -77,6 +80,12 @@ npm run dev
 | `npm run format`                    | Biome でファイルを一括フォーマット                       |
 | `npm run test`                      | ユニットテストを実行 (CI でも実行)                       |
 | `npm run test:coverage`             | ユニットテストを実行しカバレッジを表示                   |
+
+### MSW (Mock Service Worker)
+
+- **ブラウザ (dev)** は `.env.local` の `NEXT_PUBLIC_USE_MSW` で制御します
+  - 有効化: `NEXT_PUBLIC_USE_MSW=true` をセット
+  - 無効化: `false` にする (または行ごと削除)
 
 Node.js のバージョンは `mise.toml` で LTS に固定しています。CI でも同じ mise 設定を使用しています。
 
