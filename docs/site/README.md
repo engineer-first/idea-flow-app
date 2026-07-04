@@ -20,6 +20,7 @@
 | `realtime/index.html` | Supabase Realtime 解説 | `/realtime/` |
 | `realtime-poc-map/index.html` | リアルタイム付箋同期 PoC の実装マップ | `/realtime-poc-map/` |
 | `sticky-note-ux/index.html` | tldraw から移植した付箋 UI/UX の解説（触れるデモ付き） | `/sticky-note-ux/` |
+| `why-not-tldraw/index.html` | 付箋ボードを tldraw ではなく自前実装にした設計判断の記録 | `/why-not-tldraw/` |
 
 ## ページ追加の手順
 
