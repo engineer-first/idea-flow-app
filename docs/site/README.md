@@ -1,0 +1,50 @@
+# docs/site — GitHub Pages 公開ディレクトリ
+
+このディレクトリ配下がそのまま <https://engineer-first.github.io/idea-flow-app/> として公開される。
+主な読者・書き手は AI エージェント。ここへページを追加・変更する前にこのファイルを読むこと。
+
+## デプロイの仕組み
+
+- `.github/workflows/deploy-pages.yml` が `develop` への push で発火する（`docs/site/**` に変更があったときだけ）。
+- ビルド工程はない。このディレクトリがそのまま Pages artifact としてアップロードされる。
+- feature ブランチ上では公開されない。プレビューはローカルで HTML ファイルを直接ブラウザで開く。
+- デプロイ状況の確認: `gh run list --workflow=deploy-pages.yml`
+- この README.md も公開対象に含まれるが、サイト内に導線がないので実害はない。
+
+## 現在の構成
+
+| パス | 内容 | URL |
+| --- | --- | --- |
+| `index.html` | Supabase Realtime 解説（暫定でルート直下に置いている） | `/` |
+
+## ページ追加の手順
+
+1. slug を kebab-case で決める（例: `realtime-explainer`）。
+2. `docs/site/<slug>/index.html` として作成する。1 ページ = 1 ディレクトリ。
+   - 理由: URL が `/<slug>/` と綺麗になり、画像などの付属アセットを同じディレクトリに同居させられる。ページが育って分割しても URL が壊れない。
+3. ルートの `index.html`（目次）に新ページへのリンクを追加する。
+4. この README の「現在の構成」表を更新する。
+
+### 2 ページ目を追加するときの一回限りの移行
+
+現在ルートの `index.html` は Realtime 解説そのもの。2 ページ目を追加するエージェントは、
+あわせて次の移行を行うこと:
+
+1. `index.html` を `realtime/index.html` に移動する。
+2. ルートに新しい `index.html` を作り、全ページへのリンクを載せた目次ページにする。
+   - ルート URL は共有済みのため、旧コンテンツへ目次からワンクリックで辿れるようにする。
+
+## ページの品質要件
+
+- **完全に自己完結させる**: CSS/JS はすべてインライン。CDN・外部フォント・外部画像・fetch/XHR を使わない。
+  - 理由: 外部依存が腐らない、オフラインでも開ける、Claude の Artifact（外部リクエスト禁止の CSP 下で動く）とソースを相互に流用できる。
+- 画像が必要な場合はページと同じディレクトリに置き、相対パスで参照する。可能なら SVG インラインを優先する。
+- 必須の head 要素: `<html lang="ja">`・`<meta charset="utf-8">`・viewport・`<meta name="color-scheme">`・`<title>`・`<meta name="description">`。
+- ライト/ダーク両テーマに対応する: `@media (prefers-color-scheme: dark)` を基本にし、`:root[data-theme="light"]` / `:root[data-theme="dark"]` で上書きできるようにする。実装例は既存ページを参照。
+- ページ全体に横スクロールを発生させない。幅の広い表・図・コードブロックは `overflow-x: auto` のコンテナ内でスクロールさせる。
+
+## 変更・削除のルール
+
+- 公開済みページの URL（= ディレクトリ名）は変えない。外部にリンクが共有されている前提で扱う。
+- ページの削除・改名は URL を壊す操作なので、ユーザーの明示的な指示があるときだけ行う。
+- 既存ページの内容更新は自由。ただし slug と `<title>` の同一性は保つ（別テーマになるなら新ページとして追加する）。
