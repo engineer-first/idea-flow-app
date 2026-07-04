@@ -5,11 +5,11 @@
 
 ## デプロイの仕組み
 
-- `.github/workflows/deploy-pages.yml` が `develop` への push で発火する（`docs/site/**` に変更があったときだけ）。
+- `.github/workflows/deploy-pages.yml` が `develop` への push で発火する（`docs/site/**` またはワークフローファイル自身に変更があったとき）。
 - ビルド工程はない。このディレクトリがそのまま Pages artifact としてアップロードされる。
 - feature ブランチ上では公開されない。プレビューはローカルで HTML ファイルを直接ブラウザで開く。
 - デプロイ状況の確認: `gh run list --workflow=deploy-pages.yml`
-- この README.md も公開対象に含まれるが、サイト内に導線がないので実害はない。
+- この README.md も公開対象に含まれ、URL 直打ちで取得できる。公開されて問題ない内容だけを書く（サイト内に導線は置かない）。
 
 ## 現在の構成
 
