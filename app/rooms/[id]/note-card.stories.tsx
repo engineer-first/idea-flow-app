@@ -12,6 +12,8 @@ const meta = {
   args: {
     note: buildNote(),
     isOwnDrag: false,
+    isSelected: false,
+    onSelect: fn(),
     onDragStart: fn(),
     onDragMove: fn(),
     onDragEnd: fn(),
@@ -47,8 +49,17 @@ export const LongContent: Story = {
   },
 };
 
+// 選択状態: 青い枠が付き、Backspace/Deleteで削除・もう一度クリックで編集に入れる。
+export const Selected: Story = {
+  args: {
+    isSelected: true,
+  },
+};
+
+// 自分がドラッグ中: 「持ち上げた」表現として影が深くなる。
 export const Dragging: Story = {
   args: {
+    isSelected: true,
     isOwnDrag: true,
   },
 };

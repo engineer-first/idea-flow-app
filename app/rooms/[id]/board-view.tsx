@@ -1,9 +1,11 @@
 "use client";
 
+import { useCallback, useState } from "react";
 import { NoteCard } from "@/app/rooms/[id]/note-card";
 // ルームボードの表示用コンポーネント。Supabase には一切依存せず、
-// 付箋の配列と各種コールバックをpropsで受け取るだけにする。
+// 付箋の配列と各種コールバックをpropsで受け取る。
 // Realtimeの購読・スロットル・Server Actionsの呼び出しはroom-board.tsx（コンテナ）の責務。
+// 「どの付箋を選択中か」は同期不要な純粋にUIの関心事なので、ここでローカルに持つ。
 import { BOARD_HEIGHT, BOARD_WIDTH } from "@/app/rooms/board-constants";
 import type { Note } from "@/app/rooms/notes-reducer";
 import { Button } from "@/components/ui/button";
@@ -31,6 +33,24 @@ export function BoardView({
   onNoteContentChange,
   onNoteDelete,
 }: BoardViewProps) {
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+
+  function handleBoardPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    // 付箋の上のpointerdownはバブリングしてくるので、ボード背景を
+    // 直接押したときだけ選択を解除する。
+    if (event.target === event.currentTarget) {
+      setSelectedNoteId(null);
+    }
+  }
+
+  const handleNoteDelete = useCallback(
+    (noteId: string) => {
+      setSelectedNoteId((current) => (current === noteId ? null : current));
+      onNoteDelete(noteId);
+    },
+    [onNoteDelete],
+  );
+
   return (
     <div className="flex h-full flex-col gap-3">
       <div className="flex items-center justify-between gap-4 border-b border-border pb-3">
@@ -47,11 +67,13 @@ export function BoardView({
 
       <div className="relative overflow-auto rounded-md border border-border bg-muted/30">
         <div
+          data-testid="board-canvas"
           className="relative"
           style={{ width: BOARD_WIDTH, height: BOARD_HEIGHT }}
+          onPointerDown={handleBoardPointerDown}
         >
           {notes.length === 0 ? (
-            <p className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
+            <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
               付箋がまだありません
             </p>
           ) : null}
@@ -61,11 +83,13 @@ export function BoardView({
               key={note.id}
               note={note}
               isOwnDrag={draggingNoteId === note.id}
+              isSelected={selectedNoteId === note.id}
+              onSelect={setSelectedNoteId}
               onDragStart={onNoteDragStart}
               onDragMove={onNoteDragMove}
               onDragEnd={onNoteDragEnd}
               onContentChange={onNoteContentChange}
-              onDelete={onNoteDelete}
+              onDelete={handleNoteDelete}
             />
           ))}
         </div>

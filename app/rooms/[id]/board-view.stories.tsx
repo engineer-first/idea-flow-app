@@ -42,7 +42,7 @@ export const Empty: Story = {
   },
 };
 
-// 自分がドラッグ中の付箋がある状態（ハンドルの色が変わる）。
+// 自分がドラッグ中の付箋がある状態（影が深くなり「持ち上げた」見た目になる）。
 export const Dragging: Story = {
   args: {
     draggingNoteId: "note-1",

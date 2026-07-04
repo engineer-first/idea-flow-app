@@ -10,3 +10,8 @@ export const NOTE_HEIGHT = 150;
 
 // ドラッグ中のnote-drag broadcastを間引く間隔（ミリ秒）。
 export const DRAG_BROADCAST_THROTTLE_MS = 80;
+
+// pointerdownからこの距離(px)を超えて動いたらドラッグとみなす閾値。
+// クリック（選択・編集開始）とドラッグ（移動）を同じポインター操作から
+// 区別するために必要。tldrawのドラッグ判定距離に合わせて4pxにしている。
+export const DRAG_THRESHOLD_PX = 4;
