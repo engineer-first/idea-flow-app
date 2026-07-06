@@ -1,0 +1,40 @@
+name: Chromatic
+
+# pull_request イベントでは GitHub が一時的なマージコミットを作るため、
+# Chromatic のベースライン特定がずれることがある。公式推奨に従い push で実行する。
+# https://www.chromatic.com/docs/github-actions
+on: push
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chromatic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chromatic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Chromatic はベースライン特定に git 履歴全体を使う
+          fetch-depth: 0
+
+      - uses: jdx/mise-action@v3
+        with:
+          install: true
+          cache: true
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Chromatic
+        uses: chromaui/action@latest
+        with:
+          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          # 差分の合否は Chromatic 側の UI Tests / UI Review ステータスチェックで
+          # 管理するため、差分検出だけでこの workflow 自体は失敗させない
+          exitZeroOnChanges: true
+          # develop へのマージ後は差分を自動承認し、新しいベースラインにする
+          autoAcceptChanges: develop
