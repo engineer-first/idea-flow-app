@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { Plus } from "lucide-react";
 
 import { Button } from "./button";
 
@@ -29,7 +30,9 @@ const variants = [
   "link",
 ] as const;
 
-const sizes = ["xs", "sm", "default", "lg"] as const;
+const textSizes = ["xs", "sm", "default", "lg"] as const;
+
+const iconSizes = ["icon-xs", "icon-sm", "icon", "icon-lg"] as const;
 
 // VRT（Chromatic）ではストーリー数がスナップショット数になるため、
 // 全 variant × size を 1 枚のグリッドにまとめて差分検出の対象にする
@@ -41,9 +44,14 @@ export const AllVariants: Story = {
           <span className="w-24 font-mono text-muted-foreground text-xs">
             {variant}
           </span>
-          {sizes.map((size) => (
+          {textSizes.map((size) => (
             <Button key={size} variant={variant} size={size}>
               ボタン
+            </Button>
+          ))}
+          {iconSizes.map((size) => (
+            <Button key={size} variant={variant} size={size} aria-label="追加">
+              <Plus />
             </Button>
           ))}
           <Button variant={variant} disabled>
