@@ -2,73 +2,87 @@ import { redirect } from "next/navigation";
 import { signInWithGoogle, signInWithPassword } from "@/app/auth/actions";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { isDevAuthEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
+import { ShieldAlert, KeyRound } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-type LoginPageProps = {
-  searchParams: Promise<{
-    error?: string;
-  }>;
-};
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
+  if (await getCurrentUser()) redirect("/");
 
-export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const params = await searchParams;
-
-  const user = await getCurrentUser();
-
-  if (user) {
-    redirect("/");
-  }
-
-  const showDevAuth = isDevAuthEnabled();
+  const isConfigured = isSupabaseConfigured();
 
   return (
-    <main>
-      <h1>IdeaFlow</h1>
-      <p>ログインしてください。</p>
+    <main className="flex min-h-screen items-center justify-center bg-slate-50 p-4 text-slate-900">
+      <div className="w-full max-w-md space-y-6 bg-white p-8 shadow-sm rounded-2xl border border-slate-200">
+        <div className="text-center space-y-2">
+          <h1 className="text-3xl font-black text-indigo-600">IdeaFlow</h1>
+          <p className="text-sm text-slate-500">アイデア出しをスマートに、スムーズに。</p>
+        </div>
 
-      {params.error ? <p>{params.error}</p> : null}
+        {error && (
+          <div className="p-3 text-xs bg-red-50 text-red-600 rounded-xl border border-red-100">
+            <span className="font-bold">エラー: </span>{error}
+          </div>
+        )}
 
-      {!isSupabaseConfigured() ? (
-        <p>
-          Supabaseの環境変数が未設定です。<code>.env.example</code>
-          を参考に<code>.env.local</code>を作成してください。
-        </p>
-      ) : null}
+        {!isConfigured && (
+          <div className="p-3 text-xs bg-amber-50 text-amber-800 rounded-xl border border-amber-100 flex gap-2">
+            <ShieldAlert className="h-4 w-4 shrink-0" />
+            <span>Supabaseの環境設定が必要です。.env.local を確認してください。</span>
+          </div>
+        )}
 
-      <form action={signInWithGoogle}>
-        <button type="submit">Googleでログイン</button>
-      </form>
+        <form action={signInWithGoogle}>
+          <button
+            type="submit"
+            disabled={!isConfigured}
+            className="w-full flex items-center justify-center gap-2 py-3 border border-slate-200 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            <svg className="h-5 w-5 text-indigo-600" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114-3.535 0-6.4-2.865-6.4-6.4s2.865-6.4 6.4-6.4c1.554 0 2.973.55 4.077 1.458L20.89 4.09C18.57 1.92 15.43 1 12 1 5.925 1 1 5.925 1 12s4.925 11 11 11c6.28 0 11-4.42 11-11 0-.74-.08-1.285-.2-1.715H12.24z" />
+            </svg>
+            Googleでログイン
+          </button>
+        </form>
 
-      {showDevAuth ? (
-        <>
-          <hr />
-          <h2>開発用ログイン</h2>
-          <form action={signInWithPassword}>
-            <label htmlFor="email">
-              メール
+        {isDevAuthEnabled() && (
+          <div className="space-y-4 pt-4 border-t border-slate-100">
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 justify-center">
+              <KeyRound className="h-4 w-4" />
+              <span>開発用ログイン</span>
+            </div>
+            <form action={signInWithPassword} className="space-y-3">
               <input
-                id="email"
                 name="email"
                 type="email"
+                placeholder="メールアドレス"
                 defaultValue="owner@example.test"
                 required
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-indigo-500 bg-slate-50/50"
               />
-            </label>
-            <label htmlFor="password">
-              パスワード
               <input
-                id="password"
                 name="password"
                 type="password"
+                placeholder="パスワード"
                 defaultValue="password"
                 required
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-indigo-500 bg-slate-50/50"
               />
-            </label>
-            <button type="submit">開発用ユーザーでログイン</button>
-          </form>
-        </>
-      ) : null}
+              <button
+                type="submit"
+                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors cursor-pointer"
+              >
+                開発用ユーザーでログイン
+              </button>
+            </form>
+          </div>
+        )}
+      </div>
     </main>
   );
 }
