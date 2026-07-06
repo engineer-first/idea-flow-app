@@ -59,5 +59,5 @@ export async function GET(request: NextRequest, context: InviteRouteContext) {
     throw new Error(error.message);
   }
 
-  return redirectTo(request, `/rooms/${inviteCode}`);
+  return redirectTo(request, `/rooms/${encodeURIComponent(inviteCode)}`);
 }
