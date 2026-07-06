@@ -55,6 +55,7 @@ export async function GET(request: NextRequest, context: InviteRouteContext) {
   }
 
   if (error) {
+    console.error("Unexpected invite join failure:", error);
     throw new Error(error.message);
   }
 
