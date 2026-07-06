@@ -2,6 +2,10 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { Button } from "./button";
 
+// shadcn/ui Button のカタログ story（恒久的に維持する。セットアップ用の仮 story ではない）。
+// Button はデザイントークン（globals.css）と CVA variant をほぼすべて通過するため、
+// トークンや Tailwind の変更による意図しない見た目の退行を VRT で検出する観測点を兼ねる。
+
 const meta = {
   title: "UI/Button",
   component: Button,
