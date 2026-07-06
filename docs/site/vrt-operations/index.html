@@ -349,7 +349,7 @@
     padding: 12px 20px;
   }
   .quickref ol { margin: 0; padding: 16px 20px 18px 40px; font-size: 14px; display: grid; gap: 6px; }
-  .quickref li::marker { color: var(--accent); font-weight: 700; }
+  .quickref ol li::marker { color: var(--accent); font-weight: 700; }
 
   .links { margin-top: 20px; display: grid; gap: 6px; font-size: 13.5px; }
   .links .lk { display: flex; gap: 10px; align-items: baseline; }
@@ -389,9 +389,9 @@
 
     <div class="demo" data-view="base" id="demo">
       <div class="demo-tabs" role="tablist" aria-label="表示切り替え">
-        <button role="tab" aria-selected="true" data-v="base">① ベースライン</button>
-        <button role="tab" aria-selected="false" data-v="pr">② PR の状態</button>
-        <button role="tab" aria-selected="false" data-v="diff">③ 差分</button>
+        <button type="button" role="tab" aria-selected="true" data-v="base">① ベースライン</button>
+        <button type="button" role="tab" aria-selected="false" data-v="pr">② PR の状態</button>
+        <button type="button" role="tab" aria-selected="false" data-v="diff">③ 差分</button>
         <span class="spacer"></span>
         <span class="demo-hint">タブを切り替えて見比べる</span>
       </div>
@@ -658,12 +658,14 @@ feature/89        <span class="ga">C───D</span>               <span class=
 <script>
   const demo = document.getElementById("demo");
   const tabs = demo.querySelectorAll("[role=tab]");
-  tabs.forEach((tab) => {
+  for (const tab of tabs) {
     tab.addEventListener("click", () => {
-      tabs.forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
+      for (const t of tabs) {
+        t.setAttribute("aria-selected", String(t === tab));
+      }
       demo.dataset.view = tab.dataset.v;
     });
-  });
+  }
 </script>
 </body>
 </html>
