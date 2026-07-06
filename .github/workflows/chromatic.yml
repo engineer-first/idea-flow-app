@@ -38,3 +38,32 @@ jobs:
           exitZeroOnChanges: true
           # develop へのマージ後は差分を自動承認し、新しいベースラインにする
           autoAcceptChanges: develop
+
+          # ==== コスト削減オプション（現在は無効。月間スナップショットが
+          # ==== 無料枠 5,000 の半分を超えたあたりで有効化を検討する）====
+          #
+          # 課金モデル: スナップショット数 = story 数 × viewport 数 × ブラウザ数。
+          # viewport / ブラウザ / accessibility テストを追加すると乗算で増えるため、
+          # 増やすときは必ず月間消費量を再試算する。
+          # https://www.chromatic.com/docs/billing
+          #
+          # TurboSnap: git 差分と Vite の依存グラフを逆引きし、影響のある story だけ
+          # 撮影する。影響のない story はベースラインのコピーとなり課金が通常の 1/5 に
+          # なる。Storybook 8+ の Vite はネイティブ対応で、この 1 行だけで有効になる。
+          # https://www.chromatic.com/docs/turbosnap
+          # onlyChanged: true
+          #
+          # TurboSnap 有効時、「全 story から依存されるが見た目に影響しない」ファイルを
+          # 依存追跡から除外し、無駄な全再撮影を減らす。ただし globals.css や
+          # preview.tsx を除外するとトークン変更の検出が漏れるので対象は慎重に選ぶ。
+          # untraced: "package-lock.json"
+          #
+          # bot が作るブランチではビルド自体をスキップする（スナップショット消費 0。
+          # skip はビルドを「スキップ済み」として記録するため、チェックが pending の
+          # まま残らない）
+          # skip: "@(renovate/**|dependabot/**)"
+          #
+          # アップロード完了時点で workflow を終了し、GitHub Actions の実行時間を
+          # 節約する（スナップショット数は減らない。結果は Chromatic が GitHub の
+          # ステータスチェックとして直接報告する）
+          # exitOnceUploaded: true
