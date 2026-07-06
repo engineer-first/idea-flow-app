@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { sanitizeNextPath } from "@/app/auth/redirects";
 import { isDevAuthEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 
@@ -22,16 +23,17 @@ function getBaseUrl() {
   return "http://localhost:3000";
 }
 
-export async function signInWithGoogle() {
+export async function signInWithGoogle(formData: FormData) {
   if (!isSupabaseConfigured()) {
     loginError("Supabaseの環境変数を設定してください。");
   }
 
+  const next = sanitizeNextPath(formData.get("next"));
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${getBaseUrl()}/auth/callback`,
+      redirectTo: `${getBaseUrl()}/auth/callback?next=${encodeURIComponent(next)}`,
     },
   });
   const url = data.url;
@@ -54,6 +56,7 @@ export async function signInWithPassword(formData: FormData) {
 
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
+  const next = sanitizeNextPath(formData.get("next"));
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -62,7 +65,7 @@ export async function signInWithPassword(formData: FormData) {
     loginError(error.message);
   }
 
-  redirect("/");
+  redirect(next);
 }
 
 export async function signOut() {

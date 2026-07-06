@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { signInWithGoogle, signInWithPassword } from "@/app/auth/actions";
+import { sanitizeNextPath } from "@/app/auth/redirects";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { isDevAuthEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
 
@@ -8,16 +9,18 @@ export const dynamic = "force-dynamic";
 type LoginPageProps = {
   searchParams: Promise<{
     error?: string;
+    next?: string;
   }>;
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
+  const next = sanitizeNextPath(params.next ?? null);
 
   const user = await getCurrentUser();
 
   if (user) {
-    redirect("/");
+    redirect(next);
   }
 
   const showDevAuth = isDevAuthEnabled();
@@ -37,6 +40,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       ) : null}
 
       <form action={signInWithGoogle}>
+        <input type="hidden" name="next" value={next} />
         <button type="submit">Googleでログイン</button>
       </form>
 
@@ -45,6 +49,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <hr />
           <h2>開発用ログイン</h2>
           <form action={signInWithPassword}>
+            <input type="hidden" name="next" value={next} />
             <label htmlFor="email">
               メール
               <input
