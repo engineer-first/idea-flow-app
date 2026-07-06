@@ -16,7 +16,9 @@
 
 | パス | 内容 | URL |
 | --- | --- | --- |
-| `index.html` | Supabase Realtime 解説（暫定でルート直下に置いている） | `/` |
+| `index.html` | 目次ページ（全ページへのリンク） | `/` |
+| `realtime/index.html` | Supabase Realtime 解説 | `/realtime/` |
+| `vrt-operations/index.html` | VRT（Chromatic）運用ガイド | `/vrt-operations/` |
 
 ## ページ追加の手順
 
@@ -25,15 +27,6 @@
    - 理由: URL が `/<slug>/` と綺麗になり、画像などの付属アセットを同じディレクトリに同居させられる。ページが育って分割しても URL が壊れない。
 3. ルートの `index.html`（目次）に新ページへのリンクを追加する。
 4. この README の「現在の構成」表を更新する。
-
-### 2 ページ目を追加するときの一回限りの移行
-
-現在ルートの `index.html` は Realtime 解説そのもの。2 ページ目を追加するエージェントは、
-あわせて次の移行を行うこと:
-
-1. `index.html` を `realtime/index.html` に移動する。
-2. ルートに新しい `index.html` を作り、全ページへのリンクを載せた目次ページにする。
-   - ルート URL は共有済みのため、旧コンテンツへ目次からワンクリックで辿れるようにする。
 
 ## ページの品質要件
 
