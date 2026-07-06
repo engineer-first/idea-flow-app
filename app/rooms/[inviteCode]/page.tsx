@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { RoomDetail } from "@/app/rooms/[inviteCode]/room-detail";
+import { unwrapRoomQueryResult } from "@/app/rooms/[inviteCode]/room-query-results";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
@@ -52,28 +53,32 @@ export default async function RoomPage({ params }: RoomPageProps) {
   }
 
   const supabase = await createClient();
-  const { data: roomData } = await supabase
+  const roomResult = await supabase
     .from("rooms")
     .select("id, invite_code, invite_expires_at")
     .eq("invite_code", inviteCode)
     .maybeSingle();
-  const room = roomData as RoomRecord | null;
+  const room = unwrapRoomQueryResult(
+    roomResult as {
+      data: RoomRecord | null;
+      error: { message: string } | null;
+    },
+    inviteCode,
+  );
 
-  if (!room) {
-    redirect(`/invite/${encodeURIComponent(inviteCode)}/expired`);
-  }
-
-  const { data: memberData } = await supabase
+  const memberResult = await supabase
     .from("room_members")
     .select("role")
     .eq("room_id", room.id)
     .eq("user_id", user.id)
     .maybeSingle();
-  const member = memberData as RoomMemberRecord | null;
-
-  if (!member) {
-    redirect(`/invite/${encodeURIComponent(inviteCode)}/expired`);
-  }
+  const member = unwrapRoomQueryResult(
+    memberResult as {
+      data: RoomMemberRecord | null;
+      error: { message: string } | null;
+    },
+    inviteCode,
+  );
 
   const inviteUrl = `${getBaseUrl()}/invite/${room.invite_code}`;
 

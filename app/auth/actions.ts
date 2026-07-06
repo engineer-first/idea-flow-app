@@ -5,8 +5,14 @@ import { sanitizeNextPath } from "@/app/auth/redirects";
 import { isDevAuthEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 
-function loginError(message: string): never {
-  redirect(`/login?error=${encodeURIComponent(message)}`);
+function loginError(message: string, next = "/"): never {
+  const params = new URLSearchParams({ error: message });
+
+  if (next !== "/") {
+    params.set("next", next);
+  }
+
+  redirect(`/login?${params.toString()}`);
 }
 
 function getBaseUrl() {
@@ -24,11 +30,12 @@ function getBaseUrl() {
 }
 
 export async function signInWithGoogle(formData: FormData) {
+  const next = sanitizeNextPath(formData.get("next"));
+
   if (!isSupabaseConfigured()) {
-    loginError("Supabaseの環境変数を設定してください。");
+    loginError("Supabaseの環境変数を設定してください。", next);
   }
 
-  const next = sanitizeNextPath(formData.get("next"));
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
@@ -39,30 +46,34 @@ export async function signInWithGoogle(formData: FormData) {
   const url = data.url;
 
   if (error || !url) {
-    loginError(error?.message ?? "Googleログインを開始できませんでした。");
+    loginError(
+      error?.message ?? "Googleログインを開始できませんでした。",
+      next,
+    );
   }
 
   redirect(url);
 }
 
 export async function signInWithPassword(formData: FormData) {
+  const next = sanitizeNextPath(formData.get("next"));
+
   if (!isDevAuthEnabled()) {
-    loginError("開発用ログインは無効です。");
+    loginError("開発用ログインは無効です。", next);
   }
 
   if (!isSupabaseConfigured()) {
-    loginError("Supabaseの環境変数を設定してください。");
+    loginError("Supabaseの環境変数を設定してください。", next);
   }
 
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
-  const next = sanitizeNextPath(formData.get("next"));
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    loginError(error.message);
+    loginError(error.message, next);
   }
 
   redirect(next);
