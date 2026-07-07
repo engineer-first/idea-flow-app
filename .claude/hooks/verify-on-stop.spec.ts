@@ -1,19 +1,29 @@
 import { execSync, spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 const hookPath = join(process.cwd(), ".claude/hooks/verify-on-stop.sh");
 
 const tempDirs: string[] = [];
 
-function createRepo({ withTsChange = false } = {}) {
+function createRepo({
+  withTsChange = false,
+  files = [],
+}: {
+  withTsChange?: boolean;
+  files?: string[];
+} = {}) {
   const dir = mkdtempSync(join(tmpdir(), "verify-on-stop-"));
   tempDirs.push(dir);
   execSync("git init --quiet", { cwd: dir });
   if (withTsChange) {
     writeFileSync(join(dir, "example.ts"), "export const value = 1;\n");
+  }
+  for (const file of files) {
+    mkdirSync(dirname(join(dir, file)), { recursive: true });
+    writeFileSync(join(dir, file), "export const value = 1;\n");
   }
   return dir;
 }
@@ -21,10 +31,12 @@ function createRepo({ withTsChange = false } = {}) {
 function runHook({
   projectDir,
   verifyCmd,
+  workersCmd,
   stopHookActive = false,
 }: {
   projectDir: string;
   verifyCmd: string;
+  workersCmd?: string;
   stopHookActive?: boolean;
 }) {
   return spawnSync("bash", [hookPath], {
@@ -35,6 +47,9 @@ function runHook({
       ...process.env,
       CLAUDE_PROJECT_DIR: projectDir,
       STOP_VERIFY_CMD: verifyCmd,
+      ...(workersCmd === undefined
+        ? {}
+        : { STOP_VERIFY_WORKERS_CMD: workersCmd }),
     },
   });
 }
@@ -85,6 +100,45 @@ describe("verify-on-stop hook", () => {
     const dir = createRepo({ withTsChange: true });
 
     const result = runHook({ projectDir: dir, verifyCmd: "exit 0" });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe("");
+  });
+
+  it("runs the workers verification when workers files changed", () => {
+    const dir = createRepo({ files: ["workers/room-do.ts"] });
+
+    const result = runHook({
+      projectDir: dir,
+      verifyCmd: "true",
+      workersCmd: "echo workers-boom; exit 1",
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("workers-boom");
+  });
+
+  it("runs the workers verification when contracts files changed", () => {
+    const dir = createRepo({ files: ["contracts/api.ts"] });
+
+    const result = runHook({
+      projectDir: dir,
+      verifyCmd: "true",
+      workersCmd: "echo workers-boom; exit 1",
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("workers-boom");
+  });
+
+  it("skips the workers verification when only app-side files changed", () => {
+    const dir = createRepo({ withTsChange: true });
+
+    const result = runHook({
+      projectDir: dir,
+      verifyCmd: "true",
+      workersCmd: "echo workers-boom; exit 1",
+    });
 
     expect(result.status).toBe(0);
     expect(result.stderr).toBe("");
