@@ -20,10 +20,10 @@
       "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "migrations"
     }
-  ],
-  "vars": {
-    // ローカル開発・テスト用の既定値。本番は `wrangler secret put SESSION_SECRET`
-    // で必ず上書きする（secret は同名の var より優先される）。
-    "SESSION_SECRET": "dev-session-secret-change-in-production!!"
-  }
+  ]
+  // SESSION_SECRET は vars に置かない（vars は secret put で上書きしない限り
+  // 本番へ適用され、秘密の平文コミットは事故になる）。
+  //   - ローカル開発: `.dev.vars`（gitignore 済み。`.dev.vars.example` を参照）
+  //   - テスト: vitest.workers.config.mts の miniflare bindings で注入
+  //   - 本番: `wrangler secret put SESSION_SECRET`
 }

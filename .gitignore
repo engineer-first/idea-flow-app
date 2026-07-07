@@ -52,3 +52,7 @@ build-storybook.log
 
 # Playwright MCP artifacts
 .playwright-mcp/
+
+# wrangler local secrets
+.dev.vars
+workers/.dev.vars

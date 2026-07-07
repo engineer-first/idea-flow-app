@@ -32,7 +32,8 @@ mise install
 npm ci
 
 # 環境設定ファイルをコピー
-cp .env.example .env.local
+cp .env.example .env.local                       # Next.js 側
+cp workers/.dev.vars.example workers/.dev.vars   # api-worker 側の秘密（gitignore 済み）
 
 # D1（ローカル）に migration を適用（初回のみ）
 npm run db:migrate

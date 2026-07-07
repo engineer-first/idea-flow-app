@@ -202,6 +202,30 @@ typecheck / lint / アプリテスト99件 / workers テスト45件 / OpenNext �
 Storybook ビルドすべて green。Supabase への参照はコード上ゼロ
 （docs の歴史的記録と、移植元を示すコメントのみ残る）。
 
+## 最終検証: 認可の敵対的レビューと SESSION_SECRET の是正
+
+移行完了後、認可・可視性コードを4視点（選択的送信・プロトコル権限昇格・
+セッション/トークン・深層防御）で敵対的にレビューし、各指摘を別エージェントが
+反証する2段構えで検証した。REFUTED 7件（未実装フェーズ機能の仮定、UUID 総当たり
+非現実的、既テスト済み）に対し、**CONFIRMED 1件（must-fix）**を修正した。
+
+### 指摘: SESSION_SECRET の平文コミット（fail-open）
+
+`workers/wrangler.jsonc` の `vars` に秘密を平文で置いていた。Cloudflare の
+`vars` は `wrangler secret put` で上書きしない限り本番へ適用されるため、設定漏れが
+「既知鍵で正常起動」というサイレント fail-open になり、リポジトリを読める攻撃者が
+セッション/ログイン主張トークンを偽造できた（なりすまし・無認証 upsert）。
+
+### 是正
+
+- `vars` から SESSION_SECRET を削除。ローカルは `workers/.dev.vars`（gitignore 済み）、
+  テストは miniflare bindings、本番は `wrangler secret put` で注入する。
+- `requireSessionSecret()` を api-worker の入口に置き、未設定・短すぎ・git 履歴に
+  漏れた既知値なら **503 で fail-closed**（設定漏れをサイレントに動かさず明示的に落とす）。
+  Next 側 `getSessionSecret()` / `isAuthConfigured()` も同じ既知値を拒否する。
+- 実機確認: 既知値/未設定 → 503、有効値 → 未認証401・有効セッション200。
+- テスト追加: `session-secret.spec.ts`（5件）+ `env.spec.ts`（7件）。全 156 件 green。
+
 ## 参照
 
 - 技術再評価メモ: <https://junhat6.github.io/claude-artifacts/2026-07-07-ideaflow-stack-reeval.html>

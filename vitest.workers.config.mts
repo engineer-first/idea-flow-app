@@ -18,6 +18,9 @@ export default defineConfig({
       miniflare: {
         bindings: {
           TEST_MIGRATIONS: migrations,
+          // テスト専用のセッション秘密。SESSION_SECRET は本番構成（wrangler.jsonc）に
+          // 置かず、ここで注入する。既知漏洩値でも短すぎる値でもない任意の固定値。
+          SESSION_SECRET: "test-only-session-secret-not-committed-to-prod",
         },
       },
     }),
