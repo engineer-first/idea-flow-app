@@ -13,6 +13,7 @@ const meta = {
     notes: buildNotes(3),
     inviteCode: "AB12CD",
     inviteUrl: "https://idea-flow.example/invite/AB12CD",
+    connectionStatus: "open",
     draggingNoteId: null,
     onAddNote: fn(),
     onNoteDragStart: fn(),
@@ -54,5 +55,20 @@ export const Dragging: Story = {
 export const ManyNotes: Story = {
   args: {
     notes: buildNotes(12),
+  },
+};
+
+// loading相当: WebSocket 接続の確立中（初回接続時。snapshot 未着なので付箋も空）。
+export const Connecting: Story = {
+  args: {
+    notes: [],
+    connectionStatus: "connecting",
+  },
+};
+
+// error相当: 予期しない切断から自動再接続を待っている状態。
+export const Reconnecting: Story = {
+  args: {
+    connectionStatus: "closed",
   },
 };

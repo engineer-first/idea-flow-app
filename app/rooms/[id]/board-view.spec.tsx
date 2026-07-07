@@ -15,6 +15,7 @@ function setup(overrides: Partial<Parameters<typeof BoardView>[0]> = {}) {
     onNoteDragEnd: vi.fn(),
     onNoteContentChange: vi.fn(),
     onNoteDelete: vi.fn(),
+    connectionStatus: "open" as const,
     ...overrides,
   };
 
@@ -72,6 +73,26 @@ describe("BoardView", () => {
     fireEvent.click(screen.getByRole("button", { name: "付箋を追加" }));
 
     expect(onAddNote).toHaveBeenCalledTimes(1);
+  });
+
+  describe("接続状態の表示", () => {
+    it("接続確立中は接続中の表示を出す（loading）", () => {
+      setup({ connectionStatus: "connecting" });
+
+      expect(screen.getByRole("status")).toHaveTextContent("接続中");
+    });
+
+    it("切断中は再接続中の表示を出す（error）", () => {
+      setup({ connectionStatus: "closed" });
+
+      expect(screen.getByRole("status")).toHaveTextContent("再接続");
+    });
+
+    it("接続済みならインジケータを出さない（success）", () => {
+      setup({ connectionStatus: "open" });
+
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    });
   });
 
   describe("付箋の選択", () => {

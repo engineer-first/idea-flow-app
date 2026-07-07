@@ -23,6 +23,7 @@ import type { ServerMessage } from "@/contracts/room-protocol";
 import {
   createRoomClient,
   type RoomClient,
+  type RoomConnectionStatus,
   type RoomSocketFactory,
 } from "@/lib/room-client/room-client";
 import { roomWebSocketUrl } from "@/lib/room-client/ws-url";
@@ -46,6 +47,9 @@ export function RoomBoard({
   // 付箋の初期状態は空。確定状態の真実はサーバー（RoomDO）側にあり、
   // 接続直後に送られてくる snapshot で復元される。
   const [notes, setNotes] = useState<Note[]>([]);
+  // createRoomClient が生成直後に "connecting" を通知するので初期値と一致する。
+  const [connectionStatus, setConnectionStatus] =
+    useState<RoomConnectionStatus>("connecting");
   const [draggingNoteId, setDraggingNoteId] = useState<string | null>(null);
   const draggingNoteIdRef = useRef<string | null>(null);
   const clientRef = useRef<RoomClient | null>(null);
@@ -73,6 +77,7 @@ export function RoomBoard({
     const client = createRoomClient({
       url: roomWebSocketUrl(roomId),
       onMessage: handleServerMessage,
+      onStatusChange: setConnectionStatus,
       webSocketFactory,
     });
     clientRef.current = client;
@@ -146,6 +151,7 @@ export function RoomBoard({
       notes={notes}
       inviteCode={inviteCode}
       inviteUrl={inviteUrl}
+      connectionStatus={connectionStatus}
       draggingNoteId={draggingNoteId}
       onAddNote={handleAddNote}
       onNoteDragStart={handleNoteDragStart}

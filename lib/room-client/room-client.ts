@@ -17,9 +17,15 @@ const DEFAULT_RECONNECT_DELAYS_MS = [1000, 2000, 4000, 8000];
 
 export type RoomSocketFactory = (url: string) => WebSocket;
 
+// UI が「接続中 / 接続済み / 切断（再接続待ち）」を表示するための状態。
+// closed は「予期しない切断」のみで、close() による意図的な終了では通知しない
+// （終了時は呼び出し側がアンマウント中で、表示する画面がもう無いため）。
+export type RoomConnectionStatus = "connecting" | "open" | "closed";
+
 export type RoomClientOptions = {
   url: string;
   onMessage: (message: ServerMessage) => void;
+  onStatusChange?: (status: RoomConnectionStatus) => void;
   // テストや Storybook からフェイクを注入するための口。
   webSocketFactory?: RoomSocketFactory;
   reconnectDelaysMs?: number[];
@@ -43,9 +49,11 @@ export function createRoomClient(options: RoomClientOptions): RoomClient {
   function connect(): void {
     const ws = factory(options.url);
     socket = ws;
+    options.onStatusChange?.("connecting");
 
     ws.addEventListener("open", () => {
       reconnectAttempt = 0;
+      options.onStatusChange?.("open");
     });
 
     ws.addEventListener("message", (event) => {
@@ -64,6 +72,7 @@ export function createRoomClient(options: RoomClientOptions): RoomClient {
       if (closedByUser || socket !== ws) {
         return;
       }
+      options.onStatusChange?.("closed");
       scheduleReconnect();
     });
   }

@@ -11,10 +11,21 @@ import { Button } from "@/components/ui/button";
 // 「どの付箋を選択中か」は同期不要な純粋にUIの関心事なので、ここでローカルに持つ。
 import { BOARD_HEIGHT, BOARD_WIDTH } from "@/contracts/board";
 
+// WebSocket 接続の表示用状態。値の生成は room-board（コンテナ）の責務で、
+// ここでは受け取った状態を表示するだけ（このコンポーネントはデータ層に依存しない）。
+export type BoardConnectionStatus = "connecting" | "open" | "closed";
+
+const CONNECTION_STATUS_LABELS: Record<BoardConnectionStatus, string | null> = {
+  connecting: "接続中…",
+  open: null,
+  closed: "接続が切れました。再接続します…",
+};
+
 export type BoardViewProps = {
   notes: Note[];
   inviteCode: string;
   inviteUrl: string;
+  connectionStatus: BoardConnectionStatus;
   draggingNoteId: string | null;
   onAddNote: () => void;
   onNoteDragStart: (noteId: string) => void;
@@ -28,6 +39,7 @@ export function BoardView({
   notes,
   inviteCode,
   inviteUrl,
+  connectionStatus,
   draggingNoteId,
   onAddNote,
   onNoteDragStart,
@@ -72,9 +84,24 @@ export function BoardView({
             </span>
           </span>
         </div>
-        <Button type="button" onClick={onAddNote}>
-          付箋を追加
-        </Button>
+        <div className="flex items-center gap-3">
+          {CONNECTION_STATUS_LABELS[connectionStatus] !== null && (
+            // role="status"（aria-live: polite）で、再接続をスクリーンリーダーにも通知する。
+            <span
+              role="status"
+              className={`text-sm ${
+                connectionStatus === "closed"
+                  ? "text-destructive"
+                  : "text-muted-foreground"
+              }`}
+            >
+              {CONNECTION_STATUS_LABELS[connectionStatus]}
+            </span>
+          )}
+          <Button type="button" onClick={onAddNote}>
+            付箋を追加
+          </Button>
+        </div>
       </div>
 
       <div className="relative overflow-auto rounded-md border border-border bg-muted/30">

@@ -211,6 +211,30 @@ describe("createRoomClient", () => {
     client.close();
   });
 
+  it("接続ライフサイクルを onStatusChange で通知する", () => {
+    // UI が「接続中 / 接続済み / 切断（再接続待ち）」を表示するための通知。
+    const statuses: string[] = [];
+    const client = createRoomClient({
+      url: "ws://test",
+      onMessage: () => {},
+      webSocketFactory: factory,
+      onStatusChange: (status) => statuses.push(status),
+    });
+    expect(statuses).toEqual(["connecting"]);
+
+    latestSocket().simulateOpen();
+    expect(statuses).toEqual(["connecting", "open"]);
+
+    latestSocket().simulateUnexpectedClose();
+    expect(statuses).toEqual(["connecting", "open", "closed"]);
+
+    // 再接続の試行開始も connecting として通知される。
+    vi.advanceTimersByTime(1000);
+    expect(statuses).toEqual(["connecting", "open", "closed", "connecting"]);
+
+    client.close();
+  });
+
   it("close() 後は再接続しない", () => {
     const client = createRoomClient({
       url: "ws://test",

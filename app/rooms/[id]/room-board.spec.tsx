@@ -43,6 +43,11 @@ class FakeWebSocket {
     this.emit("open", {});
   }
 
+  simulateUnexpectedClose(): void {
+    this.readyState = 3;
+    this.emit("close", {});
+  }
+
   simulateServerMessage(message: unknown): void {
     this.emit("message", { data: JSON.stringify(message) });
   }
@@ -67,7 +72,7 @@ function protocolNote(overrides?: Partial<ProtocolNote>): ProtocolNote {
   };
 }
 
-function renderBoard() {
+function renderBoard(options: { open?: boolean } = {}) {
   FakeWebSocket.instances = [];
   const factory = (url: string) =>
     new FakeWebSocket(url) as unknown as WebSocket;
@@ -81,7 +86,9 @@ function renderBoard() {
   );
   const socket = FakeWebSocket.instances.at(-1);
   if (!socket) throw new Error("WebSocket が生成されていない");
-  act(() => socket.simulateOpen());
+  if (options.open !== false) {
+    act(() => socket.simulateOpen());
+  }
   return { view, socket };
 }
 
@@ -152,6 +159,28 @@ describe("サーバーメッセージ → 画面反映", () => {
     expect(consoleError).toHaveBeenCalledWith(
       expect.stringContaining("forbidden"),
     );
+  });
+});
+
+describe("接続状態 → 画面反映", () => {
+  it("接続確立前は接続中の表示になる（loading）", () => {
+    renderBoard({ open: false });
+
+    expect(screen.getByRole("status")).toHaveTextContent("接続中");
+  });
+
+  it("接続が確立するとインジケータが消える（success）", () => {
+    renderBoard();
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("予期しない切断で再接続中の表示になる（error）", () => {
+    const { socket } = connectWithSnapshot([]);
+
+    act(() => socket.simulateUnexpectedClose());
+
+    expect(screen.getByRole("status")).toHaveTextContent("再接続");
   });
 });
 
