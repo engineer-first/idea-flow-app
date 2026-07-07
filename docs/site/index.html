@@ -96,9 +96,33 @@
 <main>
   <p class="eyebrow">engineer-first / idea-flow-app</p>
   <h1>idea-flow-app ドキュメント</h1>
-  <p class="lede">PoC・技術検証に関する解説ページの目次です。</p>
+  <p class="lede">アーキテクチャ・設計判断・技術検証に関する解説ページの目次です。</p>
 
   <ul class="toc">
+    <li>
+      <a href="./architecture/">
+        <span class="title">IdeaFlow — 構成 &amp; デプロイ概観</span>
+        <span class="desc">2つの Cloudflare Worker（app / api）、RoomDO と D1 の責務分担、境界ルール、CI/CD、よく使うコマンドを1ページで俯瞰する。</span>
+      </a>
+    </li>
+    <li>
+      <a href="./cloudflare-map/">
+        <span class="title">Cloudflare の地図 — Workers / Durable Objects / D1</span>
+        <span class="desc">Go + Vue の経験を起点に Cloudflare の3部品を対応表から理解する。「1ルーム = 1 権威サーバー」の設計理由を実コードで辿る技術解説。</span>
+      </a>
+    </li>
+    <li>
+      <a href="./room-creation-flow/">
+        <span class="title">系統図 — ルーム作成</span>
+        <span class="desc">「ルーム作成」と「ルーム参加」がコード上でどう流れるか。UI → Server Action → api-worker → D1 / RoomDO の境界と招待コードの仕様をコード引用つきで辿る。</span>
+      </a>
+    </li>
+    <li>
+      <a href="./stack-reeval/">
+        <span class="title">技術選定の再評価 — 実装負荷を除外した場合</span>
+        <span class="desc">Cloudflare Workers + Durable Objects を選んだ意思決定メモ。コスト試算・候補比較・判断が反転する条件の記録。</span>
+      </a>
+    </li>
     <li>
       <a href="./realtime/">
         <span class="title">HTTPしか知らない人のための Supabase Realtime</span>

@@ -17,6 +17,10 @@
 | パス | 内容 | URL |
 | --- | --- | --- |
 | `index.html` | 全ページへのリンクを載せた目次 | `/` |
+| `architecture/index.html` | 現行構成（2 Worker + RoomDO + D1）とデプロイの概観 | `/architecture/` |
+| `cloudflare-map/index.html` | Workers / Durable Objects / D1 のチーム向け技術解説 | `/cloudflare-map/` |
+| `room-creation-flow/index.html` | ルーム作成・参加のコード系統図 | `/room-creation-flow/` |
+| `stack-reeval/index.html` | Cloudflare 採用に至った技術選定の再評価メモ（意思決定記録） | `/stack-reeval/` |
 | `realtime/index.html` | Supabase Realtime 解説 | `/realtime/` |
 | `realtime-poc-map/index.html` | リアルタイム付箋同期 PoC の実装マップ | `/realtime-poc-map/` |
 | `sticky-note-ux/index.html` | tldraw から移植した付箋 UI/UX の解説（触れるデモ付き） | `/sticky-note-ux/` |
