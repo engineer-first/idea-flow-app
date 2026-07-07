@@ -56,6 +56,40 @@ describe("vote-state", () => {
     expect(result.canVote).toBe(false);
   });
 
+  it("ignores votes that belong to removed sticky notes when valid ids are provided", () => {
+    const votes: VoteRecord[] = [
+      {
+        id: "vote-1",
+        userId: "user-1",
+        stickyNoteId: "removed-note",
+        voteType: "subjective",
+        createdAt: "2026-07-06T00:00:00.000Z",
+      },
+    ];
+
+    const remaining = getRemainingVotes(votes, []);
+
+    expect(remaining.subjective).toBe(1);
+    expect(remaining.objective).toBe(3);
+  });
+
+  it("blocks votes for sticky notes outside the valid id list", () => {
+    const result = applyVote(
+      { votes: [] },
+      {
+        id: "vote-1",
+        userId: "user-1",
+        stickyNoteId: "removed-note",
+        voteType: "objective",
+        createdAt: "2026-07-06T00:00:00.000Z",
+      },
+      [],
+    );
+
+    expect(result.votes).toHaveLength(0);
+    expect(result.canVote).toBe(false);
+  });
+
   it("provides a stable user id for persistence", () => {
     const first = getCurrentUserId();
     const second = getCurrentUserId();

@@ -13,6 +13,11 @@ export type VoteState = {
   canVote?: boolean;
 };
 
+export type RemainingVotes = {
+  subjective: number;
+  objective: number;
+};
+
 const SUBJECTIVE_LIMIT = 1;
 const OBJECTIVE_LIMIT = 3;
 const STORAGE_KEY = "idea-flow-votes";
@@ -34,32 +39,38 @@ export function getCurrentUserId() {
 
 export function getRemainingVotes(
   votes: VoteRecord[],
-  validStickyNoteIds: string[] = [],
-) {
-  const validIds = new Set(validStickyNoteIds);
+  validStickyNoteIds?: string[],
+): RemainingVotes {
   const filteredVotes =
-    validStickyNoteIds.length > 0
-      ? votes.filter((vote) => validIds.has(vote.stickyNoteId))
-      : votes;
+    validStickyNoteIds === undefined
+      ? votes
+      : votes.filter((vote) => validStickyNoteIds.includes(vote.stickyNoteId));
 
-  const subjectiveVotes = filteredVotes.filter(
-    (vote) => vote.voteType === "subjective",
-  );
-  const objectiveVotes = filteredVotes.filter(
-    (vote) => vote.voteType === "objective",
-  );
+  const usedVotes: RemainingVotes = { subjective: 0, objective: 0 };
+  for (const vote of filteredVotes) {
+    usedVotes[vote.voteType] += 1;
+  }
 
   return {
-    subjective: Math.max(SUBJECTIVE_LIMIT - subjectiveVotes.length, 0),
-    objective: Math.max(OBJECTIVE_LIMIT - objectiveVotes.length, 0),
+    subjective: Math.max(SUBJECTIVE_LIMIT - usedVotes.subjective, 0),
+    objective: Math.max(OBJECTIVE_LIMIT - usedVotes.objective, 0),
   };
 }
 
 export function applyVote(
   state: VoteState,
   vote: VoteRecord,
-  validStickyNoteIds: string[] = [],
-) {
+  validStickyNoteIds?: string[],
+): VoteState {
+  const isValidStickyNote =
+    validStickyNoteIds === undefined
+      ? true
+      : validStickyNoteIds.includes(vote.stickyNoteId);
+
+  if (!isValidStickyNote) {
+    return { ...state, canVote: false };
+  }
+
   const remaining = getRemainingVotes(state.votes, validStickyNoteIds);
   const limitReached =
     vote.voteType === "subjective"
