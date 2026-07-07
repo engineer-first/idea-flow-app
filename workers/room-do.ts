@@ -7,6 +7,11 @@
 // 単一スレッドで直列化されるため、フェーズ遷移や同時編集のレースは構造的に起きない。
 import { DurableObject } from "cloudflare:workers";
 import {
+  NOTE_SPAWN_JITTER,
+  NOTE_SPAWN_X_MIN,
+  NOTE_SPAWN_Y_MIN,
+} from "../contracts/board";
+import {
   type ClientMessage,
   type ProtocolNote,
   parseClientMessage,
@@ -179,8 +184,8 @@ export class RoomDO extends DurableObject {
           authorId: userId,
           content: "",
           // 新規付箋はボード中央付近に少しずつずらして配置する（PoC と同じ）。
-          x: 800 + Math.random() * 200,
-          y: 500 + Math.random() * 200,
+          x: NOTE_SPAWN_X_MIN + Math.random() * NOTE_SPAWN_JITTER,
+          y: NOTE_SPAWN_Y_MIN + Math.random() * NOTE_SPAWN_JITTER,
           createdAt: now,
           updatedAt: now,
         };

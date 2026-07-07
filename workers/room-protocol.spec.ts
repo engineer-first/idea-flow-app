@@ -8,6 +8,11 @@
 // - note:drag は永続化されず、送信者自身にはエコーされない
 // - 再接続時は snapshot で現在状態へ復帰できる（R1 復帰パス）
 import { describe, expect, it } from "vitest";
+import {
+  NOTE_SPAWN_JITTER,
+  NOTE_SPAWN_X_MIN,
+  NOTE_SPAWN_Y_MIN,
+} from "../contracts/board";
 import type { ServerMessage } from "../contracts/room-protocol";
 import {
   connectRoomAs,
@@ -128,10 +133,14 @@ describe("note:create", () => {
     expect(toOwner.note.roomId).toBe(roomId);
     expect(toOwner.note.content).toBe("");
     // 新規付箋はボード中央付近に配置される（PoC と同じ挙動）
-    expect(toOwner.note.x).toBeGreaterThanOrEqual(800);
-    expect(toOwner.note.x).toBeLessThanOrEqual(1000);
-    expect(toOwner.note.y).toBeGreaterThanOrEqual(500);
-    expect(toOwner.note.y).toBeLessThanOrEqual(700);
+    expect(toOwner.note.x).toBeGreaterThanOrEqual(NOTE_SPAWN_X_MIN);
+    expect(toOwner.note.x).toBeLessThanOrEqual(
+      NOTE_SPAWN_X_MIN + NOTE_SPAWN_JITTER,
+    );
+    expect(toOwner.note.y).toBeGreaterThanOrEqual(NOTE_SPAWN_Y_MIN);
+    expect(toOwner.note.y).toBeLessThanOrEqual(
+      NOTE_SPAWN_Y_MIN + NOTE_SPAWN_JITTER,
+    );
 
     owner.close();
     member.close();

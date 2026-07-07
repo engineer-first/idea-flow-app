@@ -8,6 +8,12 @@ export const BOARD_HEIGHT = 1200;
 export const NOTE_WIDTH = 200;
 export const NOTE_HEIGHT = 150;
 
+// 新規付箋の初期配置範囲。ボード中央付近に JITTER 分だけずらして重なりを避ける。
+// 配置はサーバー（RoomDO）が決めるため、その検証テストともここで値を共有する。
+export const NOTE_SPAWN_X_MIN = 800;
+export const NOTE_SPAWN_Y_MIN = 500;
+export const NOTE_SPAWN_JITTER = 200;
+
 // ドラッグ中のnote-drag配信を間引く間隔（ミリ秒）。
 export const DRAG_BROADCAST_THROTTLE_MS = 80;
 
