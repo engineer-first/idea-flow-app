@@ -18,7 +18,7 @@ export function unwrapRoomQueryResult<T>(
   }
 
   if (!result.data) {
-    redirect(`/invite/${encodeURIComponent(inviteCode)}/expired`);
+    redirect(`/invite/${encodeURIComponent(inviteCode)}`);
   }
 
   return result.data;

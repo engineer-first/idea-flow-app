@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 import { unwrapRoomQueryResult } from "@/app/rooms/[inviteCode]/room-query-results";
 
@@ -20,10 +21,11 @@ describe("unwrapRoomQueryResult", () => {
     ).toThrow("permission denied for table rooms");
   });
 
-  it("dataがnullでerrorがない場合だけ期限切れ/無効画面へ送る", () => {
+  it("dataがnullでerrorがない場合は招待参加フローへ送る", () => {
     expect(() =>
       unwrapRoomQueryResult({ data: null, error: null }, "abc123"),
-    ).toThrow("redirect:/invite/abc123/expired");
+    ).toThrow("redirect:");
+    expect(redirect).toHaveBeenCalledWith("/invite/abc123");
   });
 
   it("dataがある場合はそのまま返す", () => {
