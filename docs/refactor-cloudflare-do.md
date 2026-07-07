@@ -92,6 +92,44 @@
   ボードは表示されるが同期は動かない。
 - 旧 `lib/supabase/*`・`supabase/` ディレクトリは Phase 4 で撤去する。
 
+## Phase 2: RoomDO — コントラクトと権威サーバー（完了）
+
+付箋の確定状態と配信の権威を RoomDO へ実装した。
+
+### コントラクト層（先行定義）
+
+- `contracts/room-protocol.ts` — クライアント ↔ RoomDO の全メッセージを zod で定義。
+  **authorId / roomId を書き換えるメッセージは存在しない**。Supabase 時代に
+  列レベル GRANT で塞いだ権限昇格攻撃（author_id 書き換えによる DELETE 迂回、
+  room_id 書き換えによる持ち出し）を、プロトコルの形そのもので構造的に塞いだ。
+- `contracts/board.ts` — ボード定数を app/rooms からコントラクト層へ移動
+  （旧ファイルは再エクスポートとして残し、UI の import は不変）。
+
+### 可視性の一点集約
+
+- `workers/visibility.ts` の `visibleTo()` — スナップショットの絞り込みも
+  配信の宛先判定も必ずこの関数を通る。現仕様は「メンバー全員が全付箋を見られる」
+  だが、個人ワーク・ステルス投票のフェーズ導入時はこの関数への分岐追加 +
+  `visibility.spec.ts` のテーブル追加だけで拡張する。
+
+### RoomDO の実装
+
+- DO 内蔵 SQLite に members / notes / meta。単一スレッド直列化により
+  同時編集・フェーズ遷移のレースは構造的に発生しない。
+- `note:drag` は永続化せず送信者以外へ配信（エコーなし。クライアントの
+  巻き戻り防止をサーバー側の仕様にした）。確定は `note:move` のみ。
+- 再接続時は接続直後の snapshot で全確定状態へ復帰する（R1 復帰パス）。
+- 存在しない付箋のドラッグは黙って捨てる（高頻度メッセージにエラー往復をしない）。
+
+### テスト（workers 45件）
+
+pgTAP の付箋認可仕様をプロトコル境界のテストとして移植:
+
+- author でないメンバーも content / 位置を更新できる（共同編集）＋ authorId 不変
+- author 以外の削除は forbidden で拒否され付箋は残る
+- 入力検証（2000文字上限・ボード範囲外・不正 JSON）は invalid-message で拒否、接続は維持
+- drag のエコー無し・非永続を配信順序と再接続 snapshot で検証
+
 ## 参照
 
 - 技術再評価メモ: <https://junhat6.github.io/claude-artifacts/2026-07-07-ideaflow-stack-reeval.html>

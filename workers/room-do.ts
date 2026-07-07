@@ -1,14 +1,38 @@
 // 1ルーム = 1 Durable Object の権威サーバー。
-// メンバーシップ（誰がこのルームに入れるか）の真実をここで持つ。
-// D1 の rooms 行は「招待コード → ルーム解決」のためのディレクトリにすぎない。
+// - メンバーシップ（誰がこのルームに入れるか）の真実をここで持つ
+// - 付箋の確定状態（notes）の真実をここで持つ
+// - 配信は必ず visibleTo（workers/visibility.ts）を通す（選択的送信）
 //
-// Phase 1: メンバー管理と WebSocket 接続の受け入れまで。
-// Phase 2 で付箋の状態・選択的送信 (visibleTo)・プレゼンスを実装する。
+// D1 の rooms 行は「招待コード → ルーム解決」のためのディレクトリにすぎない。
+// 単一スレッドで直列化されるため、フェーズ遷移や同時編集のレースは構造的に起きない。
 import { DurableObject } from "cloudflare:workers";
+import {
+  type ClientMessage,
+  type ProtocolNote,
+  parseClientMessage,
+  type ServerMessage,
+} from "../contracts/room-protocol";
+import { filterVisible, visibleTo } from "./visibility";
 
-// api-worker がセッション検証済みのユーザーIDを DO へ引き継ぐためのヘッダー。
-// DO は外部から直接到達できないため、このヘッダーは常に api-worker が設定する。
+// api-worker がセッション検証済みのユーザーIDとルーム情報を DO へ引き継ぐヘッダー。
+// DO は外部から直接到達できないため、これらは常に api-worker が設定する。
 export const USER_ID_HEADER = "X-Idea-Flow-User-Id";
+export const ROOM_ID_HEADER = "X-Idea-Flow-Room-Id";
+export const INVITE_CODE_HEADER = "X-Idea-Flow-Invite-Code";
+
+type SocketAttachment = {
+  userId: string;
+};
+
+type NoteRow = {
+  id: string;
+  author_id: string;
+  content: string;
+  x: number;
+  y: number;
+  created_at: string;
+  updated_at: string;
+};
 
 export class RoomDO extends DurableObject {
   constructor(ctx: DurableObjectState, env: Env) {
@@ -18,10 +42,27 @@ export class RoomDO extends DurableObject {
         `CREATE TABLE IF NOT EXISTS members (
            user_id TEXT PRIMARY KEY,
            joined_at TEXT NOT NULL DEFAULT (datetime('now'))
-         )`,
+         );
+         CREATE TABLE IF NOT EXISTS notes (
+           id TEXT PRIMARY KEY,
+           author_id TEXT NOT NULL,
+           content TEXT NOT NULL DEFAULT '',
+           x REAL NOT NULL,
+           y REAL NOT NULL,
+           created_at TEXT NOT NULL,
+           updated_at TEXT NOT NULL
+         );
+         CREATE TABLE IF NOT EXISTS meta (
+           key TEXT PRIMARY KEY,
+           value TEXT NOT NULL
+         );`,
       );
     });
   }
+
+  // ------------------------------------------------------------
+  // RPC（api-worker からのみ呼ばれる）
+  // ------------------------------------------------------------
 
   // 冪等: 既にメンバーでも何も起きない（Supabase 時代の join_room と同じ契約）。
   join(userId: string): void {
@@ -46,8 +87,13 @@ export class RoomDO extends DurableObject {
     return cursor.toArray().map((row) => String(row.user_id));
   }
 
-  // WebSocket 接続。認可（セッション検証・メンバー確認）は api-worker 側で
-  // 完了しているため、ここでは USER_ID_HEADER を信頼して接続を受け入れる。
+  // ------------------------------------------------------------
+  // WebSocket 接続
+  // ------------------------------------------------------------
+
+  // 認可（セッション検証・メンバー確認）は api-worker 側で完了しているため、
+  // ここではヘッダーを信頼して接続を受け入れる。ヘッダーが無い到達は
+  // api-worker を経由していない不正経路なので拒否する（深層防御）。
   override async fetch(request: Request): Promise<Response> {
     if (request.headers.get("Upgrade") !== "websocket") {
       return new Response("expected websocket", { status: 426 });
@@ -55,9 +101,15 @@ export class RoomDO extends DurableObject {
 
     const userId = request.headers.get(USER_ID_HEADER);
     if (!userId || !this.isMember(userId)) {
-      // api-worker を経由しない不正な到達は拒否する（深層防御）。
       return new Response("forbidden", { status: 403 });
     }
+
+    // ルーム情報（snapshot 用）を保存する。D1 が真実だが、接続経路で毎回
+    // 引き継がれるためここでのキャッシュは常に最新に保たれる。
+    const roomId = request.headers.get(ROOM_ID_HEADER);
+    const inviteCode = request.headers.get(INVITE_CODE_HEADER);
+    if (roomId) this.setMeta("room_id", roomId);
+    if (inviteCode) this.setMeta("invite_code", inviteCode);
 
     const pair = new WebSocketPair();
     const client = pair[0];
@@ -65,15 +117,35 @@ export class RoomDO extends DurableObject {
     // Hibernation API で受け入れ、接続にユーザーIDを添付する。
     // ハイバネーション復帰後も deserializeAttachment で取り出せる。
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ userId });
+    const attachment: SocketAttachment = { userId };
+    server.serializeAttachment(attachment);
+
+    this.sendSnapshot(server, userId);
+
     return new Response(null, { status: 101, webSocket: client });
   }
 
   override async webSocketMessage(
-    _ws: WebSocket,
-    _message: ArrayBuffer | string,
+    ws: WebSocket,
+    raw: ArrayBuffer | string,
   ): Promise<void> {
-    // Phase 2: contracts/room-protocol.ts のメッセージを処理する。
+    const attachment = ws.deserializeAttachment() as SocketAttachment | null;
+    if (!attachment) {
+      ws.close(1011, "missing attachment");
+      return;
+    }
+
+    const message = parseClientMessage(raw);
+    if (!message) {
+      this.sendTo(ws, {
+        type: "error",
+        code: "invalid-message",
+        message: "メッセージ形式が不正です。",
+      });
+      return;
+    }
+
+    this.handleClientMessage(ws, attachment.userId, message);
   }
 
   override async webSocketClose(
@@ -82,13 +154,245 @@ export class RoomDO extends DurableObject {
     _reason: string,
     _wasClean: boolean,
   ): Promise<void> {
-    // Phase 2: プレゼンス（退室通知）を実装する。
+    // プレゼンス（在室表示）の導入時に退室通知をここへ実装する。
   }
 
-  override async webSocketError(
-    _ws: WebSocket,
-    _error: unknown,
-  ): Promise<void> {
-    // Phase 2: エラー時の切断処理を実装する。
+  override async webSocketError(ws: WebSocket, _error: unknown): Promise<void> {
+    ws.close(1011, "websocket error");
+  }
+
+  // ------------------------------------------------------------
+  // プロトコル処理
+  // ------------------------------------------------------------
+
+  private handleClientMessage(
+    ws: WebSocket,
+    userId: string,
+    message: ClientMessage,
+  ): void {
+    switch (message.type) {
+      case "note:create": {
+        const now = new Date().toISOString();
+        const note: ProtocolNote = {
+          id: crypto.randomUUID(),
+          roomId: this.getMeta("room_id") ?? "",
+          authorId: userId,
+          content: "",
+          // 新規付箋はボード中央付近に少しずつずらして配置する（PoC と同じ）。
+          x: 800 + Math.random() * 200,
+          y: 500 + Math.random() * 200,
+          createdAt: now,
+          updatedAt: now,
+        };
+        this.ctx.storage.sql.exec(
+          `INSERT INTO notes (id, author_id, content, x, y, created_at, updated_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
+          note.id,
+          note.authorId,
+          note.content,
+          note.x,
+          note.y,
+          note.createdAt,
+          note.updatedAt,
+        );
+        this.broadcast({ type: "note:inserted", note }, note);
+        return;
+      }
+
+      case "note:update-content": {
+        const row = this.findNote(message.noteId);
+        if (!row) {
+          this.sendNotFound(ws);
+          return;
+        }
+        // 共同編集: メンバーなら誰でも本文を更新できる（旧 RLS と同じ仕様）。
+        // authorId はメッセージに存在しないため書き換えは構造的に不可能。
+        const updatedAt = new Date().toISOString();
+        this.ctx.storage.sql.exec(
+          "UPDATE notes SET content = ?2, updated_at = ?3 WHERE id = ?1",
+          message.noteId,
+          message.content,
+          updatedAt,
+        );
+        const note = this.toProtocolNote({
+          ...row,
+          content: message.content,
+          updated_at: updatedAt,
+        });
+        this.broadcast({ type: "note:updated", note }, note);
+        return;
+      }
+
+      case "note:move": {
+        const row = this.findNote(message.noteId);
+        if (!row) {
+          this.sendNotFound(ws);
+          return;
+        }
+        const updatedAt = new Date().toISOString();
+        this.ctx.storage.sql.exec(
+          "UPDATE notes SET x = ?2, y = ?3, updated_at = ?4 WHERE id = ?1",
+          message.noteId,
+          message.x,
+          message.y,
+          updatedAt,
+        );
+        const note = this.toProtocolNote({
+          ...row,
+          x: message.x,
+          y: message.y,
+          updated_at: updatedAt,
+        });
+        this.broadcast({ type: "note:updated", note }, note);
+        return;
+      }
+
+      case "note:drag": {
+        const row = this.findNote(message.noteId);
+        if (!row) {
+          // ドラッグは高頻度なためエラー往復はせず黙って捨てる
+          // （直後に削除された付箋のドラッグ等、正常系でも起こりうる）。
+          return;
+        }
+        // 永続化しない。送信者自身へはエコーしない（クライアントは自分の
+        // ドラッグをローカル反映済みのため、エコーは巻き戻りの原因になる）。
+        this.broadcast(
+          {
+            type: "note:drag",
+            noteId: message.noteId,
+            x: message.x,
+            y: message.y,
+          },
+          this.toProtocolNote(row),
+          ws,
+        );
+        return;
+      }
+
+      case "note:delete": {
+        const row = this.findNote(message.noteId);
+        if (!row) {
+          this.sendNotFound(ws);
+          return;
+        }
+        // 削除は author のみ（旧 RLS の DELETE ポリシーと同じ仕様）。
+        if (row.author_id !== userId) {
+          this.sendTo(ws, {
+            type: "error",
+            code: "forbidden",
+            message: "この操作を行う権限がありません。",
+          });
+          return;
+        }
+        this.ctx.storage.sql.exec(
+          "DELETE FROM notes WHERE id = ?1",
+          message.noteId,
+        );
+        this.broadcast(
+          { type: "note:deleted", noteId: message.noteId },
+          this.toProtocolNote(row),
+        );
+        return;
+      }
+
+      default: {
+        // メッセージ型の網羅性チェック（コンパイル時のみ意味を持つ）
+        const _exhaustive: never = message;
+        void _exhaustive;
+        return;
+      }
+    }
+  }
+
+  // ------------------------------------------------------------
+  // 配信（必ず visibleTo を通す）
+  // ------------------------------------------------------------
+
+  private sendSnapshot(ws: WebSocket, userId: string): void {
+    const notes = this.listNotes();
+    this.sendTo(ws, {
+      type: "snapshot",
+      room: {
+        roomId: this.getMeta("room_id") ?? "",
+        inviteCode: this.getMeta("invite_code") ?? "",
+      },
+      self: { userId },
+      notes: filterVisible({ viewerId: userId }, notes),
+    });
+  }
+
+  // subject の可視性を受信者ごとに判定して配信する。except は送信者除外用。
+  private broadcast(
+    message: ServerMessage,
+    subject: ProtocolNote,
+    except?: WebSocket,
+  ): void {
+    const payload = JSON.stringify(message);
+    for (const socket of this.ctx.getWebSockets()) {
+      if (socket === except) continue;
+      const attachment =
+        socket.deserializeAttachment() as SocketAttachment | null;
+      if (!attachment) continue;
+      if (!visibleTo({ viewerId: attachment.userId }, subject)) continue;
+      socket.send(payload);
+    }
+  }
+
+  private sendTo(ws: WebSocket, message: ServerMessage): void {
+    ws.send(JSON.stringify(message));
+  }
+
+  private sendNotFound(ws: WebSocket): void {
+    this.sendTo(ws, {
+      type: "error",
+      code: "not-found",
+      message: "付箋が見つかりませんでした。",
+    });
+  }
+
+  // ------------------------------------------------------------
+  // ストレージアクセス
+  // ------------------------------------------------------------
+
+  private findNote(noteId: string): NoteRow | null {
+    const rows = this.ctx.storage.sql
+      .exec("SELECT * FROM notes WHERE id = ?1", noteId)
+      .toArray();
+    return rows.length > 0 ? (rows[0] as unknown as NoteRow) : null;
+  }
+
+  private listNotes(): ProtocolNote[] {
+    return this.ctx.storage.sql
+      .exec("SELECT * FROM notes ORDER BY created_at")
+      .toArray()
+      .map((row) => this.toProtocolNote(row as unknown as NoteRow));
+  }
+
+  private toProtocolNote(row: NoteRow): ProtocolNote {
+    return {
+      id: row.id,
+      roomId: this.getMeta("room_id") ?? "",
+      authorId: row.author_id,
+      content: row.content,
+      x: row.x,
+      y: row.y,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  private getMeta(key: string): string | null {
+    const rows = this.ctx.storage.sql
+      .exec("SELECT value FROM meta WHERE key = ?1", key)
+      .toArray();
+    return rows.length > 0 ? String(rows[0]?.value) : null;
+  }
+
+  private setMeta(key: string, value: string): void {
+    this.ctx.storage.sql.exec(
+      "INSERT INTO meta (key, value) VALUES (?1, ?2) ON CONFLICT (key) DO UPDATE SET value = ?2",
+      key,
+      value,
+    );
   }
 }

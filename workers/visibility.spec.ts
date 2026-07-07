@@ -1,0 +1,61 @@
+// visibleTo のテーブル駆動テスト。
+// フェーズ・ロールの分岐を visibility.ts に追加するときは、このテーブルに
+// 必ず対応する行を足す（分岐がテーブルにないままのマージはレビューで差し戻す）。
+import { describe, expect, it } from "vitest";
+import type { ProtocolNote } from "../contracts/room-protocol";
+import { filterVisible, visibleTo } from "./visibility";
+
+const AUTHOR = "11111111-1111-4111-8111-111111111111";
+const VIEWER = "22222222-2222-4222-8222-222222222222";
+
+function note(overrides?: Partial<ProtocolNote>): ProtocolNote {
+  return {
+    id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    roomId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    authorId: AUTHOR,
+    content: "メモ",
+    x: 100,
+    y: 100,
+    createdAt: "2026-07-07T00:00:00.000Z",
+    updatedAt: "2026-07-07T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+// フェーズ概念の導入時に { phase, viewer, note作者, expected } の形へ拡張する。
+const TABLE: Array<{
+  name: string;
+  viewerId: string;
+  note: ProtocolNote;
+  expected: boolean;
+}> = [
+  {
+    name: "共有ボード: 作者本人は自分の付箋を見られる",
+    viewerId: AUTHOR,
+    note: note(),
+    expected: true,
+  },
+  {
+    name: "共有ボード: 他のメンバーも付箋を見られる",
+    viewerId: VIEWER,
+    note: note(),
+    expected: true,
+  },
+];
+
+describe("visibleTo", () => {
+  for (const row of TABLE) {
+    it(row.name, () => {
+      expect(visibleTo({ viewerId: row.viewerId }, row.note)).toBe(
+        row.expected,
+      );
+    });
+  }
+});
+
+describe("filterVisible", () => {
+  it("visibleTo の判定でスナップショットを絞り込む", () => {
+    const notes = [note({ id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc" })];
+    expect(filterVisible({ viewerId: VIEWER }, notes)).toEqual(notes);
+  });
+});
