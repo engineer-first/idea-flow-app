@@ -134,6 +134,20 @@ describe("NoteCard", () => {
       expect(textarea).toHaveAttribute("readonly");
       expect(getNoteSurface()).toHaveFocus();
     });
+
+    it("Escapeでの編集終了でも編集内容は保存される（キャンセルではなくコミット）", () => {
+      // tldraw の Note shape 踏襲: Escape は「編集の完了」であり、blur と同じく
+      // 内容を確定する。誤って Escape を押したときに入力が消えるのを防ぐ意図。
+      const onContentChange = vi.fn();
+      setup({ isSelected: true, onContentChange });
+
+      clickNote();
+      const textarea = screen.getByRole("textbox");
+      fireEvent.change(textarea, { target: { value: "編集した本文" } });
+      fireEvent.keyDown(textarea, { key: "Escape" });
+
+      expect(onContentChange).toHaveBeenCalledWith("note-1", "編集した本文");
+    });
   });
 
   describe("キーボード削除", () => {

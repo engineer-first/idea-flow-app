@@ -217,6 +217,9 @@ export function NoteCard({
         onKeyDown={(event) => {
           if (event.key === "Escape") {
             event.stopPropagation();
+            // Escape はキャンセルではなく「編集の完了」（tldraw 踏襲）。
+            // 編集終了でフォーカスがサーフェスへ移り、上の onBlur が発火して
+            // 内容が確定する。誤操作で入力を失わせないための意図的な挙動。
             setIsEditing(false);
           }
         }}
