@@ -1,3 +1,20 @@
+export const SUPABASE_CONFIGURATION_ERROR_MESSAGE =
+  "Supabaseの環境変数を設定してください。";
+
+export function getLoginErrorPath(message: string, next = "/") {
+  const params = new URLSearchParams({ error: message });
+
+  if (next !== "/") {
+    params.set("next", next);
+  }
+
+  return `/login?${params.toString()}`;
+}
+
+export function getSupabaseConfigurationErrorLoginPath(next = "/") {
+  return getLoginErrorPath(SUPABASE_CONFIGURATION_ERROR_MESSAGE, next);
+}
+
 export function sanitizeNextPath(value: FormDataEntryValue | string | null) {
   if (typeof value !== "string") {
     return "/";

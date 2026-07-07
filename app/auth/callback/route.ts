@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { getSupabaseConfigurationErrorLoginPath } from "@/app/auth/redirects";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
 
   if (!isSupabaseConfigured()) {
     return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent("Supabaseの環境変数を設定してください。")}`,
+      `${origin}${getSupabaseConfigurationErrorLoginPath()}`,
     );
   }
 

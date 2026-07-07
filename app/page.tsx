@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { signOut } from "@/app/auth/actions";
+import { SUPABASE_CONFIGURATION_ERROR_MESSAGE } from "@/app/auth/redirects";
 import { createRoom } from "@/app/rooms/actions";
 import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/supabase/auth";
@@ -12,7 +13,7 @@ export default async function Home() {
     return (
       <main>
         <h1>IdeaFlow</h1>
-        <p>Supabaseの環境変数を設定してください。</p>
+        <p>{SUPABASE_CONFIGURATION_ERROR_MESSAGE}</p>
         <p>
           <code>.env.example</code>を参考に<code>.env.local</code>を作成します。
         </p>

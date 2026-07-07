@@ -1,18 +1,16 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { sanitizeNextPath } from "@/app/auth/redirects";
+import {
+  getLoginErrorPath,
+  SUPABASE_CONFIGURATION_ERROR_MESSAGE,
+  sanitizeNextPath,
+} from "@/app/auth/redirects";
 import { isDevAuthEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 
 function loginError(message: string, next = "/"): never {
-  const params = new URLSearchParams({ error: message });
-
-  if (next !== "/") {
-    params.set("next", next);
-  }
-
-  redirect(`/login?${params.toString()}`);
+  redirect(getLoginErrorPath(message, next));
 }
 
 function getBaseUrl() {
@@ -33,7 +31,7 @@ export async function signInWithGoogle(formData: FormData) {
   const next = sanitizeNextPath(formData.get("next"));
 
   if (!isSupabaseConfigured()) {
-    loginError("Supabaseの環境変数を設定してください。", next);
+    loginError(SUPABASE_CONFIGURATION_ERROR_MESSAGE, next);
   }
 
   const supabase = await createClient();
@@ -63,7 +61,7 @@ export async function signInWithPassword(formData: FormData) {
   }
 
   if (!isSupabaseConfigured()) {
-    loginError("Supabaseの環境変数を設定してください。", next);
+    loginError(SUPABASE_CONFIGURATION_ERROR_MESSAGE, next);
   }
 
   const email = String(formData.get("email") ?? "");

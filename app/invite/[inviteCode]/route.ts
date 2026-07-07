@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { getSupabaseConfigurationErrorLoginPath } from "@/app/auth/redirects";
 import {
   getInviteFailureRedirectPath,
   isInvalidOrExpiredInviteError,
@@ -23,10 +24,7 @@ export async function GET(request: NextRequest, context: InviteRouteContext) {
   const { inviteCode } = await context.params;
 
   if (!isSupabaseConfigured()) {
-    return redirectTo(
-      request,
-      `/login?error=${encodeURIComponent("Supabaseの環境変数を設定してください。")}`,
-    );
+    return redirectTo(request, getSupabaseConfigurationErrorLoginPath());
   }
 
   const user = await getCurrentUser();
