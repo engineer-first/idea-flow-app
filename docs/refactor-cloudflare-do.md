@@ -173,6 +173,35 @@ Playwright で実ブラウザを操作して確認:
 この時点で Supabase への参照は `lib/supabase/*`（未使用）と
 `app/whiteboard/`（tldraw PoC）だけになり、Phase 4 で撤去する。
 
+## Phase 4: 撤去と規約更新（完了）
+
+### 撤去したもの
+
+- `supabase/`（migration・pgTAP。仕様は Phase 1〜2 で workers テストへ移植済み）
+- `lib/supabase/`・`app/whiteboard/`（tldraw PoC）・`scripts/seed-dev-users.mjs`
+  （開発ユーザーはログイン時に自動作成されるためシード不要になった）
+- npm 依存: `@supabase/ssr` / `@supabase/supabase-js` / `supabase`(CLI) / `tldraw`
+- `.mcp.json` の supabase MCP サーバー、`.claude`/`.agents` 配下の Supabase 系スキル
+- `docs/local-supabase-google-auth.md`（Google ログインは OIDC 直接実装になった）
+
+### 規約・ドキュメントの更新
+
+- **AGENTS.md（CLAUDE.md）**: テスト方針を vitest-pool-workers 前提に改訂。
+  「可視性は visibleTo() に一点集約」「書き換え禁止フィールドはプロトコルの形で塞ぐ」
+  「否定系テストを先に書く」を新しい認可規約として明文化。
+- **README**: 環境構築を wrangler 前提に書き換え（Docker 不要になった）。
+  デプロイ手順（D1 作成・secret 設定）を追記。
+- **CI**: `test:workers` ジョブを追加し、build を `build:cf`（OpenNext）に変更。
+- **レビューエージェント**: `rls-security-reviewer` → `authz-security-reviewer` に改名し、
+  観点を DO の選択的送信・プロトコル・深層防御へ書き換え。
+- **verify スキル**: 起動レシピを dev:api + dev の2プロセス構成に更新。
+
+### 検証
+
+typecheck / lint / アプリテスト99件 / workers テスト45件 / OpenNext ビルド /
+Storybook ビルドすべて green。Supabase への参照はコード上ゼロ
+（docs の歴史的記録と、移植元を示すコメントのみ残る）。
+
 ## 参照
 
 - 技術再評価メモ: <https://junhat6.github.io/claude-artifacts/2026-07-07-ideaflow-stack-reeval.html>

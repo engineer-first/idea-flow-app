@@ -2,9 +2,9 @@
 
 import { useCallback, useState } from "react";
 import { NoteCard } from "@/app/rooms/[id]/note-card";
-// ルームボードの表示用コンポーネント。Supabase には一切依存せず、
+// ルームボードの表示用コンポーネント。データ層には一切依存せず、
 // 付箋の配列と各種コールバックをpropsで受け取る。
-// Realtimeの購読・スロットル・Server Actionsの呼び出しはroom-board.tsx（コンテナ）の責務。
+// WebSocket接続・スロットル・プロトコル送信はroom-board.tsx（コンテナ）の責務。
 // 「どの付箋を選択中か」は同期不要な純粋にUIの関心事なので、ここでローカルに持つ。
 import { BOARD_HEIGHT, BOARD_WIDTH } from "@/app/rooms/board-constants";
 import type { Note } from "@/app/rooms/notes-reducer";

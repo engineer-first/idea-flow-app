@@ -12,7 +12,6 @@
       "!next-env.d.ts",
       "!package-lock.json",
       "!public",
-      "!supabase/.temp",
       "!.open-next",
       "!.wrangler",
       "!storybook-static",
