@@ -7,18 +7,6 @@
 // からの位置更新を無視し、ローカルの操作を優先する。そうしないと、ドラッグ中に
 // 古い位置を運ぶ UPDATE/DRAG イベントを受信した瞬間に付箋が巻き戻って見えてしまう。
 
-// notes テーブルの行そのもの（snake_case、DBスキーマに追従）。
-export type NoteRow = {
-  id: string;
-  room_id: string;
-  author_id: string;
-  content: string;
-  x: number;
-  y: number;
-  created_at: string;
-  updated_at: string;
-};
-
 // アプリケーションで扱うドメインモデル（camelCase）。
 export type Note = {
   id: string;
@@ -30,19 +18,6 @@ export type Note = {
   createdAt: string;
   updatedAt: string;
 };
-
-export function toNote(row: NoteRow): Note {
-  return {
-    id: row.id,
-    roomId: row.room_id,
-    authorId: row.author_id,
-    content: row.content,
-    x: row.x,
-    y: row.y,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
 
 // realtime.broadcast_changes トリガー由来のイベントと、
 // クライアント発のドラッグ中イベントを共通の判別可能ユニオンで表現する。

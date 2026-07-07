@@ -1,5 +1,4 @@
 // セッション・認証まわりの環境変数アクセス。
-// （lib/supabase/env.ts の後継。Supabase 依存の撤去にあわせて置き換える）
 // git 履歴に漏れた既知の値。本番で誤って再利用されないよう拒否する。
 // workers/lib/session-secret.ts の KNOWN_INSECURE_SECRETS と一致させる。
 const KNOWN_INSECURE_SECRETS = ["dev-session-secret-change-in-production!!"];

@@ -69,7 +69,7 @@ export class RoomDO extends DurableObject {
   // RPC（api-worker からのみ呼ばれる）
   // ------------------------------------------------------------
 
-  // 冪等: 既にメンバーでも何も起きない（Supabase 時代の join_room と同じ契約）。
+  // 冪等: 既にメンバーでも何も起きない。
   join(userId: string): void {
     this.ctx.storage.sql.exec(
       "INSERT OR IGNORE INTO members (user_id) VALUES (?1)",
@@ -183,7 +183,7 @@ export class RoomDO extends DurableObject {
           roomId: this.getMeta("room_id") ?? "",
           authorId: userId,
           content: "",
-          // 新規付箋はボード中央付近に少しずつずらして配置する（PoC と同じ）。
+          // 新規付箋はボード中央付近に少しずつずらして配置する。
           x: NOTE_SPAWN_X_MIN + Math.random() * NOTE_SPAWN_JITTER,
           y: NOTE_SPAWN_Y_MIN + Math.random() * NOTE_SPAWN_JITTER,
           createdAt: now,

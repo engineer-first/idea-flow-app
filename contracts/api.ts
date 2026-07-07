@@ -19,7 +19,3 @@ export const RoomInfoResponseSchema = z.object({
   roomId: z.string().uuid(),
   inviteCode: z.string(),
 });
-
-export const ApiErrorSchema = z.object({
-  error: z.string(),
-});

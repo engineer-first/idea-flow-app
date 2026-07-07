@@ -68,7 +68,7 @@ export function NoteCard({
   const surfaceRef = useRef<HTMLButtonElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // 他ユーザーの編集がRealtime経由で届いたら反映する。
+  // 他ユーザーの編集がWebSocket（RoomDO）経由で届いたら反映する。
   // ただし自分が編集モードの間は上書きしない
   // （タイピング中に他人の更新で巻き戻るのを防ぐ）。
   useEffect(() => {

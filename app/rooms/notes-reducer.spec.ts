@@ -1,21 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  applyNoteEvent,
-  type Note,
-  type NoteRow,
-  toNote,
-} from "@/app/rooms/notes-reducer";
-
-const row: NoteRow = {
-  id: "note-1",
-  room_id: "room-1",
-  author_id: "user-1",
-  content: "hello",
-  x: 10,
-  y: 20,
-  created_at: "2026-07-03T00:00:00.000Z",
-  updated_at: "2026-07-03T00:00:00.000Z",
-};
+import { applyNoteEvent, type Note } from "@/app/rooms/notes-reducer";
 
 const note: Note = {
   id: "note-1",
@@ -31,12 +15,6 @@ const note: Note = {
 function makeNote(overrides: Partial<Note> = {}): Note {
   return { ...note, ...overrides };
 }
-
-describe("toNote", () => {
-  it("DBの行（snake_case）をドメインのNote（camelCase）に変換する", () => {
-    expect(toNote(row)).toEqual(note);
-  });
-});
 
 describe("applyNoteEvent", () => {
   it("INSERTイベントで新しい付箋を追加する", () => {

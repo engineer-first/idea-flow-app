@@ -77,8 +77,7 @@ export async function upsertUserFromAssertion(
   return userId;
 }
 
-// ルーム行を作成する。招待コードの一意制約に衝突した場合は再生成してリトライする
-// （Supabase 時代の create_room() と同じ方針）。
+// ルーム行を作成する。招待コードの一意制約に衝突した場合は再生成してリトライする。
 export async function insertRoom(
   db: D1Database,
   hostId: string,
