@@ -11,14 +11,16 @@ export const KNOWN_INSECURE_SECRETS: readonly string[] = [
   "dev-session-secret-change-in-production!!",
 ];
 
-const MIN_SECRET_LENGTH = 16;
+// HS256 の鍵はハッシュ出力と同じ 256bit（32バイト）以上が RFC 7518 §3.2 の MUST。
+// 鍵材料になるのは文字列そのものではなく UTF-8 バイト列なので、バイト長で測る。
+const MIN_SECRET_BYTES = 32;
 
 export type SessionSecretIssue = "missing-or-short" | "known-insecure";
 
 export function sessionSecretIssue(
   secret: string | undefined,
 ): SessionSecretIssue | null {
-  if (!secret || secret.length < MIN_SECRET_LENGTH) {
+  if (!secret || new TextEncoder().encode(secret).length < MIN_SECRET_BYTES) {
     return "missing-or-short";
   }
   if (KNOWN_INSECURE_SECRETS.includes(secret)) {

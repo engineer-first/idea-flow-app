@@ -17,6 +17,20 @@ describe("sessionSecretIssue", () => {
     expect(sessionSecretIssue("short")).toBe("missing-or-short");
   });
 
+  // HS256 の鍵は RFC 7518 §3.2 でハッシュ出力と同じ 256bit（32バイト）以上が
+  // MUST。判定は文字数ではなく UTF-8 バイト長で行う。
+  it("31バイトの秘密は missing-or-short（HS256 の下限未満）", () => {
+    expect(sessionSecretIssue("a".repeat(31))).toBe("missing-or-short");
+  });
+
+  it("32バイトちょうどの秘密は null（問題なし）", () => {
+    expect(sessionSecretIssue("a".repeat(32))).toBeNull();
+  });
+
+  it("マルチバイト文字はバイト長で数える（11文字でも33バイトなら有効）", () => {
+    expect(sessionSecretIssue("あ".repeat(11))).toBeNull();
+  });
+
   it("git 履歴に漏れた既知の値は known-insecure", () => {
     expect(sessionSecretIssue(KNOWN_LEAKED)).toBe("known-insecure");
   });

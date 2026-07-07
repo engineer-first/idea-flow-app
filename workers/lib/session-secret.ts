@@ -10,7 +10,7 @@ export function requireSessionSecret(secret: string | undefined): string {
   const issue = sessionSecretIssue(secret);
   if (issue === "missing-or-short" || secret === undefined) {
     throw new Error(
-      "SESSION_SECRET が未設定または短すぎます。本番では `wrangler secret put SESSION_SECRET` で十分な長さの秘密を設定してください。",
+      "SESSION_SECRET が未設定または短すぎます。本番では `wrangler secret put SESSION_SECRET` で 32 バイト以上の秘密を設定してください。",
     );
   }
   if (issue === "known-insecure") {

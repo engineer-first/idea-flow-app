@@ -11,7 +11,7 @@ export function getSessionSecret(): string {
   const issue = sessionSecretIssue(secret);
   if (issue === "missing-or-short" || secret === undefined) {
     throw new Error(
-      "SESSION_SECRET が未設定または短すぎます。十分な長さの秘密を設定してください。",
+      "SESSION_SECRET が未設定または短すぎます。32バイト以上の秘密を設定してください。",
     );
   }
   if (issue === "known-insecure") {
