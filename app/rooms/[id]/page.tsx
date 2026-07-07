@@ -37,12 +37,16 @@ export default async function RoomPage({ params }: RoomPageProps) {
     notFound();
   }
 
-  // 付箋の初期データは Phase 3 で WebSocket 接続時のスナップショットに置き換わる。
+  // 付箋の初期状態は空。接続直後に RoomDO が snapshot を送る。
+  // key={roomId} で、クライアント遷移（/rooms/A → /rooms/B）時に RoomBoard を
+  // 強制的に再マウントする。これがないと notes state（や draggingNoteId）が
+  // 旧ルームの値を保持し、新ルームの snapshot が届くまで旧データが表示される。
   return (
     <main className="flex h-screen flex-col gap-4 p-4">
       <h1 className="text-lg font-semibold">IdeaFlow ルーム</h1>
       <div className="min-h-0 flex-1">
         <RoomBoard
+          key={parsed.data.roomId}
           roomId={parsed.data.roomId}
           inviteCode={parsed.data.inviteCode}
           initialNotes={[]}
