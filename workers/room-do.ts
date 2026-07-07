@@ -19,11 +19,9 @@ import {
 } from "../contracts/room-protocol";
 import { filterVisible, visibleTo } from "./visibility";
 
-// api-worker がセッション検証済みのユーザーIDとルーム情報を DO へ引き継ぐヘッダー。
-// DO は外部から直接到達できないため、これらは常に api-worker が設定する。
+// api-worker がセッション検証済みのユーザーIDを DO へ引き継ぐヘッダー。
+// DO は外部から直接到達できないため、これは常に api-worker が設定する。
 export const USER_ID_HEADER = "X-Idea-Flow-User-Id";
-export const ROOM_ID_HEADER = "X-Idea-Flow-Room-Id";
-export const INVITE_CODE_HEADER = "X-Idea-Flow-Invite-Code";
 
 type SocketAttachment = {
   userId: string;
@@ -57,10 +55,10 @@ export class RoomDO extends DurableObject {
            created_at TEXT NOT NULL,
            updated_at TEXT NOT NULL
          );
-         CREATE TABLE IF NOT EXISTS meta (
-           key TEXT PRIMARY KEY,
-           value TEXT NOT NULL
-         );`,
+         -- 旧バージョンが招待コード等をキャッシュしていた meta テーブルの掃除。
+         -- 招待コードはベアラートークン相当の秘密なので、どこからも読まれない
+         -- 複製を既存 DO のストレージに残さない（全 DO 移行後にこの行は削除可）。
+         DROP TABLE IF EXISTS meta;`,
       );
     });
   }
@@ -108,13 +106,6 @@ export class RoomDO extends DurableObject {
     if (!userId || !this.isMember(userId)) {
       return new Response("forbidden", { status: 403 });
     }
-
-    // ルーム情報（snapshot 用）を保存する。D1 が真実だが、接続経路で毎回
-    // 引き継がれるためここでのキャッシュは常に最新に保たれる。
-    const roomId = request.headers.get(ROOM_ID_HEADER);
-    const inviteCode = request.headers.get(INVITE_CODE_HEADER);
-    if (roomId) this.setMeta("room_id", roomId);
-    if (inviteCode) this.setMeta("invite_code", inviteCode);
 
     const pair = new WebSocketPair();
     const client = pair[0];
@@ -180,7 +171,6 @@ export class RoomDO extends DurableObject {
         const now = new Date().toISOString();
         const note: ProtocolNote = {
           id: crypto.randomUUID(),
-          roomId: this.getMeta("room_id") ?? "",
           authorId: userId,
           content: "",
           // 新規付箋はボード中央付近に少しずつずらして配置する。
@@ -205,11 +195,8 @@ export class RoomDO extends DurableObject {
       }
 
       case "note:update-content": {
-        const row = this.findNote(message.noteId);
-        if (!row) {
-          this.sendNotFound(ws);
-          return;
-        }
+        const row = this.requireNote(ws, message.noteId);
+        if (!row) return;
         // 共同編集: メンバーなら誰でも本文を更新できる（旧 RLS と同じ仕様）。
         // authorId はメッセージに存在しないため書き換えは構造的に不可能。
         const updatedAt = new Date().toISOString();
@@ -229,11 +216,8 @@ export class RoomDO extends DurableObject {
       }
 
       case "note:move": {
-        const row = this.findNote(message.noteId);
-        if (!row) {
-          this.sendNotFound(ws);
-          return;
-        }
+        const row = this.requireNote(ws, message.noteId);
+        if (!row) return;
         const updatedAt = new Date().toISOString();
         this.ctx.storage.sql.exec(
           "UPDATE notes SET x = ?2, y = ?3, updated_at = ?4 WHERE id = ?1",
@@ -275,11 +259,8 @@ export class RoomDO extends DurableObject {
       }
 
       case "note:delete": {
-        const row = this.findNote(message.noteId);
-        if (!row) {
-          this.sendNotFound(ws);
-          return;
-        }
+        const row = this.requireNote(ws, message.noteId);
+        if (!row) return;
         // 削除は author のみ（旧 RLS の DELETE ポリシーと同じ仕様）。
         if (row.author_id !== userId) {
           this.sendTo(ws, {
@@ -317,11 +298,6 @@ export class RoomDO extends DurableObject {
     const notes = this.listNotes();
     this.sendTo(ws, {
       type: "snapshot",
-      room: {
-        roomId: this.getMeta("room_id") ?? "",
-        inviteCode: this.getMeta("invite_code") ?? "",
-      },
-      self: { userId },
       notes: filterVisible({ viewerId: userId }, notes),
     });
   }
@@ -366,6 +342,18 @@ export class RoomDO extends DurableObject {
     return rows.length > 0 ? (rows[0] as unknown as NoteRow) : null;
   }
 
+  // note:update-content / note:move / note:delete で共通の
+  // 「見つからなければ not-found を返して打ち切る」を1箇所にまとめる。
+  // note:drag は高頻度なため意図的にこのヘルパーを使わず黙って捨てる。
+  private requireNote(ws: WebSocket, noteId: string): NoteRow | null {
+    const row = this.findNote(noteId);
+    if (!row) {
+      this.sendNotFound(ws);
+      return null;
+    }
+    return row;
+  }
+
   private listNotes(): ProtocolNote[] {
     return this.ctx.storage.sql
       .exec("SELECT * FROM notes ORDER BY created_at")
@@ -376,7 +364,6 @@ export class RoomDO extends DurableObject {
   private toProtocolNote(row: NoteRow): ProtocolNote {
     return {
       id: row.id,
-      roomId: this.getMeta("room_id") ?? "",
       authorId: row.author_id,
       content: row.content,
       x: row.x,
@@ -384,20 +371,5 @@ export class RoomDO extends DurableObject {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
-  }
-
-  private getMeta(key: string): string | null {
-    const rows = this.ctx.storage.sql
-      .exec("SELECT value FROM meta WHERE key = ?1", key)
-      .toArray();
-    return rows.length > 0 ? String(rows[0]?.value) : null;
-  }
-
-  private setMeta(key: string, value: string): void {
-    this.ctx.storage.sql.exec(
-      "INSERT INTO meta (key, value) VALUES (?1, ?2) ON CONFLICT (key) DO UPDATE SET value = ?2",
-      key,
-      value,
-    );
   }
 }

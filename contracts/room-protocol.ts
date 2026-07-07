@@ -3,8 +3,12 @@
 // 境界を流れるメッセージはすべてここで検証される。
 //
 // 設計上の不変条件:
-// - authorId / roomId を書き換えるメッセージは存在しない（構造的に不可能にする）。
+// - authorId を書き換えるメッセージは存在しない（構造的に不可能にする）。
 //   Supabase 時代に列レベル GRANT で塞いだ権限昇格攻撃を、プロトコルの形で塞ぐ。
+//   authorId はサーバーが接続時のヘッダー（検証済みユーザーID）から決める。
+// - roomId はそもそもプロトコルに現れない。1 RoomDO = 1 ルームなので、
+//   接続先（どの DO に繋いでいるか）自体が roomId を意味しており、
+//   メッセージの中に含めて信頼する必要がない。
 // - note:drag は永続化されない一時データ。確定は note:move だけが行う。
 import { z } from "zod";
 import { BOARD_HEIGHT, BOARD_WIDTH } from "./board";
@@ -13,7 +17,6 @@ export const NOTE_CONTENT_MAX_LENGTH = 2000;
 
 export const NoteSchema = z.object({
   id: z.string().uuid(),
-  roomId: z.string().uuid(),
   authorId: z.string().uuid(),
   content: z.string(),
   x: z.number(),
@@ -70,11 +73,6 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
   // 接続直後・再接続時に現在状態を一括送信する（復帰パスの本体）
   z.object({
     type: z.literal("snapshot"),
-    room: z.object({
-      roomId: z.string().uuid(),
-      inviteCode: z.string(),
-    }),
-    self: z.object({ userId: z.string().uuid() }),
     notes: z.array(NoteSchema),
   }),
   z.object({ type: z.literal("note:inserted"), note: NoteSchema }),

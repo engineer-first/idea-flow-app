@@ -2,8 +2,9 @@
 // Supabase 時代の pgTAP テストのうち付箋の認可仕様をプロトコル境界に移植した:
 // - メンバーは他人の付箋の content / 位置を更新できる（共同編集）
 // - author 以外は削除できない（forbidden エラー、付箋は残る）
-// - authorId / roomId の書き換えは「そもそもメッセージが存在しない」ため構造的に不可能
+// - authorId の書き換えは「そもそもメッセージが存在しない」ため構造的に不可能
 //   （旧: 列レベル GRANT。update-content が authorId を変えないことをここで固定する）
+//   なお roomId はプロトコルに現れない（note には含まれない）
 // 加えて PoC の同期セマンティクスを検証する:
 // - note:drag は永続化されず、送信者自身にはエコーされない
 // - 再接続時は snapshot で現在状態へ復帰できる（R1 復帰パス）
@@ -78,14 +79,14 @@ async function createNote(room: {
 }
 
 describe("snapshot（接続・再接続の復帰パス）", () => {
-  it("接続直後に room 情報・自分の userId・付箋一覧が届く", async () => {
-    const { roomId, inviteCode } = await createRoomAs(OWNER);
+  it("接続直後に付箋一覧が届く（roomId はプロトコルに現れない）", async () => {
+    const { roomId } = await createRoomAs(OWNER);
     const socket = await connectRoomAs(OWNER, roomId);
     const snapshot = await expectType(socket, "snapshot");
 
-    expect(snapshot.room).toEqual({ roomId, inviteCode });
-    expect(snapshot.self).toEqual({ userId: OWNER.sub });
     expect(snapshot.notes).toEqual([]);
+    expect(snapshot).not.toHaveProperty("room");
+    expect(snapshot).not.toHaveProperty("self");
     socket.close();
   });
 
@@ -122,7 +123,7 @@ describe("snapshot（接続・再接続の復帰パス）", () => {
 
 describe("note:create", () => {
   it("作成者を authorId として全メンバーに note:inserted が届く", async () => {
-    const { roomId, owner, member } = await setupRoom();
+    const { owner, member } = await setupRoom();
 
     send(owner, { type: "note:create" });
     const toOwner = await expectType(owner, "note:inserted");
@@ -130,7 +131,7 @@ describe("note:create", () => {
 
     expect(toOwner.note).toEqual(toMember.note);
     expect(toOwner.note.authorId).toBe(OWNER.sub);
-    expect(toOwner.note.roomId).toBe(roomId);
+    expect(toOwner.note).not.toHaveProperty("roomId");
     expect(toOwner.note.content).toBe("");
     // 新規付箋はボード中央付近に配置される（PoC と同じ挙動）
     expect(toOwner.note.x).toBeGreaterThanOrEqual(NOTE_SPAWN_X_MIN);

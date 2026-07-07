@@ -57,7 +57,6 @@ class FakeWebSocket {
 function protocolNote(overrides?: Partial<ProtocolNote>): ProtocolNote {
   return {
     id: NOTE_ID,
-    roomId: ROOM_ID,
     authorId: USER_ID,
     content: "最初の付箋",
     x: 100,
@@ -92,8 +91,6 @@ function connectWithSnapshot(notes: ProtocolNote[] = []) {
   act(() =>
     socket.simulateServerMessage({
       type: "snapshot",
-      room: { roomId: ROOM_ID, inviteCode: "AB12CD" },
-      self: { userId: USER_ID },
       notes,
     }),
   );

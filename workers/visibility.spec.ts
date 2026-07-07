@@ -11,7 +11,6 @@ const VIEWER = "22222222-2222-4222-8222-222222222222";
 function note(overrides?: Partial<ProtocolNote>): ProtocolNote {
   return {
     id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    roomId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
     authorId: AUTHOR,
     content: "メモ",
     x: 100,

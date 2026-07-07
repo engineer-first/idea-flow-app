@@ -5,7 +5,6 @@ import type { Note } from "@/app/rooms/notes-reducer";
 export function buildNote(overrides: Partial<Note> = {}): Note {
   return {
     id: "note-1",
-    roomId: "room-1",
     authorId: "user-1",
     content: "付箋の本文",
     x: 100,

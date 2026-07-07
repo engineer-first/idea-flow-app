@@ -22,12 +22,7 @@ import {
 } from "./lib/db";
 import { getSessionFromRequest } from "./lib/session";
 import { requireSessionSecret } from "./lib/session-secret";
-import {
-  INVITE_CODE_HEADER,
-  ROOM_ID_HEADER,
-  RoomDO,
-  USER_ID_HEADER,
-} from "./room-do";
+import { RoomDO, USER_ID_HEADER } from "./room-do";
 
 export { RoomDO };
 
@@ -163,9 +158,6 @@ async function handleRoomWebSocket(
 
   const headers = new Headers(request.headers);
   headers.set(USER_ID_HEADER, session.sub);
-  // snapshot 用のルーム情報（D1 が真実）を DO へ引き継ぐ。
-  headers.set(ROOM_ID_HEADER, room.roomId);
-  headers.set(INVITE_CODE_HEADER, room.inviteCode);
   return stub.fetch(request.url, { headers });
 }
 

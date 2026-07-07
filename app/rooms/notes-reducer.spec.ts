@@ -6,12 +6,10 @@ import {
 } from "@/app/rooms/notes-reducer";
 import type { ServerMessage } from "@/contracts/room-protocol";
 
-const ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 
 const note: Note = {
   id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-  roomId: ROOM_ID,
   authorId: USER_ID,
   content: "hello",
   x: 10,
@@ -28,8 +26,6 @@ describe("applyServerMessage", () => {
   it("snapshotで付箋を丸ごと置き換える", () => {
     const message: ServerMessage = {
       type: "snapshot",
-      room: { roomId: ROOM_ID, inviteCode: "AB12CD" },
-      self: { userId: USER_ID },
       notes: [note],
     };
 
@@ -43,8 +39,6 @@ describe("applyServerMessage", () => {
     const snapshotNote = makeNote({ x: 0, y: 0 });
     const message: ServerMessage = {
       type: "snapshot",
-      room: { roomId: ROOM_ID, inviteCode: "AB12CD" },
-      self: { userId: USER_ID },
       notes: [snapshotNote],
     };
 
