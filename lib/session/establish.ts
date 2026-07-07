@@ -30,17 +30,25 @@ export async function establishSession(
     expiresInSeconds: ASSERTION_TTL_SECONDS,
   });
 
-  const res = await apiFetch("/api/auth/sync", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ assertion: assertionToken }),
-  });
+  // ログインフローの中核なので、ネットワーク障害・タイムアウト・不正 JSON も
+  // 未処理例外にせず ok:false に畳む（呼び出し側がエラー表示へ倒せる形を保つ）。
+  let res: Response;
+  try {
+    res = await apiFetch("/api/auth/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ assertion: assertionToken }),
+    });
+  } catch {
+    return { ok: false, error: "ユーザー情報の同期に失敗しました。" };
+  }
 
   if (!res.ok) {
     return { ok: false, error: "ユーザー情報の同期に失敗しました。" };
   }
 
-  const parsed = SyncUserResponseSchema.safeParse(await res.json());
+  const body: unknown = await res.json().catch(() => null);
+  const parsed = SyncUserResponseSchema.safeParse(body);
   if (!parsed.success) {
     return { ok: false, error: "ユーザー情報の同期結果が不正です。" };
   }

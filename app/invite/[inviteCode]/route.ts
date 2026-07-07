@@ -37,12 +37,27 @@ export async function GET(
     body: JSON.stringify({ code: normalizeInviteCode(inviteCode) }),
   });
 
-  if (!res.ok) {
-    // 404（無効なコード）も 400（形式不正）も、利用者にはどちらも「無効な招待」。
+  // 404（無効なコード）も 400（形式不正）も、利用者にはどちらも「無効な招待」。
+  if (res.status === 400 || res.status === 404) {
     return NextResponse.redirect(new URL(`${invitePath}/invalid`, request.url));
   }
 
-  const parsed = JoinRoomResponseSchema.safeParse(await res.json());
+  // getCurrentUser 通過後に api-worker 側でセッションが無効になったケース。
+  // ログインし直せば招待は有効なので、invalid ではなくログインへ戻す。
+  if (res.status === 401) {
+    return NextResponse.redirect(
+      new URL(getLoginPath(invitePath), request.url),
+    );
+  }
+
+  // 5xx 等の障害を「招待が無効」と誤案内しない。error boundary に任せる。
+  if (!res.ok) {
+    throw new Error(`ルーム参加 API が失敗しました: ${res.status}`);
+  }
+
+  const parsed = JoinRoomResponseSchema.safeParse(
+    await res.json().catch(() => null),
+  );
   if (!parsed.success) {
     return NextResponse.redirect(new URL(`${invitePath}/invalid`, request.url));
   }

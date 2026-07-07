@@ -1,0 +1,122 @@
+// @vitest-environment node
+// createRoom / joinRoom の Server Actions 境界のテスト。
+// api-worker の応答が「非 2xx」「2xx だが不正 JSON」のどちらでも、未処理例外に
+// せずエラーリダイレクトへ倒れること（利用者に汎用 500 を見せない）を検証する。
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const { apiFetchMock, getCurrentUserMock, redirectMock } = vi.hoisted(() => ({
+  apiFetchMock:
+    vi.fn<(path: string, init?: RequestInit) => Promise<Response>>(),
+  getCurrentUserMock: vi.fn(),
+  redirectMock: vi.fn<(url: string) => never>(),
+}));
+
+vi.mock("@/lib/api-client", () => ({ apiFetch: apiFetchMock }));
+vi.mock("@/lib/session/current-user", () => ({
+  getCurrentUser: getCurrentUserMock,
+}));
+vi.mock("next/navigation", () => ({ redirect: redirectMock }));
+
+import { createRoom, joinRoom } from "@/app/rooms/actions";
+
+// 実物の redirect() は例外を投げて以降の処理を打ち切る。同じ制御フローを再現する。
+class RedirectSignal extends Error {
+  constructor(readonly url: string) {
+    super(`redirect: ${url}`);
+  }
+}
+
+async function callAndGetRedirect(
+  action: () => Promise<void>,
+): Promise<string> {
+  try {
+    await action();
+  } catch (error) {
+    if (error instanceof RedirectSignal) {
+      return error.url;
+    }
+    throw error;
+  }
+  throw new Error("redirect が呼ばれませんでした");
+}
+
+function joinFormData(code: string): FormData {
+  const formData = new FormData();
+  formData.set("code", code);
+  return formData;
+}
+
+beforeEach(() => {
+  redirectMock.mockImplementation((url: string) => {
+    throw new RedirectSignal(url);
+  });
+  getCurrentUserMock.mockResolvedValue({
+    sub: "123e4567-e89b-12d3-a456-426614174000",
+    email: "dev@example.com",
+  });
+});
+
+afterEach(() => {
+  vi.clearAllMocks();
+});
+
+describe("createRoom", () => {
+  it("未認証なら /login へリダイレクトする", async () => {
+    getCurrentUserMock.mockResolvedValue(null);
+
+    expect(await callAndGetRedirect(() => createRoom())).toBe("/login");
+    expect(apiFetchMock).not.toHaveBeenCalled();
+  });
+
+  it("作成に成功したらルームページへリダイレクトする", async () => {
+    apiFetchMock.mockResolvedValue(
+      Response.json({
+        roomId: "123e4567-e89b-12d3-a456-426614174000",
+        inviteCode: "ABC123",
+      }),
+    );
+
+    expect(await callAndGetRedirect(() => createRoom())).toBe(
+      "/rooms/123e4567-e89b-12d3-a456-426614174000",
+    );
+  });
+
+  it("API が非 2xx ならエラー付きでトップへ戻す", async () => {
+    apiFetchMock.mockResolvedValue(new Response("error", { status: 500 }));
+
+    expect(await callAndGetRedirect(() => createRoom())).toContain("/?error=");
+  });
+
+  it("API が 2xx でも不正 JSON ならエラー付きでトップへ戻す", async () => {
+    apiFetchMock.mockResolvedValue(new Response("<html>gateway error</html>"));
+
+    expect(await callAndGetRedirect(() => createRoom())).toContain("/?error=");
+  });
+});
+
+describe("joinRoom", () => {
+  it("形式不正の招待コードはエラー付きでトップへ戻す", async () => {
+    expect(
+      await callAndGetRedirect(() => joinRoom(joinFormData("bad"))),
+    ).toContain("/?error=");
+    expect(apiFetchMock).not.toHaveBeenCalled();
+  });
+
+  it("参加に成功したらルームページへリダイレクトする", async () => {
+    apiFetchMock.mockResolvedValue(
+      Response.json({ roomId: "123e4567-e89b-12d3-a456-426614174000" }),
+    );
+
+    expect(
+      await callAndGetRedirect(() => joinRoom(joinFormData("ABC123"))),
+    ).toBe("/rooms/123e4567-e89b-12d3-a456-426614174000");
+  });
+
+  it("API が 2xx でも不正 JSON ならエラー付きでトップへ戻す", async () => {
+    apiFetchMock.mockResolvedValue(new Response("<html>gateway error</html>"));
+
+    expect(
+      await callAndGetRedirect(() => joinRoom(joinFormData("ABC123"))),
+    ).toContain("/?error=");
+  });
+});

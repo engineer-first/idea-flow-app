@@ -36,8 +36,10 @@ export async function createRoom(): Promise<void> {
   }
 
   const res = await apiFetch("/api/rooms", { method: "POST" });
+  // 2xx でもボディが不正 JSON（プロキシの HTML エラーページ等）のことがある。
+  // 例外で落とさず、非 2xx と同じエラーリダイレクトへ倒す。
   const parsed = res.ok
-    ? CreateRoomResponseSchema.safeParse(await res.json())
+    ? CreateRoomResponseSchema.safeParse(await res.json().catch(() => null))
     : null;
 
   if (!parsed?.success) {
@@ -70,7 +72,7 @@ export async function joinRoom(formData: FormData): Promise<void> {
     body: JSON.stringify({ code: parsedInput.data.code }),
   });
   const parsed = res.ok
-    ? JoinRoomResponseSchema.safeParse(await res.json())
+    ? JoinRoomResponseSchema.safeParse(await res.json().catch(() => null))
     : null;
 
   if (!parsed?.success) {

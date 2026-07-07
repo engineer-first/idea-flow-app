@@ -22,6 +22,10 @@ function getServiceBinding(): FetcherLike | null {
   }
 }
 
+// api-worker が無応答のとき、呼び出し元の Server Action（createRoom 等）が
+// 無期限にブロックされないよう、外部呼び出しには必ず上限時間を設ける。
+const DEFAULT_TIMEOUT_MS = 10_000;
+
 export async function apiFetch(
   path: string,
   init?: RequestInit,
@@ -34,9 +38,11 @@ export async function apiFetch(
     headers.set("Cookie", `${SESSION_COOKIE_NAME}=${sessionToken}`);
   }
 
+  const signal = init?.signal ?? AbortSignal.timeout(DEFAULT_TIMEOUT_MS);
+
   const baseUrl = process.env.API_WORKER_URL;
   if (baseUrl) {
-    return fetch(new URL(path, baseUrl), { ...init, headers });
+    return fetch(new URL(path, baseUrl), { ...init, headers, signal });
   }
 
   const binding = getServiceBinding();
@@ -45,6 +51,7 @@ export async function apiFetch(
     return binding.fetch(`https://api-worker.internal${path}`, {
       ...init,
       headers,
+      signal,
     });
   }
 

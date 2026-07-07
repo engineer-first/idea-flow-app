@@ -44,38 +44,55 @@ export async function upsertUserFromAssertion(
     return assertion.userId;
   }
 
-  const bySub = await db
-    .prepare("SELECT id FROM users WHERE google_sub = ?1")
-    .bind(assertion.googleSub)
-    .first<{ id: string }>();
-  if (bySub) {
-    await db
-      .prepare("UPDATE users SET email = ?2, name = ?3 WHERE id = ?1")
-      .bind(bySub.id, assertion.email, assertion.name ?? null)
-      .run();
-    return bySub.id;
-  }
+  // 同一ユーザーの初回ログインが並行すると、両方が SELECT で未登録と判断して
+  // から INSERT に至り、片方が UNIQUE 違反（email / google_sub）になる。
+  // その時点で相手の INSERT は成功しているので、再解決すれば既存行に合流できる。
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const bySub = await db
+      .prepare("SELECT id FROM users WHERE google_sub = ?1")
+      .bind(assertion.googleSub)
+      .first<{ id: string }>();
+    if (bySub) {
+      await db
+        .prepare("UPDATE users SET email = ?2, name = ?3 WHERE id = ?1")
+        .bind(bySub.id, assertion.email, assertion.name ?? null)
+        .run();
+      return bySub.id;
+    }
 
-  const byEmail = await db
-    .prepare("SELECT id FROM users WHERE email = ?1")
-    .bind(assertion.email)
-    .first<{ id: string }>();
-  if (byEmail) {
-    await db
-      .prepare("UPDATE users SET google_sub = ?2, name = ?3 WHERE id = ?1")
-      .bind(byEmail.id, assertion.googleSub, assertion.name ?? null)
-      .run();
-    return byEmail.id;
-  }
+    const byEmail = await db
+      .prepare("SELECT id FROM users WHERE email = ?1")
+      .bind(assertion.email)
+      .first<{ id: string }>();
+    if (byEmail) {
+      await db
+        .prepare("UPDATE users SET google_sub = ?2, name = ?3 WHERE id = ?1")
+        .bind(byEmail.id, assertion.googleSub, assertion.name ?? null)
+        .run();
+      return byEmail.id;
+    }
 
-  const userId = crypto.randomUUID();
-  await db
-    .prepare(
-      "INSERT INTO users (id, email, name, google_sub) VALUES (?1, ?2, ?3, ?4)",
-    )
-    .bind(userId, assertion.email, assertion.name ?? null, assertion.googleSub)
-    .run();
-  return userId;
+    const userId = crypto.randomUUID();
+    try {
+      await db
+        .prepare(
+          "INSERT INTO users (id, email, name, google_sub) VALUES (?1, ?2, ?3, ?4)",
+        )
+        .bind(
+          userId,
+          assertion.email,
+          assertion.name ?? null,
+          assertion.googleSub,
+        )
+        .run();
+      return userId;
+    } catch (error) {
+      if (!isUniqueViolation(error)) {
+        throw error;
+      }
+    }
+  }
+  throw new Error("ユーザーの作成に失敗しました。もう一度お試しください。");
 }
 
 // ルーム行を作成する。招待コードの一意制約に衝突した場合は再生成してリトライする。
