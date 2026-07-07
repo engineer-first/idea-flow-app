@@ -7,6 +7,7 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { isEmailVerified } from "@/app/auth/google-claims";
 import { sanitizeNextPath } from "@/app/auth/redirects";
 import { OAUTH_STATE_COOKIE } from "@/lib/session/cookie";
 import {
@@ -122,7 +123,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return redirectToLogin(origin, "ログインをやり直してください。");
   }
 
-  if (claims.email_verified === false) {
+  // クレーム欠落も未検証扱い（fail-closed）。email でのアカウントリンクがあるため。
+  if (!isEmailVerified(claims)) {
     return redirectToLogin(origin, "メールアドレスが確認されていません。");
   }
 
