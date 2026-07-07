@@ -3,7 +3,8 @@
 // その状態で既知のフォールバック値へ暗黙に落ちると、リポジトリを読める攻撃者が
 // JWT を偽造できてしまう。そうならないよう「設定漏れは起動時に落とす」。
 import { describe, expect, it } from "vitest";
-import { KNOWN_INSECURE_SECRETS, requireSessionSecret } from "./session-secret";
+import { KNOWN_INSECURE_SECRETS } from "../../lib/session/secret";
+import { requireSessionSecret } from "./session-secret";
 
 describe("requireSessionSecret", () => {
   it("十分な長さの秘密はそのまま返す", () => {

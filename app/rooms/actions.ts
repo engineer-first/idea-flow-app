@@ -9,13 +9,13 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import {
-  isValidInviteCode,
-  normalizeInviteCode,
-} from "@/app/rooms/invite-code";
-import {
   CreateRoomResponseSchema,
   JoinRoomResponseSchema,
 } from "@/contracts/api";
+import {
+  isValidInviteCode,
+  normalizeInviteCode,
+} from "@/contracts/invite-code";
 import { apiFetch } from "@/lib/api-client";
 import { getCurrentUser } from "@/lib/session/current-user";
 

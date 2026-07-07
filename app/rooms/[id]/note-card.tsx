@@ -12,14 +12,14 @@
 // 編集状態(isEditing)はこの付箋に閉じた関心事なのでローカルに持つ。
 import { useEffect, useRef, useState } from "react";
 import { getNoteShadow } from "@/app/rooms/[id]/note-shadow";
+import type { Note } from "@/app/rooms/notes-reducer";
 import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
   DRAG_THRESHOLD_PX,
   NOTE_HEIGHT,
   NOTE_WIDTH,
-} from "@/app/rooms/board-constants";
-import type { Note } from "@/app/rooms/notes-reducer";
+} from "@/contracts/board";
 import { NOTE_CONTENT_MAX_LENGTH } from "@/contracts/room-protocol";
 
 export type NoteCardProps = {

@@ -77,6 +77,20 @@ describe("check-boundaries hook", () => {
     expect(result.stderr).toBe("");
   });
 
+  it("blocks workers files that import app modules", () => {
+    const dir = createProject();
+    const file = writeProjectFile(
+      dir,
+      "workers/api-worker.ts",
+      'import { normalizeInviteCode } from "../app/rooms/invite-code";\nexport const x = normalizeInviteCode;\n',
+    );
+
+    const result = runHook(dir, file);
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("no-app-import-inside-workers");
+  });
+
   it("allows app files without workers imports", () => {
     const dir = createProject();
     const file = writeProjectFile(

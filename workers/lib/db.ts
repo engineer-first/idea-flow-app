@@ -1,7 +1,8 @@
 // D1（ロビー層）へのクエリ。ルームの中身（メンバー・付箋）の真実は RoomDO が
 // 持つため、ここにあるのは「ユーザー」と「招待コード → ルーム解決」だけ。
+
+import { generateInviteCode } from "../../contracts/invite-code";
 import type { LoginAssertion } from "../../contracts/session";
-import { generateInviteCode } from "./invite-code";
 
 export type RoomRecord = {
   roomId: string;

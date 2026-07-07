@@ -12,9 +12,9 @@
 // 確定（note:deleted）を待ってから消すことで「消えたのに戻る」揺れを避ける。
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BoardView } from "@/app/rooms/[id]/board-view";
-import { DRAG_BROADCAST_THROTTLE_MS } from "@/app/rooms/board-constants";
 import { applyNoteEvent, type Note } from "@/app/rooms/notes-reducer";
 import { createThrottled } from "@/app/rooms/throttle";
+import { DRAG_BROADCAST_THROTTLE_MS } from "@/contracts/board";
 import type { ServerMessage } from "@/contracts/room-protocol";
 import {
   createRoomClient,

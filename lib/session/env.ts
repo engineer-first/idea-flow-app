@@ -1,26 +1,20 @@
 // セッション・認証まわりの環境変数アクセス。
-// git 履歴に漏れた既知の値。本番で誤って再利用されないよう拒否する。
-// workers/lib/session-secret.ts の KNOWN_INSECURE_SECRETS と一致させる。
-const KNOWN_INSECURE_SECRETS = ["dev-session-secret-change-in-production!!"];
-const MIN_SECRET_LENGTH = 16;
+// SESSION_SECRET の妥当性判定は lib/session/secret.ts に一点集約されている。
+import { sessionSecretIssue } from "@/lib/session/secret";
 
 export function isAuthConfigured(): boolean {
-  const secret = process.env.SESSION_SECRET;
-  return Boolean(
-    secret &&
-      secret.length >= MIN_SECRET_LENGTH &&
-      !KNOWN_INSECURE_SECRETS.includes(secret),
-  );
+  return sessionSecretIssue(process.env.SESSION_SECRET) === null;
 }
 
 export function getSessionSecret(): string {
   const secret = process.env.SESSION_SECRET;
-  if (!secret || secret.length < MIN_SECRET_LENGTH) {
+  const issue = sessionSecretIssue(secret);
+  if (issue === "missing-or-short" || secret === undefined) {
     throw new Error(
       "SESSION_SECRET が未設定または短すぎます。十分な長さの秘密を設定してください。",
     );
   }
-  if (KNOWN_INSECURE_SECRETS.includes(secret)) {
+  if (issue === "known-insecure") {
     throw new Error(
       "SESSION_SECRET が git 履歴に漏れた既知の値です。新しい秘密を生成してください。",
     );

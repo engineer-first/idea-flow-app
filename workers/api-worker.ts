@@ -2,10 +2,11 @@
 // すべてのエンドポイントはセッション（または署名済みログイン主張）を要求する。
 // Next 側は UI とセッション Cookie の発行だけを担い、データへは必ずここを通る。
 import { z } from "zod";
+import { isUuid } from "../contracts/ids";
 import {
   isValidInviteCode,
   normalizeInviteCode,
-} from "../app/rooms/invite-code";
+} from "../contracts/invite-code";
 import {
   LoginAssertionSchema,
   type SessionPayload,
@@ -29,9 +30,6 @@ import {
 } from "./room-do";
 
 export { RoomDO };
-
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const SyncRequestSchema = z.object({ assertion: z.string().min(1) });
 const JoinRequestSchema = z.object({ code: z.string() });
@@ -205,7 +203,7 @@ export default {
 
     const wsMatch = pathname.match(/^\/api\/rooms\/([^/]+)\/ws$/);
     if (method === "GET" && wsMatch?.[1]) {
-      if (!UUID_PATTERN.test(wsMatch[1])) {
+      if (!isUuid(wsMatch[1])) {
         return error(404, "ルームが見つかりませんでした。");
       }
       return handleRoomWebSocket(request, env, session, wsMatch[1]);
@@ -213,7 +211,7 @@ export default {
 
     const roomMatch = pathname.match(/^\/api\/rooms\/([^/]+)$/);
     if (method === "GET" && roomMatch?.[1]) {
-      if (!UUID_PATTERN.test(roomMatch[1])) {
+      if (!isUuid(roomMatch[1])) {
         return error(404, "ルームが見つかりませんでした。");
       }
       return handleGetRoom(env, session, roomMatch[1]);

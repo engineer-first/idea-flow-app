@@ -14,9 +14,9 @@ esac
 
 REL="${FILE#"$PROJECT_DIR"/}"
 
-# 境界ルールの対象は UI・共有層のみ。workers/ 自身は対象外。
+# 境界ルールの対象: UI・共有層（workers import 禁止）と workers/（app import 禁止）。
 case "$REL" in
-  app/*|lib/*|components/*|contracts/*) ;;
+  app/*|lib/*|components/*|contracts/*|workers/*) ;;
   *) exit 0 ;;
 esac
 

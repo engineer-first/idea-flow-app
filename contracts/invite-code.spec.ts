@@ -1,7 +1,12 @@
-// 招待コード生成の仕様。Supabase 時代の internal.generate_invite_code() から移植:
-// 誤読しやすい 0/O, 1/I を除いた32文字アルファベットから6文字を選ぶ。
+// 招待コード生成の仕様。誤読しやすい 0/O, 1/I を除いた32文字アルファベットから
+// 6文字を選ぶ。
 import { describe, expect, it, vi } from "vitest";
-import { generateInviteCode, INVITE_CODE_ALPHABET } from "./invite-code";
+import {
+  generateInviteCode,
+  INVITE_CODE_ALPHABET,
+  isValidInviteCode,
+  normalizeInviteCode,
+} from "@/contracts/invite-code";
 
 describe("generateInviteCode", () => {
   it("6文字のコードを生成する", () => {
@@ -42,5 +47,45 @@ describe("generateInviteCode", () => {
     const last = generateInviteCode(() => 0.999999);
     expect(first).toBe(INVITE_CODE_ALPHABET[0]?.repeat(6));
     expect(last).toBe(INVITE_CODE_ALPHABET[31]?.repeat(6));
+  });
+});
+
+describe("normalizeInviteCode", () => {
+  it("小文字を大文字に変換する", () => {
+    expect(normalizeInviteCode("ab12cd")).toBe("AB12CD");
+  });
+
+  it("前後の空白を取り除く", () => {
+    expect(normalizeInviteCode("  ab12cd  ")).toBe("AB12CD");
+  });
+
+  it("英数字以外の文字を取り除く", () => {
+    expect(normalizeInviteCode("ab-12 cd!")).toBe("AB12CD");
+  });
+});
+
+describe("isValidInviteCode", () => {
+  it("大文字英数字6桁は有効", () => {
+    expect(isValidInviteCode("AB12CD")).toBe(true);
+  });
+
+  it("5桁以下は無効", () => {
+    expect(isValidInviteCode("AB12C")).toBe(false);
+  });
+
+  it("7桁以上は無効", () => {
+    expect(isValidInviteCode("AB12CDE")).toBe(false);
+  });
+
+  it("小文字混じりは無効", () => {
+    expect(isValidInviteCode("ab12cd")).toBe(false);
+  });
+
+  it("記号を含む場合は無効", () => {
+    expect(isValidInviteCode("AB12-D")).toBe(false);
+  });
+
+  it("空文字は無効", () => {
+    expect(isValidInviteCode("")).toBe(false);
   });
 });

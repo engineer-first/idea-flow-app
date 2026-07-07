@@ -3,13 +3,13 @@
 import { useCallback, useState } from "react";
 import { CopyInviteButton } from "@/app/rooms/[id]/copy-invite-button";
 import { NoteCard } from "@/app/rooms/[id]/note-card";
+import type { Note } from "@/app/rooms/notes-reducer";
+import { Button } from "@/components/ui/button";
 // ルームボードの表示用コンポーネント。データ層には一切依存せず、
 // 付箋の配列と各種コールバックをpropsで受け取る。
 // WebSocket接続・スロットル・プロトコル送信はroom-board.tsx（コンテナ）の責務。
 // 「どの付箋を選択中か」は同期不要な純粋にUIの関心事なので、ここでローカルに持つ。
-import { BOARD_HEIGHT, BOARD_WIDTH } from "@/app/rooms/board-constants";
-import type { Note } from "@/app/rooms/notes-reducer";
-import { Button } from "@/components/ui/button";
+import { BOARD_HEIGHT, BOARD_WIDTH } from "@/contracts/board";
 
 export type BoardViewProps = {
   notes: Note[];

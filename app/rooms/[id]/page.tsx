@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { buildInviteUrl } from "@/app/invite/invite-url";
 import { RoomBoard } from "@/app/rooms/[id]/room-board";
 import { RoomInfoResponseSchema } from "@/contracts/api";
+import { isUuid } from "@/contracts/ids";
 import { apiFetch } from "@/lib/api-client";
 import { getCurrentUser } from "@/lib/session/current-user";
 import { getBaseUrl } from "@/lib/session/env";
@@ -12,9 +13,6 @@ export const dynamic = "force-dynamic";
 type RoomPageProps = {
   params: Promise<{ id: string }>;
 };
-
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // 招待URL のオリジンは、利用者が実際にアクセスしているホストから作る
 // （複数ドメインで配信しても正しい招待URLになる）。取れなければ設定値へフォールバック。
@@ -31,7 +29,7 @@ async function resolveOrigin(): Promise<string> {
 export default async function RoomPage({ params }: RoomPageProps) {
   const { id } = await params;
 
-  if (!UUID_PATTERN.test(id)) {
+  if (!isUuid(id)) {
     notFound();
   }
 

@@ -6,8 +6,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getLoginPath } from "@/app/auth/redirects";
 import { buildInvitePath } from "@/app/invite/invite-url";
-import { normalizeInviteCode } from "@/app/rooms/invite-code";
 import { JoinRoomResponseSchema } from "@/contracts/api";
+import { normalizeInviteCode } from "@/contracts/invite-code";
 import { apiFetch } from "@/lib/api-client";
 import { getCurrentUser } from "@/lib/session/current-user";
 
