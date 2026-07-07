@@ -1,10 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { applyNoteEvent, type Note } from "@/app/rooms/notes-reducer";
+import {
+  applyServerMessage,
+  moveNoteLocally,
+  type Note,
+} from "@/app/rooms/notes-reducer";
+import type { ServerMessage } from "@/contracts/room-protocol";
+
+const ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const USER_ID = "11111111-1111-4111-8111-111111111111";
 
 const note: Note = {
-  id: "note-1",
-  roomId: "room-1",
-  authorId: "user-1",
+  id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+  roomId: ROOM_ID,
+  authorId: USER_ID,
   content: "hello",
   x: 10,
   y: 20,
@@ -16,114 +24,185 @@ function makeNote(overrides: Partial<Note> = {}): Note {
   return { ...note, ...overrides };
 }
 
-describe("applyNoteEvent", () => {
-  it("INSERTイベントで新しい付箋を追加する", () => {
-    const result = applyNoteEvent(
-      [],
-      { operation: "INSERT", record: note, oldRecord: null },
-      { draggingNoteId: null },
-    );
+describe("applyServerMessage", () => {
+  it("snapshotで付箋を丸ごと置き換える", () => {
+    const message: ServerMessage = {
+      type: "snapshot",
+      room: { roomId: ROOM_ID, inviteCode: "AB12CD" },
+      self: { userId: USER_ID },
+      notes: [note],
+    };
+
+    const result = applyServerMessage([], message, { draggingNoteId: null });
 
     expect(result).toEqual([note]);
   });
 
-  it("INSERTイベントで既に同じIDの付箋があれば置き換える（冪等）", () => {
+  it("snapshotはドラッグ中でも丸ごと上書きする", () => {
+    const existing = makeNote({ x: 100, y: 100 });
+    const snapshotNote = makeNote({ x: 0, y: 0 });
+    const message: ServerMessage = {
+      type: "snapshot",
+      room: { roomId: ROOM_ID, inviteCode: "AB12CD" },
+      self: { userId: USER_ID },
+      notes: [snapshotNote],
+    };
+
+    const result = applyServerMessage([existing], message, {
+      draggingNoteId: note.id,
+    });
+
+    expect(result).toEqual([snapshotNote]);
+  });
+
+  it("note:insertedで新しい付箋を追加する", () => {
+    const message: ServerMessage = { type: "note:inserted", note };
+
+    const result = applyServerMessage([], message, { draggingNoteId: null });
+
+    expect(result).toEqual([note]);
+  });
+
+  it("note:insertedで既に同じIDの付箋があれば置き換える（冪等）", () => {
     const existing = makeNote({ content: "old" });
     const incoming = makeNote({ content: "new" });
+    const message: ServerMessage = { type: "note:inserted", note: incoming };
 
-    const result = applyNoteEvent(
-      [existing],
-      { operation: "INSERT", record: incoming, oldRecord: null },
-      { draggingNoteId: null },
-    );
+    const result = applyServerMessage([existing], message, {
+      draggingNoteId: null,
+    });
 
     expect(result).toEqual([incoming]);
   });
 
-  it("UPDATEイベントで既存の付箋を更新する", () => {
+  it("note:updatedで既存の付箋を更新する", () => {
     const existing = makeNote({ content: "old", x: 0, y: 0 });
     const updated = makeNote({ content: "new", x: 50, y: 60 });
+    const message: ServerMessage = { type: "note:updated", note: updated };
 
-    const result = applyNoteEvent(
-      [existing],
-      { operation: "UPDATE", record: updated, oldRecord: existing },
-      { draggingNoteId: null },
-    );
+    const result = applyServerMessage([existing], message, {
+      draggingNoteId: null,
+    });
 
     expect(result).toEqual([updated]);
   });
 
-  it("自分がドラッグ中の付箋に対するUPDATEは位置(x, y)を無視し、他フィールドのみ反映する", () => {
+  it("自分がドラッグ中の付箋に対するnote:updatedは位置(x, y)を無視し、他フィールドのみ反映する", () => {
     const existing = makeNote({ content: "old", x: 100, y: 100 });
     // サーバーからの反射（エコー）が古い位置を運んでくる想定
     const echoed = makeNote({ content: "new-content", x: 0, y: 0 });
+    const message: ServerMessage = { type: "note:updated", note: echoed };
 
-    const result = applyNoteEvent(
-      [existing],
-      { operation: "UPDATE", record: echoed, oldRecord: existing },
-      { draggingNoteId: "note-1" },
-    );
+    const result = applyServerMessage([existing], message, {
+      draggingNoteId: note.id,
+    });
 
     expect(result).toEqual([
       makeNote({ content: "new-content", x: 100, y: 100 }),
     ]);
   });
 
-  it("DELETEイベントで付箋を取り除く", () => {
+  it("note:deletedで付箋を取り除く", () => {
     const existing = makeNote();
+    const message: ServerMessage = {
+      type: "note:deleted",
+      noteId: existing.id,
+    };
 
-    const result = applyNoteEvent(
-      [existing],
-      { operation: "DELETE", record: null, oldRecord: existing },
-      { draggingNoteId: null },
-    );
+    const result = applyServerMessage([existing], message, {
+      draggingNoteId: null,
+    });
 
     expect(result).toEqual([]);
   });
 
-  it("DRAGイベントで対象付箋の位置のみ更新する", () => {
+  it("note:dragで対象付箋の位置のみ更新する", () => {
     const existing = makeNote({ x: 0, y: 0 });
+    const message: ServerMessage = {
+      type: "note:drag",
+      noteId: existing.id,
+      x: 42,
+      y: 84,
+    };
 
-    const result = applyNoteEvent(
-      [existing],
-      { operation: "DRAG", noteId: "note-1", x: 42, y: 84 },
-      { draggingNoteId: null },
-    );
+    const result = applyServerMessage([existing], message, {
+      draggingNoteId: null,
+    });
 
     expect(result).toEqual([makeNote({ x: 42, y: 84 })]);
   });
 
-  it("自分がドラッグ中の付箋に対するDRAGイベントは無視する（自分の操作を優先）", () => {
+  it("自分がドラッグ中の付箋に対するnote:dragイベントは無視する（自分の操作を優先）", () => {
     const existing = makeNote({ x: 100, y: 100 });
+    const message: ServerMessage = {
+      type: "note:drag",
+      noteId: existing.id,
+      x: 42,
+      y: 84,
+    };
 
-    const result = applyNoteEvent(
-      [existing],
-      { operation: "DRAG", noteId: "note-1", x: 42, y: 84 },
-      { draggingNoteId: "note-1" },
-    );
+    const result = applyServerMessage([existing], message, {
+      draggingNoteId: existing.id,
+    });
 
     expect(result).toEqual([existing]);
   });
 
-  it("存在しない付箋IDへのDRAG/UPDATE/DELETEは何もしない", () => {
+  it("存在しない付箋IDへのnote:drag/note:updated/note:deletedは何もしない", () => {
     const existing = makeNote();
 
-    const dragResult = applyNoteEvent(
+    const dragResult = applyServerMessage(
       [existing],
-      { operation: "DRAG", noteId: "unknown", x: 1, y: 1 },
+      { type: "note:drag", noteId: "unknown", x: 1, y: 1 },
       { draggingNoteId: null },
     );
     expect(dragResult).toEqual([existing]);
 
-    const deleteResult = applyNoteEvent(
+    const updateResult = applyServerMessage(
       [existing],
-      {
-        operation: "DELETE",
-        record: null,
-        oldRecord: makeNote({ id: "unknown" }),
-      },
+      { type: "note:updated", note: makeNote({ id: "unknown" }) },
+      { draggingNoteId: null },
+    );
+    expect(updateResult).toEqual([existing]);
+
+    const deleteResult = applyServerMessage(
+      [existing],
+      { type: "note:deleted", noteId: "unknown" },
       { draggingNoteId: null },
     );
     expect(deleteResult).toEqual([existing]);
+  });
+
+  it("errorメッセージはnotesをそのまま返す（副作用はコンテナの責務）", () => {
+    const existing = makeNote();
+    const message: ServerMessage = {
+      type: "error",
+      code: "forbidden",
+      message: "この操作を行う権限がありません。",
+    };
+
+    const result = applyServerMessage([existing], message, {
+      draggingNoteId: null,
+    });
+
+    expect(result).toEqual([existing]);
+  });
+});
+
+describe("moveNoteLocally", () => {
+  it("指定した付箋の位置を更新する", () => {
+    const existing = makeNote({ x: 0, y: 0 });
+
+    const result = moveNoteLocally([existing], existing.id, 42, 84);
+
+    expect(result).toEqual([makeNote({ x: 42, y: 84 })]);
+  });
+
+  it("存在しない付箋IDを指定した場合は何もしない", () => {
+    const existing = makeNote();
+
+    const result = moveNoteLocally([existing], "unknown", 1, 1);
+
+    expect(result).toEqual([existing]);
   });
 });

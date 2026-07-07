@@ -12,7 +12,11 @@
 // 確定（note:deleted）を待ってから消すことで「消えたのに戻る」揺れを避ける。
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BoardView } from "@/app/rooms/[id]/board-view";
-import { applyNoteEvent, type Note } from "@/app/rooms/notes-reducer";
+import {
+  applyServerMessage,
+  moveNoteLocally,
+  type Note,
+} from "@/app/rooms/notes-reducer";
 import { createThrottled } from "@/app/rooms/throttle";
 import { DRAG_BROADCAST_THROTTLE_MS } from "@/contracts/board";
 import type { ServerMessage } from "@/contracts/room-protocol";
@@ -54,69 +58,15 @@ export function RoomBoard({
   }, [draggingNoteId]);
 
   const handleServerMessage = useCallback((message: ServerMessage) => {
-    switch (message.type) {
-      case "snapshot": {
-        // 接続・再接続時の一括復元。確定状態はサーバーが真実。
-        setNotes(message.notes);
-        return;
-      }
-      case "note:inserted": {
-        setNotes((current) =>
-          applyNoteEvent(
-            current,
-            { operation: "INSERT", record: message.note, oldRecord: null },
-            { draggingNoteId: draggingNoteIdRef.current },
-          ),
-        );
-        return;
-      }
-      case "note:updated": {
-        setNotes((current) =>
-          applyNoteEvent(
-            current,
-            { operation: "UPDATE", record: message.note, oldRecord: null },
-            { draggingNoteId: draggingNoteIdRef.current },
-          ),
-        );
-        return;
-      }
-      case "note:deleted": {
-        setNotes((current) => {
-          const oldRecord = current.find((note) => note.id === message.noteId);
-          if (!oldRecord) return current;
-          return applyNoteEvent(
-            current,
-            { operation: "DELETE", record: null, oldRecord },
-            { draggingNoteId: draggingNoteIdRef.current },
-          );
-        });
-        return;
-      }
-      case "note:drag": {
-        setNotes((current) =>
-          applyNoteEvent(
-            current,
-            {
-              operation: "DRAG",
-              noteId: message.noteId,
-              x: message.x,
-              y: message.y,
-            },
-            { draggingNoteId: draggingNoteIdRef.current },
-          ),
-        );
-        return;
-      }
-      case "error": {
-        console.error(`ルーム操作エラー (${message.code}): ${message.message}`);
-        return;
-      }
-      default: {
-        const _exhaustive: never = message;
-        void _exhaustive;
-        return;
-      }
+    if (message.type === "error") {
+      console.error(`ルーム操作エラー (${message.code}): ${message.message}`);
+      return;
     }
+    setNotes((current) =>
+      applyServerMessage(current, message, {
+        draggingNoteId: draggingNoteIdRef.current,
+      }),
+    );
   }, []);
 
   useEffect(() => {
@@ -156,14 +106,8 @@ export function RoomBoard({
 
   const handleNoteDragMove = useCallback(
     (noteId: string, x: number, y: number) => {
-      // 自分自身の操作なのでフィルタなし（draggingNoteId: null）で直接反映する。
-      setNotes((current) =>
-        applyNoteEvent(
-          current,
-          { operation: "DRAG", noteId, x, y },
-          { draggingNoteId: null },
-        ),
-      );
+      // 自分自身の操作なので即座にローカル反映する。
+      setNotes((current) => moveNoteLocally(current, noteId, x, y));
       sendDragRef.current?.({ id: noteId, x, y });
     },
     [],
@@ -173,13 +117,7 @@ export function RoomBoard({
     (noteId: string, x: number, y: number) => {
       sendDragRef.current?.cancel();
       setDraggingNoteId(null);
-      setNotes((current) =>
-        applyNoteEvent(
-          current,
-          { operation: "DRAG", noteId, x, y },
-          { draggingNoteId: null },
-        ),
-      );
+      setNotes((current) => moveNoteLocally(current, noteId, x, y));
       // ドロップ確定だけを永続化する（ドラッグ中の座標はサーバーに残らない）。
       clientRef.current?.send({ type: "note:move", noteId, x, y });
     },

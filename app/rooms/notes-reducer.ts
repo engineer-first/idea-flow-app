@@ -1,81 +1,87 @@
-// ルーム内の付箋（Note）配列に対して、Realtime 経由で届くイベントを適用する
-// 純粋関数群。DB由来の broadcast_changes イベント（INSERT/UPDATE/DELETE）と、
-// ドラッグ中の一時的な位置共有イベント（DRAG、DBには書き込まない）の両方を
-// 同じ reducer で扱う。
+// ルーム内の付箋（Note）配列に対して、RoomDO から届く ServerMessage
+// （contracts/room-protocol.ts）を適用する純粋関数群。
 //
 // 「自分がドラッグ中の付箋」については、他クライアント（＝自分自身のエコーを含む）
 // からの位置更新を無視し、ローカルの操作を優先する。そうしないと、ドラッグ中に
-// 古い位置を運ぶ UPDATE/DRAG イベントを受信した瞬間に付箋が巻き戻って見えてしまう。
+// 古い位置を運ぶ note:updated/note:drag イベントを受信した瞬間に付箋が
+// 巻き戻って見えてしまう。
+import type { ProtocolNote, ServerMessage } from "@/contracts/room-protocol";
 
-// アプリケーションで扱うドメインモデル（camelCase）。
-export type Note = {
-  id: string;
-  roomId: string;
-  authorId: string;
-  content: string;
-  x: number;
-  y: number;
-  createdAt: string;
-  updatedAt: string;
-};
+// アプリケーションで扱うドメインモデル。プロトコル上の付箋と同一の形なので
+// contracts の型をそのまま再エクスポートする（重複定義を避ける）。
+export type Note = ProtocolNote;
 
-// realtime.broadcast_changes トリガー由来のイベントと、
-// クライアント発のドラッグ中イベントを共通の判別可能ユニオンで表現する。
-export type NoteChangeEvent =
-  | { operation: "INSERT"; record: Note; oldRecord: Note | null }
-  | { operation: "UPDATE"; record: Note; oldRecord: Note | null }
-  | { operation: "DELETE"; record: null; oldRecord: Note }
-  | { operation: "DRAG"; noteId: string; x: number; y: number };
-
-export type ApplyNoteEventOptions = {
+export type ApplyServerMessageOptions = {
   // 現在ローカルでドラッグ操作中の付箋ID（ドラッグしていなければ null）。
   draggingNoteId: string | null;
 };
 
-export function applyNoteEvent(
+export function applyServerMessage(
   notes: Note[],
-  event: NoteChangeEvent,
-  options: ApplyNoteEventOptions,
+  message: ServerMessage,
+  options: ApplyServerMessageOptions,
 ): Note[] {
-  switch (event.operation) {
-    case "INSERT": {
-      const exists = notes.some((n) => n.id === event.record.id);
-      if (!exists) {
-        return [...notes, event.record];
-      }
-      return notes.map((n) => (n.id === event.record.id ? event.record : n));
+  switch (message.type) {
+    case "snapshot": {
+      // 接続・再接続時の一括復元。確定状態はサーバーが真実なので、
+      // ドラッグ中でも丸ごと置き換える。
+      return message.notes;
     }
 
-    case "UPDATE": {
+    case "note:inserted": {
+      const exists = notes.some((n) => n.id === message.note.id);
+      if (!exists) {
+        return [...notes, message.note];
+      }
+      return notes.map((n) => (n.id === message.note.id ? message.note : n));
+    }
+
+    case "note:updated": {
       return notes.map((n) => {
-        if (n.id !== event.record.id) {
+        if (n.id !== message.note.id) {
           return n;
         }
         if (options.draggingNoteId === n.id) {
           // 自分がドラッグ中の位置はローカル優先で保持し、他フィールドのみ反映する。
-          return { ...event.record, x: n.x, y: n.y };
+          return { ...message.note, x: n.x, y: n.y };
         }
-        return event.record;
+        return message.note;
       });
     }
 
-    case "DELETE": {
-      return notes.filter((n) => n.id !== event.oldRecord.id);
+    case "note:deleted": {
+      return notes.filter((n) => n.id !== message.noteId);
     }
 
-    case "DRAG": {
-      if (options.draggingNoteId === event.noteId) {
+    case "note:drag": {
+      if (options.draggingNoteId === message.noteId) {
         // 自分自身のドラッグ操作を優先し、エコーを無視する。
         return notes;
       }
       return notes.map((n) =>
-        n.id === event.noteId ? { ...n, x: event.x, y: event.y } : n,
+        n.id === message.noteId ? { ...n, x: message.x, y: message.y } : n,
       );
     }
 
+    case "error": {
+      // 通知・ログはコンテナ（room-board.tsx）の責務。ここでは状態を変えない。
+      return notes;
+    }
+
     default: {
-      const _exhaustive: never = event;
+      const _exhaustive: never = message;
       return _exhaustive;
     }
   }
+}
+
+// 自分自身のドラッグ操作をローカルへ即時反映するための純粋関数。
+// サーバーへの確定（note:move）を待たず、操作の追従性を優先する。
+export function moveNoteLocally(
+  notes: Note[],
+  noteId: string,
+  x: number,
+  y: number,
+): Note[] {
+  return notes.map((n) => (n.id === noteId ? { ...n, x, y } : n));
 }
