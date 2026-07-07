@@ -40,3 +40,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# OpenNext / Cloudflare
+.open-next/
+.wrangler/
+workers/worker-configuration.d.ts
+
+# Storybook build output
+storybook-static/
+build-storybook.log

@@ -9,9 +9,13 @@
     "lint": "biome check",
     "fix": "biome check --write",
     "format": "biome format --write",
-    "typecheck": "tsc --noEmit",
+    "cf-typegen": "wrangler types --config workers/wrangler.jsonc workers/worker-configuration.d.ts",
+    "typecheck": "npm run cf-typegen && tsc --noEmit && tsc -p workers/tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests",
+    "test:workers": "vitest run --config vitest.workers.config.mts",
     "test:coverage": "vitest run --passWithNoTests --coverage",
+    "build:cf": "opennextjs-cloudflare build",
+    "preview:cf": "opennextjs-cloudflare build && wrangler dev",
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop",
     "seed:dev-users": "node scripts/seed-dev-users.mjs",
@@ -36,6 +40,8 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.1",
+    "@cloudflare/vitest-pool-workers": "^0.18.0",
+    "@opennextjs/cloudflare": "^1.20.1",
     "@storybook/addon-docs": "^10.4.6",
     "@storybook/addon-themes": "^10.4.6",
     "@storybook/nextjs-vite": "^10.4.6",
@@ -54,7 +60,8 @@
     "supabase": "^2.109.0",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.9",
+    "wrangler": "^4.107.0"
   },
   "msw": {
     "workerDirectory": [

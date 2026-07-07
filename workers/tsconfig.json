@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "lib": ["esnext"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "types": [],
+    "paths": {
+      "@/*": ["../*"]
+    }
+  },
+  "include": [
+    "./**/*.ts",
+    "./worker-configuration.d.ts",
+    "../contracts/**/*.ts",
+    "../node_modules/@cloudflare/vitest-pool-workers/types/cloudflare-test.d.ts"
+  ]
+}

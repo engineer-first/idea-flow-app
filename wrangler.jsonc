@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "idea-flow-app",
+  // Phase 0 ゲート検証用の最小構成。Phase 1 以降で
+  // main をカスタム Worker (workers/app-worker.ts) に差し替え、
+  // RoomDO / D1 のバインディングを追加する。
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-06-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  }
+}
