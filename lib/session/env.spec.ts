@@ -1,6 +1,10 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getSessionSecret, isAuthConfigured } from "@/lib/session/env";
+import {
+  getBaseUrl,
+  getSessionSecret,
+  isAuthConfigured,
+} from "@/lib/session/env";
 
 const VALID = "a-sufficiently-long-random-secret-value";
 const KNOWN_LEAKED = "dev-session-secret-change-in-production!!";
@@ -28,6 +32,27 @@ describe("getSessionSecret", () => {
   it("git 履歴に漏れた既知の値は例外", () => {
     vi.stubEnv("SESSION_SECRET", KNOWN_LEAKED);
     expect(() => getSessionSecret()).toThrow();
+  });
+});
+
+// 招待URLや OAuth redirect_uri の origin はこの設定値から作る。
+// リクエストヘッダー（x-forwarded-host 等）は client が偽装できるため使わない。
+describe("getBaseUrl", () => {
+  it("NEXT_PUBLIC_SITE_URL が設定されていればそれを返す", () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://ideaflow.example.com");
+    expect(getBaseUrl()).toBe("https://ideaflow.example.com");
+  });
+
+  it("本番で未設定なら例外（fail-closed）", () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
+    vi.stubEnv("NODE_ENV", "production");
+    expect(() => getBaseUrl()).toThrow();
+  });
+
+  it("開発で未設定なら localhost にフォールバックする", () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
+    vi.stubEnv("NODE_ENV", "development");
+    expect(getBaseUrl()).toBe("http://localhost:3000");
   });
 });
 

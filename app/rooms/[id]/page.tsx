@@ -1,4 +1,3 @@
-import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { buildInviteUrl } from "@/app/invite/invite-url";
 import { RoomBoard } from "@/app/rooms/[id]/room-board";
@@ -13,18 +12,6 @@ export const dynamic = "force-dynamic";
 type RoomPageProps = {
   params: Promise<{ id: string }>;
 };
-
-// 招待URL のオリジンは、利用者が実際にアクセスしているホストから作る
-// （複数ドメインで配信しても正しい招待URLになる）。取れなければ設定値へフォールバック。
-async function resolveOrigin(): Promise<string> {
-  const headerStore = await headers();
-  const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host");
-  if (host) {
-    const proto = headerStore.get("x-forwarded-proto") ?? "https";
-    return `${proto}://${host}`;
-  }
-  return getBaseUrl();
-}
 
 export default async function RoomPage({ params }: RoomPageProps) {
   const { id } = await params;
@@ -50,10 +37,10 @@ export default async function RoomPage({ params }: RoomPageProps) {
     notFound();
   }
 
-  const inviteUrl = buildInviteUrl(
-    await resolveOrigin(),
-    parsed.data.inviteCode,
-  );
+  // 招待URL の origin は設定値（NEXT_PUBLIC_SITE_URL、本番では必須）から作る。
+  // x-forwarded-host / host はクライアントが偽装できるヘッダーで、Cloudflare も
+  // 既定では剥がさない。共有される URL の origin をそこから組み立てない。
+  const inviteUrl = buildInviteUrl(getBaseUrl(), parsed.data.inviteCode);
 
   // key={roomId} で、クライアント遷移（/rooms/A → /rooms/B）時に RoomBoard を
   // 強制的に再マウントする。これがないと notes state（や draggingNoteId）が
