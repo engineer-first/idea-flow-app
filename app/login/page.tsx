@@ -1,8 +1,8 @@
+import { KeyRound, ShieldAlert } from "lucide-react";
 import { redirect } from "next/navigation";
 import { signInWithGoogle, signInWithPassword } from "@/app/auth/actions";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { isDevAuthEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
-import { ShieldAlert, KeyRound } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -21,19 +21,24 @@ export default async function LoginPage({
       <div className="w-full max-w-md space-y-6 bg-white p-8 shadow-sm rounded-2xl border border-slate-200">
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-black text-indigo-600">IdeaFlow</h1>
-          <p className="text-sm text-slate-500">アイデア出しをスマートに、スムーズに。</p>
+          <p className="text-sm text-slate-500">
+            アイデア出しをスマートに、スムーズに。
+          </p>
         </div>
 
         {error && (
           <div className="p-3 text-xs bg-red-50 text-red-600 rounded-xl border border-red-100">
-            <span className="font-bold">エラー: </span>{error}
+            <span className="font-bold">エラー: </span>
+            {error}
           </div>
         )}
 
         {!isConfigured && (
           <div className="p-3 text-xs bg-amber-50 text-amber-800 rounded-xl border border-amber-100 flex gap-2">
             <ShieldAlert className="h-4 w-4 shrink-0" />
-            <span>Supabaseの環境設定が必要です。.env.local を確認してください。</span>
+            <span>
+              Supabaseの環境設定が必要です。.env.local を確認してください。
+            </span>
           </div>
         )}
 
@@ -43,7 +48,12 @@ export default async function LoginPage({
             disabled={!isConfigured}
             className="w-full flex items-center justify-center gap-2 py-3 border border-slate-200 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer"
           >
-            <svg className="h-5 w-5 text-indigo-600" viewBox="0 0 24 24" fill="currentColor">
+            <svg
+              className="h-5 w-5 text-indigo-600"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+            >
+              <title>Google</title>
               <path d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114-3.535 0-6.4-2.865-6.4-6.4s2.865-6.4 6.4-6.4c1.554 0 2.973.55 4.077 1.458L20.89 4.09C18.57 1.92 15.43 1 12 1 5.925 1 1 5.925 1 12s4.925 11 11 11c6.28 0 11-4.42 11-11 0-.74-.08-1.285-.2-1.715H12.24z" />
             </svg>
             Googleでログイン
