@@ -4,12 +4,17 @@ import { useEffect, useMemo, useState } from "react";
 import {
   createTLStore,
   defaultShapeUtils,
-  renderPlaintextFromRichText,
   type Editor,
+  renderPlaintextFromRichText,
+  type TLNoteShape,
   type TLRecord,
   Tldraw,
 } from "tldraw";
 import "tldraw/tldraw.css";
+import { VoteControlPanel } from "@/app/components/whiteboard/molecules/vote-control-panel";
+import { NoteVoteList } from "@/app/components/whiteboard/organisms/note-vote-list";
+import { VoteCanvasOverlay } from "@/app/components/whiteboard/organisms/vote-canvas-overlay";
+import type { NoteTarget } from "@/app/components/whiteboard/types";
 import { createClient } from "@/lib/supabase/client";
 import {
   applyVote,
@@ -30,22 +35,7 @@ type StoreUpdatePayload = {
   removed: string[];
 };
 
-type NoteTarget = {
-  noteId: string;
-  title: string;
-  bounds: {
-    left: number;
-    top: number;
-    width: number;
-    height: number;
-  };
-};
-
-function getNoteTitle(editor: Editor, shape: { type: string; props: any }) {
-  if (shape.type !== "note") {
-    return "付箋";
-  }
-
+function getNoteTitle(editor: Editor, shape: TLNoteShape) {
   try {
     const text = renderPlaintextFromRichText(editor, shape.props.richText);
     return text.trim().split("\n")[0] || "付箋";
@@ -85,7 +75,7 @@ function getNoteTargets(editor: Editor): NoteTarget[] {
 
 export default function WhiteboardCanvas() {
   const [editor, setEditor] = useState<Editor | null>(null);
-  const [storeVersion, setStoreVersion] = useState(0);
+  const [, setStoreVersion] = useState(0);
   const [store] = useState(() =>
     createTLStore({
       shapeUtils: defaultShapeUtils,
@@ -96,7 +86,9 @@ export default function WhiteboardCanvas() {
     }),
   );
   const [supabase] = useState(() => createClient());
-  const [votes, setVotes] = useState<VoteRecord[]>(() => loadVotesFromStorage());
+  const [votes, setVotes] = useState<VoteRecord[]>(() =>
+    loadVotesFromStorage(),
+  );
   const [feedback, setFeedback] = useState<string>("");
   const [activeMode, setActiveMode] = useState<VoteType | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
@@ -187,10 +179,7 @@ export default function WhiteboardCanvas() {
     };
   }, [editor, store]);
 
-  const noteTargets = useMemo(
-    () => (editor ? getNoteTargets(editor) : []),
-    [editor, storeVersion],
-  );
+  const noteTargets = editor ? getNoteTargets(editor) : [];
 
   const currentNoteIds = useMemo(
     () => noteTargets.map((note) => note.noteId),
@@ -203,7 +192,10 @@ export default function WhiteboardCanvas() {
       return;
     }
 
-    if (selectedNoteId && noteTargets.some((note) => note.noteId === selectedNoteId)) {
+    if (
+      selectedNoteId &&
+      noteTargets.some((note) => note.noteId === selectedNoteId)
+    ) {
       return;
     }
 
@@ -233,14 +225,17 @@ export default function WhiteboardCanvas() {
   };
 
   const removeVote = (voteId: string) => {
-    setVotes((currentVotes) => currentVotes.filter((vote) => vote.id !== voteId));
+    setVotes((currentVotes) =>
+      currentVotes.filter((vote) => vote.id !== voteId),
+    );
     setFeedback("ドットを削除しました。");
   };
 
   const removeVoteOfType = (stickyNoteId: string, voteType: VoteType) => {
     setVotes((currentVotes) => {
       const voteIndex = currentVotes.findIndex(
-        (vote) => vote.stickyNoteId === stickyNoteId && vote.voteType === voteType,
+        (vote) =>
+          vote.stickyNoteId === stickyNoteId && vote.voteType === voteType,
       );
       if (voteIndex === -1) {
         return currentVotes;
@@ -283,6 +278,22 @@ export default function WhiteboardCanvas() {
     );
   };
 
+  const handleSelectedNoteVote = () => {
+    if (!selectedNoteId) {
+      setFeedback("先に付箋を選択してください。");
+      return;
+    }
+    handleNoteSelect(selectedNoteId);
+  };
+
+  const handleRemoveSelectedVoteType = (voteType: VoteType) => {
+    if (!selectedNoteId) {
+      setFeedback("先に付箋を選択してください。");
+      return;
+    }
+    removeVoteOfType(selectedNoteId, voteType);
+  };
+
   return (
     <div style={{ position: "fixed", inset: 0 }}>
       <div
@@ -299,356 +310,31 @@ export default function WhiteboardCanvas() {
           gap: 12,
         }}
       >
-        <div
-          style={{
-            pointerEvents: "auto",
-            background: "rgba(255,255,255,0.95)",
-            border: "1px solid #d0d7de",
-            borderRadius: 12,
-            padding: 12,
-            width: "min(420px, calc(100vw - 32px))",
-            boxShadow: "0 10px 30px rgba(15, 23, 42, 0.15)",
-          }}
-        >
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>投票状況</div>
-          <div style={{ fontSize: 14, marginBottom: 8 }}>
-            主観: 残り{remaining.subjective}票 / 客観: 残り{remaining.objective}票
-          </div>
-          <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-            <button
-              type="button"
-              onClick={() => setActiveMode("subjective")}
-              style={{
-                border: "none",
-                borderRadius: 999,
-                padding: "6px 10px",
-                background: activeMode === "subjective" ? "#ef4444" : "#f3f4f6",
-                color: activeMode === "subjective" ? "#fff" : "#111827",
-                cursor: "pointer",
-              }}
-            >
-              🔴 主観
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveMode("objective")}
-              style={{
-                border: "none",
-                borderRadius: 999,
-                padding: "6px 10px",
-                background: activeMode === "objective" ? "#2563eb" : "#f3f4f6",
-                color: activeMode === "objective" ? "#fff" : "#111827",
-                cursor: "pointer",
-              }}
-            >
-              🔵 客観
-            </button>
-            <select
-              value={selectedNoteId ?? ""}
-              onChange={(event) => setSelectedNoteId(event.target.value)}
-              style={{
-                borderRadius: 999,
-                padding: "6px 10px",
-                border: "1px solid #d1d5db",
-                background: "#ffffff",
-                color: "#111827",
-                cursor: "pointer",
-              }}
-            >
-              {noteTargets.map((target) => {
-                const noteVotes = votes.filter((vote) => vote.stickyNoteId === target.noteId);
-                const subjectiveDots = noteVotes.filter((vote) => vote.voteType === "subjective");
-                const objectiveDots = noteVotes.filter((vote) => vote.voteType === "objective");
-                return (
-                  <option key={target.noteId} value={target.noteId}>
-                    {target.title} ({subjectiveDots.length}/1 主観, {objectiveDots.length}/3 客観)
-                  </option>
-                );
-              })}
-            </select>
-            <button
-              type="button"
-              onClick={() => {
-                if (!selectedNoteId) {
-                  setFeedback("先に付箋を選択してください。");
-                  return;
-                }
-                handleNoteSelect(selectedNoteId);
-              }}
-              style={{
-                border: "none",
-                borderRadius: 999,
-                padding: "6px 10px",
-                background: "#22c55e",
-                color: "#ffffff",
-                cursor: "pointer",
-              }}
-            >
-              投票する
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (!selectedNoteId) {
-                  setFeedback("先に付箋を選択してください。");
-                  return;
-                }
-                removeVoteOfType(selectedNoteId, "subjective");
-              }}
-              style={{
-                border: "1px solid #ef4444",
-                borderRadius: 999,
-                padding: "6px 10px",
-                background: "#fff",
-                color: "#ef4444",
-                cursor: "pointer",
-              }}
-            >
-              主観削除
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (!selectedNoteId) {
-                  setFeedback("先に付箋を選択してください。");
-                  return;
-                }
-                removeVoteOfType(selectedNoteId, "objective");
-              }}
-              style={{
-                border: "1px solid #2563eb",
-                borderRadius: 999,
-                padding: "6px 10px",
-                background: "#fff",
-                color: "#2563eb",
-                cursor: "pointer",
-              }}
-            >
-              客観削除
-            </button>
-          </div>
-          {feedback ? (
-            <div style={{ fontSize: 13, marginBottom: 8 }}>{feedback}</div>
-          ) : null}
-          <div style={{ fontSize: 12, color: "#6b7280" }}>
-            付箋を選択して、選択中の投票種別のドットを配置できます。
-          </div>
-        </div>
-        <div
-          style={{
-            pointerEvents: "auto",
-            display: "grid",
-            gap: 12,
-            width: "min(900px, calc(100vw - 32px))",
-          }}
-        >
-          <details
-            style={{
-              background: "#f8fafc",
-              border: "1px solid #cbd5e1",
-              borderRadius: 12,
-              padding: 14,
-              color: "#334155",
-            }}
-          >
-            <summary
-              style={{
-                cursor: noteTargets.length > 0 ? "pointer" : "default",
-                fontWeight: 700,
-                marginBottom: 10,
-                outline: "none",
-              }}
-            >
-              キャンバス上の付箋に投票
-            </summary>
-            <div style={{ fontSize: 13, color: "#64748b", marginBottom: 12 }}>
-              付箋上でドットを確認し、ドラッグで別の付箋に移動できます。
-            </div>
-            {noteTargets.length === 0 ? (
-              <div style={{ marginTop: 10, color: "#475569" }}>
-                まだ付箋がありません。左のツールバーまたはペンツールで付箋を追加してください。
-              </div>
-            ) : (
-              <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
-                {noteTargets.map((target) => {
-                  const noteVotes = votes.filter((vote) => vote.stickyNoteId === target.noteId);
-                  const subjectiveDots = noteVotes.filter(
-                    (vote) => vote.voteType === "subjective",
-                  );
-                  const objectiveDots = noteVotes.filter(
-                    (vote) => vote.voteType === "objective",
-                  );
-
-                  return (
-                    <div
-                      key={target.noteId}
-                      onDragOver={(event) => {
-                        event.preventDefault();
-                        setDragOverNoteId(target.noteId);
-                      }}
-                      onDragLeave={() => setDragOverNoteId(null)}
-                      onDrop={(event) => {
-                        event.preventDefault();
-                        if (!draggedVoteId) {
-                          return;
-                        }
-                        moveVoteToNote(draggedVoteId, target.noteId);
-                        setDragOverNoteId(null);
-                      }}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 8,
-                        padding: 10,
-                        background: dragOverNoteId === target.noteId ? "#e0f2fe" : "#ffffff",
-                        border: "1px solid #e2e8f0",
-                        borderRadius: 10,
-                      }}
-                    >
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {target.title}
-                        </div>
-                        <div style={{ fontSize: 12, color: "#64748b" }}>
-                          {subjectiveDots.length} / 1 主観, {objectiveDots.length} / 3 客観
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                        {noteVotes.map((vote) => (
-                          <span
-                            key={vote.id}
-                            draggable
-                            onDragStart={() => handleVoteDragStart(vote.id)}
-                            onDragEnd={handleVoteDragEnd}
-                            title={`ドラッグして別の付箋に移動 (${vote.voteType === "subjective" ? "主観" : "客観"})`}
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              width: 24,
-                              height: 24,
-                              borderRadius: "50%",
-                              background: vote.voteType === "subjective" ? "#ef4444" : "#2563eb",
-                              color: "#ffffff",
-                              fontSize: 12,
-                              cursor: "grab",
-                              userSelect: "none",
-                              pointerEvents: "auto",
-                            }}
-                          >
-                            {vote.voteType === "subjective" ? "S" : "O"}
-                          </span>
-                        ))}
-                      </div>
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 6 }}>
-                        {noteVotes.map((vote) => (
-                          <button
-                            key={`${vote.id}-remove`}
-                            type="button"
-                            onClick={() => removeVote(vote.id)}
-                            style={{
-                              border: "1px solid #cbd5e1",
-                              borderRadius: 999,
-                              padding: "4px 8px",
-                              background: "#fff",
-                              color: "#334155",
-                              cursor: "pointer",
-                              fontSize: 12,
-                            }}
-                          >
-                            {vote.voteType === "subjective" ? "主観削除" : "客観削除"}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </details>
-        </div>
+        <VoteControlPanel
+          activeMode={activeMode}
+          feedback={feedback}
+          noteTargets={noteTargets}
+          remaining={remaining}
+          selectedNoteId={selectedNoteId}
+          votes={votes}
+          onActiveModeChange={setActiveMode}
+          onRemoveVoteType={handleRemoveSelectedVoteType}
+          onSelectedNoteChange={setSelectedNoteId}
+          onVote={handleSelectedNoteVote}
+        />
+        <NoteVoteList
+          draggedVoteId={draggedVoteId}
+          dragOverNoteId={dragOverNoteId}
+          noteTargets={noteTargets}
+          votes={votes}
+          onDragOverNoteChange={setDragOverNoteId}
+          onMoveVoteToNote={moveVoteToNote}
+          onRemoveVote={removeVote}
+          onVoteDragEnd={handleVoteDragEnd}
+          onVoteDragStart={handleVoteDragStart}
+        />
       </div>
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          pointerEvents: "none",
-          zIndex: 15,
-        }}
-      >
-        {noteTargets.map((target) => {
-          const noteVotes = votes.filter((vote) => vote.stickyNoteId === target.noteId);
-          const subjectiveCount = noteVotes.filter(
-            (vote) => vote.voteType === "subjective",
-          ).length;
-          const objectiveCount = noteVotes.filter(
-            (vote) => vote.voteType === "objective",
-          ).length;
-
-          return (
-            <div
-              key={target.noteId}
-              style={{
-                position: "absolute",
-                left: target.bounds.left,
-                top: target.bounds.top,
-                width: target.bounds.width,
-                height: target.bounds.height,
-                pointerEvents: "none",
-              }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  top: 8,
-                  right: 8,
-                  display: "flex",
-                  gap: 4,
-                  pointerEvents: "none",
-                }}
-              >
-                {subjectiveCount > 0 ? (
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      width: 26,
-                      height: 26,
-                      borderRadius: "50%",
-                      background: "rgba(239, 68, 68, 0.9)",
-                      color: "#ffffff",
-                      fontSize: 12,
-                      fontWeight: 700,
-                    }}
-                  >
-                    S{subjectiveCount}
-                  </span>
-                ) : null}
-                {objectiveCount > 0 ? (
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      width: 26,
-                      height: 26,
-                      borderRadius: "50%",
-                      background: "rgba(37, 99, 235, 0.9)",
-                      color: "#ffffff",
-                      fontSize: 12,
-                      fontWeight: 700,
-                    }}
-                  >
-                    O{objectiveCount}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <VoteCanvasOverlay noteTargets={noteTargets} votes={votes} />
       <Tldraw store={store} />
     </div>
   );

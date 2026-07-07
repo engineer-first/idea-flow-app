@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   applyVote,
+  getCurrentUserId,
+  getRemainingVotes,
   type VoteRecord,
   type VoteState,
-  getRemainingVotes,
-  getCurrentUserId,
 } from "./vote-state";
 
 describe("vote-state", () => {
