@@ -76,6 +76,7 @@ function renderBoard() {
     <RoomBoard
       roomId={ROOM_ID}
       inviteCode="AB12CD"
+      inviteUrl="https://idea-flow.example/invite/AB12CD"
       initialNotes={[]}
       webSocketFactory={factory}
     />,

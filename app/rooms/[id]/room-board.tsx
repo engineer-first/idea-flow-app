@@ -26,6 +26,7 @@ import { roomWebSocketUrl } from "@/lib/room-client/ws-url";
 export type RoomBoardProps = {
   roomId: string;
   inviteCode: string;
+  inviteUrl: string;
   initialNotes: Note[];
   // テストからフェイク WebSocket を注入するための口。本番では未指定。
   webSocketFactory?: RoomSocketFactory;
@@ -36,6 +37,7 @@ type NoteDragPayload = { id: string; x: number; y: number };
 export function RoomBoard({
   roomId,
   inviteCode,
+  inviteUrl,
   initialNotes,
   webSocketFactory,
 }: RoomBoardProps) {
@@ -205,6 +207,7 @@ export function RoomBoard({
     <BoardView
       notes={notes}
       inviteCode={inviteCode}
+      inviteUrl={inviteUrl}
       draggingNoteId={draggingNoteId}
       onAddNote={handleAddNote}
       onNoteDragStart={handleNoteDragStart}

@@ -7,6 +7,7 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { sanitizeNextPath } from "@/app/auth/redirects";
 import { OAUTH_STATE_COOKIE } from "@/lib/session/cookie";
 import {
   getBaseUrl,
@@ -25,6 +26,7 @@ const GOOGLE_ISSUERS = ["https://accounts.google.com", "accounts.google.com"];
 const OauthStateSchema = z.object({
   state: z.string().min(1),
   nonce: z.string().min(1),
+  next: z.string().optional(),
 });
 
 const GoogleClaimsSchema = z.object({
@@ -135,5 +137,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return redirectToLogin(origin, result.error);
   }
 
-  return NextResponse.redirect(`${origin}/`);
+  // ログイン開始時に保存した戻り先（招待URL 等）へ戻す。安全化済みだが二重で通す。
+  const next = sanitizeNextPath(oauthState.next);
+  return NextResponse.redirect(new URL(next, origin));
 }

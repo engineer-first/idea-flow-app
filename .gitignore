@@ -56,3 +56,4 @@ build-storybook.log
 # wrangler local secrets
 .dev.vars
 workers/.dev.vars
+workers/.wrangler/

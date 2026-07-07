@@ -226,6 +226,37 @@ Storybook ビルドすべて green。Supabase への参照はコード上ゼロ
 - 実機確認: 既知値/未設定 → 503、有効値 → 未認証401・有効セッション200。
 - テスト追加: `session-secret.spec.ts`（5件）+ `env.spec.ts`（7件）。全 156 件 green。
 
+## 招待URL の実装（issue #69 / PR #83 の統合）
+
+CLOSED だった Supabase ベースの PR #83 の UX を Cloudflare 構成へ移植し、
+**招待URL と招待コードの両方**を提供する形で issue #69 に対応した。
+
+### 方式の判断: 両方採用
+
+- issue #69 の受け入れ条件が「招待URL + ワンクリックコピー」を必須とするため URL は外せない。
+- 一方、対面チーム（ハッカソン）では口頭で言える6桁コードに URL にない価値がある。
+- URL は同じコードを `/invite/{code}` で包むだけなので、両方採用の追加コストは小さい。
+
+### 実装
+
+- **ルームの正規URLは UUID の `/rooms/[id]` のまま**。招待コードは参加の手段にすぎず、
+  `/invite/[code]` を参加エントリにした（#83 の「ルームを inviteCode で URL 化」は不採用）。
+- `app/invite/[inviteCode]/route.ts` — 未ログインは `/login?next=/invite/{code}` へ、
+  ログイン済は api-worker で参加して `/rooms/{roomId}` へ、無効コードは `/invite/{code}/invalid` へ。
+- `sanitizeNextPath`（`app/auth/redirects.ts`）— next はアプリ内相対パスに限定し、
+  オープンリダイレクトを防ぐ。ログインアクションは `.bind(null, next)` で戻り先を受け取り、
+  Google は OAuth state Cookie に next を載せて callback で復元する。
+- `CopyInviteButton` — 招待URLをクリップボードへコピー。失敗時は成功表示を出さない
+  （貼り付けたら空、という事故を防ぐ）。
+- ルーム画面に「招待URL + コピー」と「または招待コード」を併記。招待URLのオリジンは
+  リクエストのホストから作る（複数ドメイン配信でも正しい URL になる）。
+
+### 実機 E2E（実ブラウザ + curl）
+
+- ログイン → ルーム作成 → 招待URL `.../invite/YJQ7VT` とコピーボタン・コードを表示
+- member が招待URL訪問 → `/rooms/{uuid}` へ自動参加、参加後もルームを開ける（200）
+- ログアウト訪問 → `/login?next=%2Finvite%2FYJQ7VT`、無効コード → `/invite/.../invalid`
+
 ## 参照
 
 - 技術再評価メモ: <https://junhat6.github.io/claude-artifacts/2026-07-07-ideaflow-stack-reeval.html>

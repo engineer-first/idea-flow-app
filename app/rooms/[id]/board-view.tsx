@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { CopyInviteButton } from "@/app/rooms/[id]/copy-invite-button";
 import { NoteCard } from "@/app/rooms/[id]/note-card";
 // ルームボードの表示用コンポーネント。データ層には一切依存せず、
 // 付箋の配列と各種コールバックをpropsで受け取る。
@@ -13,6 +14,7 @@ import { Button } from "@/components/ui/button";
 export type BoardViewProps = {
   notes: Note[];
   inviteCode: string;
+  inviteUrl: string;
   draggingNoteId: string | null;
   onAddNote: () => void;
   onNoteDragStart: (noteId: string) => void;
@@ -25,6 +27,7 @@ export type BoardViewProps = {
 export function BoardView({
   notes,
   inviteCode,
+  inviteUrl,
   draggingNoteId,
   onAddNote,
   onNoteDragStart,
@@ -53,13 +56,22 @@ export function BoardView({
 
   return (
     <div className="flex h-full flex-col gap-3">
-      <div className="flex items-center justify-between gap-4 border-b border-border pb-3">
-        <p className="text-sm text-muted-foreground">
-          招待コード:{" "}
-          <span className="font-mono text-base font-semibold text-foreground">
-            {inviteCode}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-3">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>招待URL</span>
+            <span className="max-w-[18rem] truncate font-mono text-xs text-foreground">
+              {inviteUrl}
+            </span>
+            <CopyInviteButton url={inviteUrl} />
           </span>
-        </p>
+          <span className="text-sm text-muted-foreground">
+            または招待コード:{" "}
+            <span className="font-mono text-base font-semibold text-foreground">
+              {inviteCode}
+            </span>
+          </span>
+        </div>
         <Button type="button" onClick={onAddNote}>
           付箋を追加
         </Button>

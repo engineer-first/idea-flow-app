@@ -7,6 +7,7 @@ function setup(overrides: Partial<Parameters<typeof BoardView>[0]> = {}) {
   const props = {
     notes: buildNotes(2),
     inviteCode: "AB12CD",
+    inviteUrl: "https://idea-flow.example/invite/AB12CD",
     draggingNoteId: null,
     onAddNote: vi.fn(),
     onNoteDragStart: vi.fn(),
@@ -39,6 +40,17 @@ describe("BoardView", () => {
     setup({ inviteCode: "ZZ99XX" });
 
     expect(screen.getByText("ZZ99XX")).toBeInTheDocument();
+  });
+
+  it("招待URLとコピーボタンを表示する", () => {
+    setup({ inviteUrl: "https://idea-flow.example/invite/ZZ99XX" });
+
+    expect(
+      screen.getByText("https://idea-flow.example/invite/ZZ99XX"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "招待URLをコピー" }),
+    ).toBeInTheDocument();
   });
 
   it("付箋を配置する", () => {

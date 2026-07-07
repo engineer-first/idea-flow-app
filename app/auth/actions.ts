@@ -5,8 +5,13 @@
 // - Google ログイン: OIDC authorization code flow を開始する
 // どちらも最終的に lib/session/establish.ts の establishSession に合流し、
 // api-worker へのユーザー upsert とセッション Cookie の発行を行う。
+//
+// next: ログイン後の戻り先。招待URL（/invite/[code]）をログアウト状態で開いた
+// ときに元のURLへ戻すため、page 側から .bind(null, next) で渡される。
+// 値は必ず sanitizeNextPath でアプリ内相対パスに限定する（オープンリダイレクト防止）。
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { getLoginPath, sanitizeNextPath } from "@/app/auth/redirects";
 import { clearSessionCookie, OAUTH_STATE_COOKIE } from "@/lib/session/cookie";
 import { DEV_PASSWORD, findDevUser } from "@/lib/session/dev-users";
 import {
@@ -17,13 +22,18 @@ import {
 } from "@/lib/session/env";
 import { establishSession } from "@/lib/session/establish";
 
-function loginError(message: string): never {
-  redirect(`/login?error=${encodeURIComponent(message)}`);
+function loginError(message: string, next?: string): never {
+  const base = getLoginPath(next);
+  const separator = base.includes("?") ? "&" : "?";
+  redirect(`${base}${separator}error=${encodeURIComponent(message)}`);
 }
 
-export async function signInWithDevPassword(formData: FormData): Promise<void> {
+export async function signInWithDevPassword(
+  next: string,
+  formData: FormData,
+): Promise<void> {
   if (!isDevAuthEnabled()) {
-    loginError("開発用ログインは無効です。");
+    loginError("開発用ログインは無効です。", next);
   }
 
   const email = String(formData.get("email") ?? "");
@@ -31,7 +41,7 @@ export async function signInWithDevPassword(formData: FormData): Promise<void> {
 
   const devUser = findDevUser(email);
   if (!devUser || password !== DEV_PASSWORD) {
-    loginError("メールアドレスまたはパスワードが違います。");
+    loginError("メールアドレスまたはパスワードが違います。", next);
   }
 
   const result = await establishSession({
@@ -42,28 +52,32 @@ export async function signInWithDevPassword(formData: FormData): Promise<void> {
   });
 
   if (!result.ok) {
-    loginError(result.error);
+    loginError(result.error, next);
   }
 
-  redirect("/");
+  redirect(sanitizeNextPath(next));
 }
 
-export async function signInWithGoogle(): Promise<void> {
+export async function signInWithGoogle(next: string): Promise<void> {
   if (!isGoogleAuthConfigured()) {
-    loginError("Google ログインの環境変数を設定してください。");
+    loginError("Google ログインの環境変数を設定してください。", next);
   }
 
   const state = crypto.randomUUID();
   const nonce = crypto.randomUUID();
 
   const cookieStore = await cookies();
-  cookieStore.set(OAUTH_STATE_COOKIE, JSON.stringify({ state, nonce }), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 600,
-  });
+  cookieStore.set(
+    OAUTH_STATE_COOKIE,
+    JSON.stringify({ state, nonce, next: sanitizeNextPath(next) }),
+    {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 600,
+    },
+  );
 
   const authorizeUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   authorizeUrl.searchParams.set("client_id", getGoogleClientId());

@@ -12,6 +12,7 @@ const meta = {
   args: {
     notes: buildNotes(3),
     inviteCode: "AB12CD",
+    inviteUrl: "https://idea-flow.example/invite/AB12CD",
     draggingNoteId: null,
     onAddNote: fn(),
     onNoteDragStart: fn(),

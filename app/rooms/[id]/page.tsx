@@ -1,8 +1,11 @@
+import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
+import { buildInviteUrl } from "@/app/invite/invite-url";
 import { RoomBoard } from "@/app/rooms/[id]/room-board";
 import { RoomInfoResponseSchema } from "@/contracts/api";
 import { apiFetch } from "@/lib/api-client";
 import { getCurrentUser } from "@/lib/session/current-user";
+import { getBaseUrl } from "@/lib/session/env";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +15,18 @@ type RoomPageProps = {
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// 招待URL のオリジンは、利用者が実際にアクセスしているホストから作る
+// （複数ドメインで配信しても正しい招待URLになる）。取れなければ設定値へフォールバック。
+async function resolveOrigin(): Promise<string> {
+  const headerStore = await headers();
+  const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host");
+  if (host) {
+    const proto = headerStore.get("x-forwarded-proto") ?? "https";
+    return `${proto}://${host}`;
+  }
+  return getBaseUrl();
+}
 
 export default async function RoomPage({ params }: RoomPageProps) {
   const { id } = await params;
@@ -37,6 +52,11 @@ export default async function RoomPage({ params }: RoomPageProps) {
     notFound();
   }
 
+  const inviteUrl = buildInviteUrl(
+    await resolveOrigin(),
+    parsed.data.inviteCode,
+  );
+
   // 付箋の初期状態は空。接続直後に RoomDO が snapshot を送る。
   // key={roomId} で、クライアント遷移（/rooms/A → /rooms/B）時に RoomBoard を
   // 強制的に再マウントする。これがないと notes state（や draggingNoteId）が
@@ -49,6 +69,7 @@ export default async function RoomPage({ params }: RoomPageProps) {
           key={parsed.data.roomId}
           roomId={parsed.data.roomId}
           inviteCode={parsed.data.inviteCode}
+          inviteUrl={inviteUrl}
           initialNotes={[]}
         />
       </div>
