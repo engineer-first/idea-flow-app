@@ -49,3 +49,6 @@ workers/worker-configuration.d.ts
 # Storybook build output
 storybook-static/
 build-storybook.log
+
+# Playwright MCP artifacts
+.playwright-mcp/

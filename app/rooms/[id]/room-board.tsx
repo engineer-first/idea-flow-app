@@ -2,158 +2,151 @@
 
 // ルームボードのコンテナ（状態・副作用を持つ側）。
 // 表示は BoardView / NoteCard に委譲し、ここでは
-//   - Supabase Realtimeのプライベートチャンネル購読（DB由来の変更 + ドラッグ中イベント）
+//   - RoomDO への WebSocket 接続（lib/room-client）とサーバーメッセージの適用
 //   - ドラッグ中イベントのスロットル送信
-//   - Server Actions呼び出しによる永続化
-// を担当する。関心の分離のため、Supabaseやnotes-reducerへの依存はこのファイルに閉じ込める。
-import type { RealtimeChannel } from "@supabase/supabase-js";
+//   - 操作のプロトコルメッセージ化（contracts/room-protocol.ts）
+// を担当する。関心の分離のため、room-client や notes-reducer への依存はこのファイルに閉じ込める。
+//
+// 確定状態の真実はサーバー（RoomDO）側にあり、再接続時は snapshot で復元される。
+// 削除は楽観更新しない: author 以外の削除はサーバーが forbidden で拒否するため、
+// 確定（note:deleted）を待ってから消すことで「消えたのに戻る」揺れを避ける。
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BoardView } from "@/app/rooms/[id]/board-view";
-import {
-  createNote,
-  deleteNote,
-  updateNoteContent,
-  updateNotePosition,
-} from "@/app/rooms/actions";
 import { DRAG_BROADCAST_THROTTLE_MS } from "@/app/rooms/board-constants";
-import {
-  applyNoteEvent,
-  type Note,
-  type NoteRow,
-  toNote,
-} from "@/app/rooms/notes-reducer";
+import { applyNoteEvent, type Note } from "@/app/rooms/notes-reducer";
 import { createThrottled } from "@/app/rooms/throttle";
-import { createClient } from "@/lib/supabase/client";
+import type { ServerMessage } from "@/contracts/room-protocol";
+import {
+  createRoomClient,
+  type RoomClient,
+  type RoomSocketFactory,
+} from "@/lib/room-client/room-client";
+import { roomWebSocketUrl } from "@/lib/room-client/ws-url";
 
 export type RoomBoardProps = {
   roomId: string;
   inviteCode: string;
   initialNotes: Note[];
+  // テストからフェイク WebSocket を注入するための口。本番では未指定。
+  webSocketFactory?: RoomSocketFactory;
 };
 
-type NoteDragBroadcastPayload = { id: string; x: number; y: number };
-
-// realtime.broadcast_changes() が積むペイロード形状。
-// { old_record, record, operation, table, schema } の実体はDB側トリガーの実装に依存する
-// （supabase/migrations の notes_broadcast_changes トリガー関数を参照）。
-type ChangePayload = {
-  record: NoteRow | null;
-  old_record: NoteRow | null;
-};
+type NoteDragPayload = { id: string; x: number; y: number };
 
 export function RoomBoard({
   roomId,
   inviteCode,
   initialNotes,
+  webSocketFactory,
 }: RoomBoardProps) {
   const [notes, setNotes] = useState<Note[]>(initialNotes);
   const [draggingNoteId, setDraggingNoteId] = useState<string | null>(null);
   const draggingNoteIdRef = useRef<string | null>(null);
-  const supabaseRef = useRef(createClient());
+  const clientRef = useRef<RoomClient | null>(null);
   const sendDragRef = useRef<ReturnType<
-    typeof createThrottled<[NoteDragBroadcastPayload]>
+    typeof createThrottled<[NoteDragPayload]>
   > | null>(null);
 
   useEffect(() => {
     draggingNoteIdRef.current = draggingNoteId;
   }, [draggingNoteId]);
 
-  useEffect(() => {
-    const supabase = supabaseRef.current;
-    let channel: RealtimeChannel | null = null;
-    let cancelled = false;
-
-    function handleDbChange(operation: "INSERT" | "UPDATE" | "DELETE") {
-      return ({ payload }: { payload: ChangePayload }) => {
+  const handleServerMessage = useCallback((message: ServerMessage) => {
+    switch (message.type) {
+      case "snapshot": {
+        // 接続・再接続時の一括復元。確定状態はサーバーが真実。
+        setNotes(message.notes);
+        return;
+      }
+      case "note:inserted": {
+        setNotes((current) =>
+          applyNoteEvent(
+            current,
+            { operation: "INSERT", record: message.note, oldRecord: null },
+            { draggingNoteId: draggingNoteIdRef.current },
+          ),
+        );
+        return;
+      }
+      case "note:updated": {
+        setNotes((current) =>
+          applyNoteEvent(
+            current,
+            { operation: "UPDATE", record: message.note, oldRecord: null },
+            { draggingNoteId: draggingNoteIdRef.current },
+          ),
+        );
+        return;
+      }
+      case "note:deleted": {
         setNotes((current) => {
-          if (operation === "DELETE") {
-            if (!payload.old_record) return current;
-            return applyNoteEvent(
-              current,
-              {
-                operation: "DELETE",
-                record: null,
-                oldRecord: toNote(payload.old_record),
-              },
-              { draggingNoteId: draggingNoteIdRef.current },
-            );
-          }
-          if (!payload.record) return current;
+          const oldRecord = current.find((note) => note.id === message.noteId);
+          if (!oldRecord) return current;
           return applyNoteEvent(
             current,
-            {
-              operation,
-              record: toNote(payload.record),
-              oldRecord: payload.old_record ? toNote(payload.old_record) : null,
-            },
+            { operation: "DELETE", record: null, oldRecord },
             { draggingNoteId: draggingNoteIdRef.current },
           );
         });
-      };
+        return;
+      }
+      case "note:drag": {
+        setNotes((current) =>
+          applyNoteEvent(
+            current,
+            {
+              operation: "DRAG",
+              noteId: message.noteId,
+              x: message.x,
+              y: message.y,
+            },
+            { draggingNoteId: draggingNoteIdRef.current },
+          ),
+        );
+        return;
+      }
+      case "error": {
+        console.error(`ルーム操作エラー (${message.code}): ${message.message}`);
+        return;
+      }
+      default: {
+        const _exhaustive: never = message;
+        void _exhaustive;
+        return;
+      }
     }
+  }, []);
 
-    function handleDrag({ payload }: { payload: NoteDragBroadcastPayload }) {
-      setNotes((current) =>
-        applyNoteEvent(
-          current,
-          { operation: "DRAG", noteId: payload.id, x: payload.x, y: payload.y },
-          { draggingNoteId: draggingNoteIdRef.current },
-        ),
-      );
-    }
+  useEffect(() => {
+    const client = createRoomClient({
+      url: roomWebSocketUrl(roomId),
+      onMessage: handleServerMessage,
+      webSocketFactory,
+    });
+    clientRef.current = client;
 
-    async function subscribe() {
-      // プライベートチャンネルを購読する前に、現在のセッションのアクセストークンを
-      // Realtimeソケットへ反映する。これを忘れるとrealtime.messagesのRLSが
-      // 常に未認証として評価され、購読が拒否される。
-      await supabase.realtime.setAuth();
-      if (cancelled) return;
-
-      channel = supabase.channel(`room:${roomId}`, {
-        config: { private: true },
+    sendDragRef.current = createThrottled((payload: NoteDragPayload) => {
+      client.send({
+        type: "note:drag",
+        noteId: payload.id,
+        x: payload.x,
+        y: payload.y,
       });
-
-      channel
-        .on("broadcast", { event: "INSERT" }, handleDbChange("INSERT"))
-        .on("broadcast", { event: "UPDATE" }, handleDbChange("UPDATE"))
-        .on("broadcast", { event: "DELETE" }, handleDbChange("DELETE"))
-        .on("broadcast", { event: "note-drag" }, handleDrag)
-        .subscribe();
-
-      sendDragRef.current = createThrottled(
-        (payload: NoteDragBroadcastPayload) => {
-          channel?.send({ type: "broadcast", event: "note-drag", payload });
-        },
-        DRAG_BROADCAST_THROTTLE_MS,
-      );
-    }
-
-    subscribe();
+    }, DRAG_BROADCAST_THROTTLE_MS);
 
     return () => {
-      cancelled = true;
       sendDragRef.current?.cancel();
       sendDragRef.current = null;
-      if (channel) {
-        supabase.removeChannel(channel);
-      }
+      clientRef.current = null;
+      client.close();
     };
-  }, [roomId]);
+  }, [roomId, handleServerMessage, webSocketFactory]);
 
-  const handleAddNote = useCallback(async () => {
-    const result = await createNote(roomId);
-    if (!result.ok) {
-      console.error(result.error);
-      return;
-    }
-    setNotes((current) =>
-      applyNoteEvent(
-        current,
-        { operation: "INSERT", record: result.data, oldRecord: null },
-        { draggingNoteId: draggingNoteIdRef.current },
-      ),
-    );
-  }, [roomId]);
+  const handleAddNote = useCallback(() => {
+    // 楽観挿入はしない: note:inserted の配信を待つ（RoomDO は同 colo の
+    // 単一オブジェクトなので往復は短く、ID 生成をサーバーに一本化できる）。
+    clientRef.current?.send({ type: "note:create" });
+  }, []);
 
   const handleNoteDragStart = useCallback((noteId: string) => {
     setDraggingNoteId(noteId);
@@ -175,7 +168,7 @@ export function RoomBoard({
   );
 
   const handleNoteDragEnd = useCallback(
-    async (noteId: string, x: number, y: number) => {
+    (noteId: string, x: number, y: number) => {
       sendDragRef.current?.cancel();
       setDraggingNoteId(null);
       setNotes((current) =>
@@ -185,38 +178,27 @@ export function RoomBoard({
           { draggingNoteId: null },
         ),
       );
-
-      const result = await updateNotePosition(noteId, x, y);
-      if (!result.ok) {
-        console.error(result.error);
-      }
+      // ドロップ確定だけを永続化する（ドラッグ中の座標はサーバーに残らない）。
+      clientRef.current?.send({ type: "note:move", noteId, x, y });
     },
     [],
   );
 
   const handleNoteContentChange = useCallback(
-    async (noteId: string, content: string) => {
+    (noteId: string, content: string) => {
+      // 入力中の見た目を止めないため本文だけは楽観更新する。
       setNotes((current) =>
         current.map((note) =>
           note.id === noteId ? { ...note, content } : note,
         ),
       );
-
-      const result = await updateNoteContent(noteId, content);
-      if (!result.ok) {
-        console.error(result.error);
-      }
+      clientRef.current?.send({ type: "note:update-content", noteId, content });
     },
     [],
   );
 
-  const handleNoteDelete = useCallback(async (noteId: string) => {
-    setNotes((current) => current.filter((note) => note.id !== noteId));
-
-    const result = await deleteNote(noteId);
-    if (!result.ok) {
-      console.error(result.error);
-    }
+  const handleNoteDelete = useCallback((noteId: string) => {
+    clientRef.current?.send({ type: "note:delete", noteId });
   }, []);
 
   return (

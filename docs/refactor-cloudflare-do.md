@@ -130,6 +130,49 @@ pgTAP の付箋認可仕様をプロトコル境界のテストとして移植:
 - 入力検証（2000文字上限・ボード範囲外・不正 JSON）は invalid-message で拒否、接続は維持
 - drag のエコー無し・非永続を配信順序と再接続 snapshot で検証
 
+## Phase 3: UI 再配線（完了）
+
+継ぎ目（`room-board.tsx`）の内側を Supabase 購読 + Server Actions から
+WebSocket クライアントへ差し替えた。**BoardView / NoteCard / notes-reducer /
+throttle は無変更**（PoC 時の「テスト可能な純粋ロジックを分離する」設計の配当）。
+
+### 追加したもの
+
+- `lib/room-client/` — フレームワーク非依存の WS クライアント。
+  指数バックオフの自動再接続つき（再接続後はサーバーが snapshot を送る契約
+  なので、クライアント側で差分の取りこぼしを追跡しない）。
+  PoC の既知の制限「トークンリフレッシュ時の再認可」も、再接続時に Cookie で
+  再認可される形で解消。
+- `app/rooms/[id]/room-board.spec.tsx` — フェイク WebSocket 注入による
+  コンテナ統合テスト（サーバーメッセージ → 画面反映、操作 → メッセージ送信の双方向）。
+
+### 挙動の変更（意図的）
+
+- **削除の楽観更新をやめた**: author 以外の削除はサーバーが forbidden で拒否する
+  ため、確定（note:deleted）を待ってから消す。PoC の既知の制限
+  「楽観更新済みUIの巻き戻しなし」を、この操作については解消した。
+- **付箋作成も確定待ち**: ID 生成をサーバーへ一本化。RoomDO は同 colo の
+  単一オブジェクトなので往復は短い。
+- 本文編集の楽観更新は維持（入力の見た目を止めないため）。
+
+### 実機 E2E（実ブラウザ + 対向クライアント）
+
+Playwright で実ブラウザを操作して確認:
+
+1. 開発用ログイン（実フォーム）→ セッション Cookie 発行 → ホーム表示
+2. 「ルームを作成」→ `/rooms/<uuid>` へ遷移、招待コード表示、空ボード描画
+3. 2本目の WS 接続（対向クライアント相当）が snapshot を受信
+4. UI で「付箋を追加」→ 対向クライアントが `note:inserted` を**ライブ受信**
+5. 対向クライアントから `note:drag` 送信 → **UI の付箋が (916,687)→(150,250) へライブ移動**
+
+### 撤去したもの
+
+- 付箋 CRUD の Server Actions（`app/rooms/actions.ts` はロビー専用になった）
+- `room-board.tsx` の Supabase Realtime 購読
+
+この時点で Supabase への参照は `lib/supabase/*`（未使用）と
+`app/whiteboard/`（tldraw PoC）だけになり、Phase 4 で撤去する。
+
 ## 参照
 
 - 技術再評価メモ: <https://junhat6.github.io/claude-artifacts/2026-07-07-ideaflow-stack-reeval.html>
