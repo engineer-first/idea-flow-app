@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { NoteCard } from "@/app/rooms/[id]/note-card";
 import { buildNote } from "@/app/rooms/[id]/note-card.fixture";
+import { NOTE_CONTENT_MAX_LENGTH } from "@/contracts/room-protocol";
 
 function setup(overrides: Partial<Parameters<typeof NoteCard>[0]> = {}) {
   const props = {
@@ -43,6 +44,17 @@ describe("NoteCard", () => {
     setup({ note: buildNote({ content: "こんにちは" }) });
 
     expect(screen.getByDisplayValue("こんにちは")).toBeInTheDocument();
+  });
+
+  it("本文の入力はコントラクトの上限文字数で制限される", () => {
+    // サーバー（RoomDO）は上限超過を invalid-message で黙って拒否するため、
+    // UI 側で制限しないと「本人にだけ保存されて見える」分岐が起きる。
+    setup();
+
+    expect(screen.getByRole("textbox")).toHaveAttribute(
+      "maxlength",
+      String(NOTE_CONTENT_MAX_LENGTH),
+    );
   });
 
   describe("選択", () => {

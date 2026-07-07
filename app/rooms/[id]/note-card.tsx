@@ -20,6 +20,7 @@ import {
   NOTE_WIDTH,
 } from "@/app/rooms/board-constants";
 import type { Note } from "@/app/rooms/notes-reducer";
+import { NOTE_CONTENT_MAX_LENGTH } from "@/contracts/room-protocol";
 
 export type NoteCardProps = {
   note: Note;
@@ -204,6 +205,9 @@ export function NoteCard({
         ref={textareaRef}
         value={localContent}
         readOnly={!isEditing}
+        // サーバー（RoomDO）は上限超過を invalid-message で拒否するため、
+        // UI 側でも同じコントラクト定数で「そもそも入力できない」形に塞ぐ。
+        maxLength={NOTE_CONTENT_MAX_LENGTH}
         tabIndex={isEditing ? 0 : -1}
         onChange={(event) => setLocalContent(event.target.value)}
         onBlur={(event) => {
