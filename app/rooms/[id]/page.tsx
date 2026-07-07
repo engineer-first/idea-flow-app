@@ -1,8 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import { RoomBoard } from "@/app/rooms/[id]/room-board";
-import { toNote } from "@/app/rooms/notes-reducer";
-import { getCurrentUser } from "@/lib/supabase/auth";
-import { createClient } from "@/lib/supabase/server";
+import { RoomInfoResponseSchema } from "@/contracts/api";
+import { apiFetch } from "@/lib/api-client";
+import { getCurrentUser } from "@/lib/session/current-user";
 
 export const dynamic = "force-dynamic";
 
@@ -25,40 +25,27 @@ export default async function RoomPage({ params }: RoomPageProps) {
     redirect("/login");
   }
 
-  const supabase = await createClient();
-
-  // rooms/notes ともにRLSで「メンバーのみSELECT可」を強制しているため、
-  // 非メンバーがアクセスした場合はここで0件（またはエラー）になり notFound() へ落ちる。
-  const { data: room, error: roomError } = await supabase
-    .from("rooms")
-    .select("id, invite_code")
-    .eq("id", id)
-    .single();
-
-  if (roomError || !room) {
+  // メンバーシップは api-worker（の先の RoomDO）が判定する。
+  // 非メンバー・存在しないルームはどちらも 404 で返るため、そのまま notFound() へ。
+  const res = await apiFetch(`/api/rooms/${id}`);
+  if (!res.ok) {
     notFound();
   }
 
-  const { data: noteRows, error: notesError } = await supabase
-    .from("notes")
-    .select("id, room_id, author_id, content, x, y, created_at, updated_at")
-    .eq("room_id", id)
-    .order("created_at", { ascending: true });
-
-  if (notesError) {
+  const parsed = RoomInfoResponseSchema.safeParse(await res.json());
+  if (!parsed.success) {
     notFound();
   }
 
-  const notes = (noteRows ?? []).map(toNote);
-
+  // 付箋の初期データは Phase 3 で WebSocket 接続時のスナップショットに置き換わる。
   return (
     <main className="flex h-screen flex-col gap-4 p-4">
       <h1 className="text-lg font-semibold">IdeaFlow ルーム</h1>
       <div className="min-h-0 flex-1">
         <RoomBoard
-          roomId={room.id}
-          inviteCode={room.invite_code}
-          initialNotes={notes}
+          roomId={parsed.data.roomId}
+          inviteCode={parsed.data.inviteCode}
+          initialNotes={[]}
         />
       </div>
     </main>

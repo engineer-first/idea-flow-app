@@ -46,6 +46,52 @@
 - `vitest.workers.config.mts` — workerd 実行のテスト設定（アプリ側 jsdom とは分離）
 - npm scripts: `test:workers` / `build:cf` / `preview:cf`、`typecheck` は workers も検査
 
+## Phase 1: 土台 — 認証・D1・api-worker（完了）
+
+認証層とロビー（ルーム作成・招待コード参加）を Supabase から新基盤へ置き換えた。
+
+### アーキテクチャ上の決定
+
+- **api-worker（`workers/`）が D1 と RoomDO への唯一の入口**。Next は UI と
+  セッション Cookie の発行だけを担う。D1 型を Next の tsconfig（DOM lib）に
+  持ち込むと型空間が衝突すること、D1 を触るコードは workers テスト（実 miniflare D1）
+  でしか統合テストできないことが理由。
+- **セッションは HS256 JWT の HttpOnly Cookie**（`jose`、TTL 7日）。Next と
+  api-worker が SESSION_SECRET を共有して検証する。audience で「セッション」と
+  「ログイン主張」を分離し、トークンの用途間流用を防ぐ。
+- **ログイン主張（LoginAssertion）**: ログイン確定時、Next が署名した短命トークンを
+  api-worker `/api/auth/sync` へ渡してユーザーを D1 に upsert する。無認証の
+  書き込みエンドポイントを作らないための設計。
+- **Google ログインは OIDC code flow を直接実装**（Supabase Auth の代替）。
+  state/nonce Cookie で CSRF・リプレイを防ぎ、id_token は Google の JWKS で検証する。
+  開発ログインは従来どおり固定3ユーザー（ID は安定 UUID に変更）。
+- **メンバーシップの真実は RoomDO**（DO 内蔵 SQLite）。D1 の rooms 行は
+  「招待コード → ルーム解決」のディレクトリにすぎない。ルームの存在を
+  非メンバーに漏らさないよう、非メンバー・不存在とも同じ 404 を返す。
+
+### テスト
+
+- workers 統合テスト 30件（`npm run test:workers`）: pgTAP 28件のうちロビー・認可に
+  関わる仕様（anon 拒否 / 非メンバー404 / join 冪等 / create が host を1件だけ登録）を移植。
+  付箋の列権限に相当する仕様は Phase 2 の WS プロトコルテストで移植する。
+- アプリ側 78件: トークン署名/検証（jose は jsdom と相性が悪いため node 環境指定）を追加。
+
+### 実機確認（完了条件）
+
+`npm run db:migrate` + `npm run dev:api` + `next dev` で以下を curl 実弾確認:
+
+- 未認証の `/api/rooms` POST → 401
+- dev ログインフォームの no-JS POST → 303 + セッション Cookie 発行（D1 upsert 込み）
+- ルーム作成 → `{roomId, inviteCode}`（コードは 0/O/1/I 除外アルファベット）
+- 非メンバーのルーム取得 404 → join（小文字空白まじりコード補正）→ 200
+- Next のルームページ: メンバー 200 / 不存在 404
+
+### 過渡状態（Phase 3 で解消）
+
+- 付箋 CRUD の Server Actions と room-board の Realtime 購読はまだ Supabase 実装のまま。
+  ボードは表示されるが同期は動かない。
+- 旧 `lib/supabase/*`・`supabase/` ディレクトリは Phase 4 で撤去する。
+
 ## 参照
 
 - 技術再評価メモ: <https://junhat6.github.io/claude-artifacts/2026-07-07-ideaflow-stack-reeval.html>

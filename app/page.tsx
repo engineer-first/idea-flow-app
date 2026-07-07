@@ -2,8 +2,8 @@ import { redirect } from "next/navigation";
 import { signOut } from "@/app/auth/actions";
 import { createRoom, joinRoom } from "@/app/rooms/actions";
 import { Button } from "@/components/ui/button";
-import { getCurrentUser } from "@/lib/supabase/auth";
-import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { getCurrentUser } from "@/lib/session/current-user";
+import { isAuthConfigured } from "@/lib/session/env";
 
 export const dynamic = "force-dynamic";
 
@@ -12,11 +12,11 @@ type HomeProps = {
 };
 
 export default async function Home({ searchParams }: HomeProps) {
-  if (!isSupabaseConfigured()) {
+  if (!isAuthConfigured()) {
     return (
       <main>
         <h1>IdeaFlow</h1>
-        <p>Supabaseの環境変数を設定してください。</p>
+        <p>認証の環境変数を設定してください。</p>
         <p>
           <code>.env.example</code>を参考に<code>.env.local</code>を作成します。
         </p>

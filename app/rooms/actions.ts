@@ -1,10 +1,10 @@
 "use server";
 
 // ルーム作成/参加、付箋のCRUDをまとめたServer Actions境界。
-// 認可はRLS + RPC（create_room/join_room）に任せ、ここでは
-// 「認証されているか」「入力形式が正しいか」だけをzodで検証する。
-// notesの行レベル認可（メンバーか、authorか）はDB側のRLSポリシーが担保するため、
-// ここで重複したチェックは行わない。
+// ルーム作成/参加は api-worker（D1 + RoomDO）へ委譲し、ここでは
+// 「認証されているか」「入力形式が正しいか」だけを検証する。
+// 付箋の CRUD は Phase 3 で WebSocket プロトコルへ置き換わるまで
+// 旧 Supabase 実装のまま残している（過渡状態）。
 
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
@@ -15,6 +15,12 @@ import {
   normalizeInviteCode,
 } from "@/app/rooms/invite-code";
 import { type Note, toNote } from "@/app/rooms/notes-reducer";
+import {
+  CreateRoomResponseSchema,
+  JoinRoomResponseSchema,
+} from "@/contracts/api";
+import { apiFetch } from "@/lib/api-client";
+import { getCurrentUser } from "@/lib/session/current-user";
 import { createClient } from "@/lib/supabase/server";
 
 export type ActionResult<T> =
@@ -69,49 +75,55 @@ const DeleteNoteInputSchema = z.object({
 // ---------------------------------------------------------------
 
 export async function createRoom(): Promise<void> {
-  const supabase = await createClient();
-  const user = await requireUser(supabase);
+  const user = await getCurrentUser();
 
   if (!user) {
     redirect("/login");
   }
 
-  const { data, error } = await supabase.rpc("create_room");
+  const res = await apiFetch("/api/rooms", { method: "POST" });
+  const parsed = res.ok
+    ? CreateRoomResponseSchema.safeParse(await res.json())
+    : null;
 
-  if (error || !data) {
+  if (!parsed?.success) {
     redirect(`/?error=${encodeURIComponent("ルームを作成できませんでした。")}`);
   }
 
-  redirect(`/rooms/${data.id}`);
+  redirect(`/rooms/${parsed.data.roomId}`);
 }
 
 export async function joinRoom(formData: FormData): Promise<void> {
-  const parsed = JoinRoomInputSchema.safeParse({
+  const parsedInput = JoinRoomInputSchema.safeParse({
     code: String(formData.get("code") ?? ""),
   });
 
-  if (!parsed.success) {
+  if (!parsedInput.success) {
     redirect(
       `/?error=${encodeURIComponent("招待コードは英数字6桁で入力してください。")}`,
     );
   }
 
-  const supabase = await createClient();
-  const user = await requireUser(supabase);
+  const user = await getCurrentUser();
 
   if (!user) {
     redirect("/login");
   }
 
-  const { data, error } = await supabase.rpc("join_room", {
-    p_code: parsed.data.code,
+  const res = await apiFetch("/api/rooms/join", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code: parsedInput.data.code }),
   });
+  const parsed = res.ok
+    ? JoinRoomResponseSchema.safeParse(await res.json())
+    : null;
 
-  if (error || !data) {
+  if (!parsed?.success) {
     redirect(`/?error=${encodeURIComponent("ルームが見つかりませんでした。")}`);
   }
 
-  redirect(`/rooms/${data}`);
+  redirect(`/rooms/${parsed.data.roomId}`);
 }
 
 // ---------------------------------------------------------------

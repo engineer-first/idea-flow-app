@@ -1,14 +1,20 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
+  // Next.js アプリ本体の Worker。/api/* は api-worker（workers/wrangler.jsonc）へ
+  // サービスバインディングで転送する。ローカルで両方を同時に動かす場合は
+  // `npm run preview:cf`（wrangler dev の複数構成起動）を使う。
   "name": "idea-flow-app",
-  // Phase 0 ゲート検証用の最小構成。Phase 1 以降で
-  // main をカスタム Worker (workers/app-worker.ts) に差し替え、
-  // RoomDO / D1 のバインディングを追加する。
-  "main": ".open-next/worker.js",
+  "main": "workers/app-worker.ts",
   "compatibility_date": "2026-06-01",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
-  }
+  },
+  "services": [
+    {
+      "binding": "API_WORKER",
+      "service": "idea-flow-api"
+    }
+  ]
 }

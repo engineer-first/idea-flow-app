@@ -1,12 +1,29 @@
 {
   "$schema": "../node_modules/wrangler/config-schema.json",
-  // vitest-pool-workers が読むテスト用構成。本番構成はリポジトリルートの wrangler.jsonc。
-  "name": "idea-flow-room-worker-test",
-  "main": "test-entry.ts",
+  // api-worker: D1（ロビー）と RoomDO（ルームの中身）への唯一の入口。
+  // テスト (vitest-pool-workers)・ローカル開発 (npm run dev:api)・デプロイの
+  // すべてでこの構成を使う。
+  "name": "idea-flow-api",
+  "main": "api-worker.ts",
   "compatibility_date": "2026-06-01",
   "compatibility_flags": ["nodejs_compat"],
   "durable_objects": {
     "bindings": [{ "name": "ROOM_DO", "class_name": "RoomDO" }]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RoomDO"] }]
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RoomDO"] }],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "idea-flow-lobby",
+      // ローカル開発・テストでは placeholder のままでよい。
+      // デプロイ時は `wrangler d1 create idea-flow-lobby` の ID に置き換える。
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    // ローカル開発・テスト用の既定値。本番は `wrangler secret put SESSION_SECRET`
+    // で必ず上書きする（secret は同名の var より優先される）。
+    "SESSION_SECRET": "dev-session-secret-change-in-production!!"
+  }
 }
