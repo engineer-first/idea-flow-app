@@ -15,13 +15,27 @@ export type TestUser = {
   name: string;
 };
 
-// RoomDO のインスタンスメソッドを直接呼び出して内部状態を検査する。
+// RoomDO のインスタンスメソッド（と、必要なら DurableObjectState）を
+// 直接呼び出して内部状態を検査する。
 export function runInRoomDO<T>(
   roomId: string,
-  fn: (instance: RoomDO) => T | Promise<T>,
+  fn: (instance: RoomDO, state: DurableObjectState) => T | Promise<T>,
 ): Promise<T> {
   const stub = env.ROOM_DO.get(env.ROOM_DO.idFromName(roomId));
   return runInDurableObject(stub, fn);
+}
+
+// members テーブルを参加順（joined_at 昇順）で直接読む。
+// 「メンバーIDの一覧を返す」は本番の RPC としては使われておらず、この検査
+// のためだけに RoomDO の公開面を広げるのは避けたいので、DurableObjectState
+// 経由でストレージを直接読むテストヘルパーとして実装する。
+export function listMemberIds(roomId: string): Promise<string[]> {
+  return runInRoomDO(roomId, (_instance, state) => {
+    const cursor = state.storage.sql.exec(
+      "SELECT user_id FROM members ORDER BY joined_at",
+    );
+    return cursor.toArray().map((row) => String(row.user_id));
+  });
 }
 
 export async function sessionCookieFor(user: TestUser): Promise<string> {

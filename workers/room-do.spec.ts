@@ -4,7 +4,7 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { USER_ID_HEADER } from "./room-do";
-import { runInRoomDO } from "./test-helpers";
+import { listMemberIds } from "./test-helpers";
 
 const USER_A = "11111111-1111-4111-8111-111111111111";
 const USER_B = "22222222-2222-4222-8222-222222222222";
@@ -19,7 +19,7 @@ describe("RoomDO メンバーシップ", () => {
     await stub.join(USER_A);
     await stub.join(USER_A);
     await stub.join(USER_A);
-    expect(await stub.getMemberIds()).toEqual([USER_A]);
+    expect(await listMemberIds("room-idempotent")).toEqual([USER_A]);
   });
 
   it("メンバーでないユーザーは isMember で false になる", async () => {
@@ -29,13 +29,11 @@ describe("RoomDO メンバーシップ", () => {
     expect(await stub.isMember(USER_B)).toBe(false);
   });
 
-  it("getMemberIds は参加順に返す", async () => {
-    const memberIds = await runInRoomDO("room-order", async (instance) => {
-      instance.join(USER_A);
-      instance.join(USER_B);
-      return instance.getMemberIds();
-    });
-    expect(memberIds).toEqual([USER_A, USER_B]);
+  it("メンバーは参加順に並ぶ", async () => {
+    const stub = roomStub("room-order");
+    await stub.join(USER_A);
+    await stub.join(USER_B);
+    expect(await listMemberIds("room-order")).toEqual([USER_A, USER_B]);
   });
 });
 

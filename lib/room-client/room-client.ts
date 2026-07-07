@@ -17,12 +17,9 @@ const DEFAULT_RECONNECT_DELAYS_MS = [1000, 2000, 4000, 8000];
 
 export type RoomSocketFactory = (url: string) => WebSocket;
 
-export type RoomConnectionStatus = "connecting" | "open" | "closed";
-
 export type RoomClientOptions = {
   url: string;
   onMessage: (message: ServerMessage) => void;
-  onStatusChange?: (status: RoomConnectionStatus) => void;
   // テストや Storybook からフェイクを注入するための口。
   webSocketFactory?: RoomSocketFactory;
   reconnectDelaysMs?: number[];
@@ -43,18 +40,12 @@ export function createRoomClient(options: RoomClientOptions): RoomClient {
   let reconnectAttempt = 0;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-  function setStatus(status: RoomConnectionStatus): void {
-    options.onStatusChange?.(status);
-  }
-
   function connect(): void {
-    setStatus("connecting");
     const ws = factory(options.url);
     socket = ws;
 
     ws.addEventListener("open", () => {
       reconnectAttempt = 0;
-      setStatus("open");
     });
 
     ws.addEventListener("message", (event) => {
@@ -78,7 +69,6 @@ export function createRoomClient(options: RoomClientOptions): RoomClient {
   }
 
   function scheduleReconnect(): void {
-    setStatus("connecting");
     const delay = delays[Math.min(reconnectAttempt, delays.length - 1)] ?? 1000;
     reconnectAttempt += 1;
     reconnectTimer = setTimeout(() => {
@@ -104,7 +94,6 @@ export function createRoomClient(options: RoomClientOptions): RoomClient {
         reconnectTimer = null;
       }
       socket?.close();
-      setStatus("closed");
     },
   };
 }

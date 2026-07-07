@@ -55,7 +55,6 @@ export default async function RoomPage({ params }: RoomPageProps) {
     parsed.data.inviteCode,
   );
 
-  // 付箋の初期状態は空。接続直後に RoomDO が snapshot を送る。
   // key={roomId} で、クライアント遷移（/rooms/A → /rooms/B）時に RoomBoard を
   // 強制的に再マウントする。これがないと notes state（や draggingNoteId）が
   // 旧ルームの値を保持し、新ルームの snapshot が届くまで旧データが表示される。
@@ -68,7 +67,6 @@ export default async function RoomPage({ params }: RoomPageProps) {
           roomId={parsed.data.roomId}
           inviteCode={parsed.data.inviteCode}
           inviteUrl={inviteUrl}
-          initialNotes={[]}
         />
       </div>
     </main>

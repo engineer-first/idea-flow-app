@@ -83,13 +83,6 @@ export class RoomDO extends DurableObject {
     return cursor.toArray().length > 0;
   }
 
-  getMemberIds(): string[] {
-    const cursor = this.ctx.storage.sql.exec(
-      "SELECT user_id FROM members ORDER BY joined_at",
-    );
-    return cursor.toArray().map((row) => String(row.user_id));
-  }
-
   // ------------------------------------------------------------
   // WebSocket 接続
   // ------------------------------------------------------------
@@ -197,7 +190,7 @@ export class RoomDO extends DurableObject {
       case "note:update-content": {
         const row = this.requireNote(ws, message.noteId);
         if (!row) return;
-        // 共同編集: メンバーなら誰でも本文を更新できる（旧 RLS と同じ仕様）。
+        // 共同編集: メンバーなら誰でも本文を更新できる。
         // authorId はメッセージに存在しないため書き換えは構造的に不可能。
         const updatedAt = new Date().toISOString();
         this.ctx.storage.sql.exec(
@@ -261,7 +254,7 @@ export class RoomDO extends DurableObject {
       case "note:delete": {
         const row = this.requireNote(ws, message.noteId);
         if (!row) return;
-        // 削除は author のみ（旧 RLS の DELETE ポリシーと同じ仕様）。
+        // 削除は author のみ。
         if (row.author_id !== userId) {
           this.sendTo(ws, {
             type: "error",

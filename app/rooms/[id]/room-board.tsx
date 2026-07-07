@@ -31,7 +31,6 @@ export type RoomBoardProps = {
   roomId: string;
   inviteCode: string;
   inviteUrl: string;
-  initialNotes: Note[];
   // テストからフェイク WebSocket を注入するための口。本番では未指定。
   webSocketFactory?: RoomSocketFactory;
 };
@@ -42,10 +41,11 @@ export function RoomBoard({
   roomId,
   inviteCode,
   inviteUrl,
-  initialNotes,
   webSocketFactory,
 }: RoomBoardProps) {
-  const [notes, setNotes] = useState<Note[]>(initialNotes);
+  // 付箋の初期状態は空。確定状態の真実はサーバー（RoomDO）側にあり、
+  // 接続直後に送られてくる snapshot で復元される。
+  const [notes, setNotes] = useState<Note[]>([]);
   const [draggingNoteId, setDraggingNoteId] = useState<string | null>(null);
   const draggingNoteIdRef = useRef<string | null>(null);
   const clientRef = useRef<RoomClient | null>(null);

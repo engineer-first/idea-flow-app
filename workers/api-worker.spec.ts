@@ -7,7 +7,7 @@ import { env, SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { TOKEN_AUDIENCE } from "../contracts/session";
 import { signToken } from "../lib/session/token";
-import { runInRoomDO } from "./test-helpers";
+import { listMemberIds } from "./test-helpers";
 
 const OWNER = {
   sub: "11111111-1111-4111-8111-111111111111",
@@ -86,9 +86,7 @@ describe("ルーム作成", () => {
     expect(inviteCode).toMatch(/^[A-HJ-NP-Z2-9]{6}$/);
 
     // pgTAP: 「create_room() は host を room_members に1件だけ登録する」
-    const memberIds = await runInRoomDO(roomId, (instance) =>
-      instance.getMemberIds(),
-    );
+    const memberIds = await listMemberIds(roomId);
     expect(memberIds).toEqual([OWNER.sub]);
   });
 
@@ -161,9 +159,7 @@ describe("ルーム参加（pgTAP: join_room）", () => {
       expect(res.status).toBe(200);
     }
 
-    const memberIds = await runInRoomDO(roomId, (instance) =>
-      instance.getMemberIds(),
-    );
+    const memberIds = await listMemberIds(roomId);
     expect(memberIds.sort()).toEqual([OWNER.sub, MEMBER.sub].sort());
   });
 
