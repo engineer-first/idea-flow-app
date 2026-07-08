@@ -40,3 +40,20 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# OpenNext / Cloudflare
+.open-next/
+.wrangler/
+workers/worker-configuration.d.ts
+
+# Storybook build output
+storybook-static/
+build-storybook.log
+
+# Playwright MCP artifacts
+.playwright-mcp/
+
+# wrangler local secrets
+.dev.vars
+workers/.dev.vars
+workers/.wrangler/

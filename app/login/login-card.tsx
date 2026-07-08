@@ -39,7 +39,7 @@ export default function LoginCard({
           <div className="p-3 text-xs bg-amber-50 text-amber-800 rounded-xl border border-amber-100 flex gap-2">
             <ShieldAlert className="h-4 w-4 shrink-0" />
             <span>
-              Supabaseの環境設定が必要です。.env.local を確認してください。
+              認証の環境設定が必要です。.env.local を確認してください。
             </span>
           </div>
         )}

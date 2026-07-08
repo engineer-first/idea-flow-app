@@ -1,51 +1,47 @@
 ---
 name: create-migration
-description: Supabase migration と pgTAP テストをペアで作成し、supabase test db で検証する
-argument-hint: <migration-name>
+description: D1 migration を規約（連番採番・戻せる意図・最小スコープ）に沿って作成し、ローカル適用と worker テストまで検証する
+argument-hint: <変更内容の説明>
 disable-model-invocation: true
 ---
 
-# Supabase migration 作成
+# D1 migration 作成
 
-`$ARGUMENTS` で指定された名前の migration を、pgTAP テストとペアで作成する。migration 単体で完結させず、必ず「migration + テスト + 検証」を 1 セットで行う。
+`$ARGUMENTS` で指定された変更内容の D1 migration を作成し、ローカル適用まで検証する。
 
-## 手順
+## 前提の確認（作業前）
 
-1. `supabase migration new <name>` で migration ファイルを生成する。ファイル名を手で作ったり、タイムスタンプを推測したりしない
-2. 生成された `supabase/migrations/<timestamp>_<name>.sql` に SQL を書く
-   - スコープは最小限に保ち、意図として戻せる形にする
-   - 新規テーブルは `alter table ... enable row level security;` を必ず含め、policy を定義する
-   - 特権的なデータベースワークフローは RPC（`security definer` 関数）にまとめる
-3. RLS / trigger / RPC を含む場合は `supabase test new <name>` で pgTAP テストを生成し、`supabase/tests/` 配下に必ず追加する
-4. `supabase test db` で green を確認する（ローカル Supabase が起動していること）
+- この変更は本当に D1 に属するか。ルームの中の真実（メンバー・付箋）は RoomDO が
+  持つ。D1 の rooms 行は「招待コード -> ルーム解決」のディレクトリにすぎない。
+  RoomDO 側に属するデータなら migration ではなく RoomDO のストレージを変更する。
+- スキーマ変更が API 境界に現れるなら、先に `contracts/` を変更する
+  （`/contract-change` の手順に従う）。
 
-## pgTAP テンプレート
+## ファイル作成
 
-```sql
-begin;
-select plan(3);
+- 配置先: `workers/migrations/`
+- 命名: `NNNN_snake_case_name.sql`（既存の最大番号 + 1、4 桁ゼロ埋め。
+  例: `0002_add_room_expiry.sql`）
+- 1 migration = 1 意図。無関係な変更を同じファイルに入れない。
 
-select has_table('public', 'ideas', 'ideas テーブルが存在する');
+## 書き方（戻せる意図で）
 
--- RLS が有効であること
-select ok(
-  (select relrowsecurity from pg_class where oid = 'public.ideas'::regclass),
-  'ideas テーブルで RLS が有効'
-);
+- additive な変更（`CREATE TABLE` / `ADD COLUMN`）を優先する。
+- 破壊的変更（`DROP` / データ変換）は additive な migration と分離し、
+  適用前にユーザーへ確認する。
+- `IF NOT EXISTS` に頼って冪等に見せかけない。順序どおり一度だけ適用される
+  前提で、意図が読める SQL を書く。
 
--- 認可の検証は anon / authenticated / 他ユーザーの 3 視点で行う
-set local role anon;
-select is_empty(
-  $$ select * from public.ideas $$,
-  'anon はデータを参照できない'
-);
+## 適用と検証
 
-select * from finish();
-rollback;
-```
+1. `npm run db:migrate` でローカルに適用する
+2. `npx wrangler d1 execute DB --local --config workers/wrangler.jsonc --command "SELECT sql FROM sqlite_master WHERE type='table'"` でスキーマを確認する
+3. D1 に触れる spec（`workers/api-worker.spec.ts` など）に新スキーマの
+   振る舞いテストを追加し、`npm run test:workers` が green になることを確認する
 
-## ガードレール
+## チェックリスト
 
-- クライアントコードを楽にするために RLS policy を緩めない
-- policy の検証は最低でも anon / authenticated（本人）/ authenticated（他ユーザー）の 3 視点で行う
-- migration とテストは同じ PR に含める
+- 番号が既存と重複していない
+- 1 ファイル 1 意図になっている
+- 破壊的変更が分離され、ユーザー確認を経ている
+- `npm run test:workers` が通る

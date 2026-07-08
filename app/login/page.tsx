@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
-import { signInWithGoogle, signInWithPassword } from "@/app/auth/actions";
-import { getCurrentUser } from "@/lib/supabase/auth";
-import { isDevAuthEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
+import { signInWithDevPassword, signInWithGoogle } from "@/app/auth/actions";
+import { sanitizeNextPath } from "@/app/auth/redirects";
+import { getCurrentUser } from "@/lib/session/current-user";
+import { isAuthConfigured, isDevAuthEnabled } from "@/lib/session/env";
 import LoginCard from "./login-card";
 
 export const dynamic = "force-dynamic";
@@ -9,18 +10,24 @@ export const dynamic = "force-dynamic";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; next?: string }>;
 }) {
-  const { error } = await searchParams;
-  if (await getCurrentUser()) redirect("/");
+  const { error, next } = await searchParams;
+  if (await getCurrentUser()) {
+    // 既にログイン済みなら戻り先（招待URL 等）へ直行する。
+    redirect(sanitizeNextPath(next));
+  }
+
+  // next を各アクションに束縛して渡す（LoginCard の API は変えない）。
+  const safeNext = sanitizeNextPath(next);
 
   return (
     <LoginCard
       error={error}
-      isConfigured={isSupabaseConfigured()}
+      isConfigured={isAuthConfigured()}
       showDevAuth={isDevAuthEnabled()}
-      googleAction={signInWithGoogle}
-      passwordAction={signInWithPassword}
+      googleAction={signInWithGoogle.bind(null, safeNext)}
+      passwordAction={signInWithDevPassword.bind(null, safeNext)}
     />
   );
 }

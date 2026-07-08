@@ -8,15 +8,16 @@
 
 プロダクトの詳細（PRD、ペルソナ、競合分析、画面イメージなど）は [idea-flow-app Wiki](https://github.com/engineer-first/idea-flow-app/wiki) にまとめています。仕様や設計の確認は Wiki を参照してください。
 
+技術構成は **Next.js（UI）+ Cloudflare Workers（api-worker）+ Durable Objects（1ルーム = 1 権威サーバー）+ D1（ロビー）** です。採用の経緯と移行の記録は [`docs/refactor-cloudflare-do.md`](docs/refactor-cloudflare-do.md) を参照してください。
+
 ## 環境構築
 
 ### 前提
 
 - [mise](https://mise.jdx.dev/)（Node.js のバージョン管理に使用）
 - Git
-- [Docker](https://www.docker.com/)（ローカルSupabaseの起動に使用。認証のローカル開発を行う場合のみ必要）
 
-Supabase CLI自体は `devDependencies` にnpmパッケージとして含まれているため、別途インストールは不要です（`npm run supabase:start` 等で自動的にローカルのCLIが使われます）。
+Docker や外部サービスのアカウントは不要です（wrangler がローカルで D1 / Durable Objects をエミュレートします）。
 
 ### 手順
 
@@ -30,10 +31,17 @@ mise install
 # 依存関係のインストール
 npm ci
 
-# 環境設定ファイルをコピー (MSW などを切り替える)
-cp .env.example .env.local
+# 環境設定ファイルをコピー
+cp .env.example .env.local                       # Next.js 側
+cp workers/.dev.vars.example workers/.dev.vars   # api-worker 側の秘密（gitignore 済み）
 
-# 開発サーバーの起動
+# D1（ローカル）に migration を適用（初回のみ）
+npm run db:migrate
+
+# ターミナル1: api-worker（D1 + Durable Objects）を起動
+npm run dev:api
+
+# ターミナル2: Next.js 開発サーバーを起動
 npm run dev
 ```
 
@@ -41,21 +49,9 @@ npm run dev
 
 ### 認証のローカル開発
 
-MVP本番のログインはGoogle認証のみを想定しています。ローカル開発では、Google認証に加えて固定のメール/パスワードユーザーでログインできます。
+本番のログインは Google 認証（OIDC）のみを想定しています。ローカル開発では、固定のメール/パスワードユーザーでログインできます（`NEXT_PUBLIC_ENABLE_DEV_AUTH=true` かつ production 以外の環境でだけ表示されます）。
 
-```bash
-cp .env.example .env.local
-npm run supabase:start
-npx supabase status -o env
-
-# 表示されたローカルのpublishable key / service_role keyを.env.localに反映してから実行
-npm run seed:dev-users
-npm run dev
-```
-
-開発用ログインは`NEXT_PUBLIC_ENABLE_DEV_AUTH=true`かつproduction以外の環境でだけ表示されます。
-
-固定ユーザー:
+固定ユーザー（初回ログイン時に自動作成されるため、シードは不要です）:
 
 | メール                | パスワード |
 | --------------------- | ---------- |
@@ -63,23 +59,31 @@ npm run dev
 | `member@example.test` | `password` |
 | `viewer@example.test` | `password` |
 
-ローカルSupabaseでGoogle認証を確認する場合は、[ローカルSupabaseでのGoogle認証設定手順](docs/local-supabase-google-auth.md)を参照してください。
+Google ログインを確認する場合は、Google Cloud Console で OAuth クライアントを作成し、`.env.local` に `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` を設定してください（リダイレクト URI は `http://localhost:3000/auth/callback`）。
 
 ### よく使うコマンド
 
-| コマンド                            | 説明                                                     |
-| ----------------------------------- | -------------------------------------------------------- |
-| `npm run dev`                       | 開発サーバーを起動                                       |
-| `npm run supabase:start`            | ローカルSupabaseを起動                                   |
-| `npm run supabase:stop`             | ローカルSupabaseを停止                                   |
-| `npm run supabase:stop --no-backup` | ローカルSupabaseの完全停止(データをすべて削除して初期化) |
-| `npm run seed:dev-users`            | 開発用固定ユーザーを作成・更新                           |
-| `npm run build`                     | 本番ビルド                                               |
-| `npm run lint`                      | Biome による静的解析 (lint + format チェック)            |
-| `npm run fix`                       | Biome の自動修正 (lint + format)                         |
-| `npm run format`                    | Biome でファイルを一括フォーマット                       |
-| `npm run test`                      | ユニットテストを実行 (CI でも実行)                       |
-| `npm run test:coverage`             | ユニットテストを実行しカバレッジを表示                   |
+| コマンド               | 説明                                                        |
+| ---------------------- | ----------------------------------------------------------- |
+| `npm run dev`          | Next.js 開発サーバーを起動                                  |
+| `npm run dev:api`      | api-worker（D1 + Durable Objects）をローカル起動            |
+| `npm run db:migrate`   | ローカル D1 に migration を適用                             |
+| `npm run build`        | Next.js 本番ビルド                                          |
+| `npm run build:cf`     | Cloudflare Workers 向けビルド（OpenNext）                   |
+| `npm run preview:cf`   | Workers 向けビルドを workerd 上でローカル実行（2構成同時）  |
+| `npm run lint`         | Biome による静的解析 (lint + format チェック)               |
+| `npm run fix`          | Biome の自動修正 (lint + format)                            |
+| `npm run format`       | Biome でファイルを一括フォーマット                          |
+| `npm run test`         | アプリ側ユニットテストを実行 (CI でも実行)                  |
+| `npm run test:workers` | Worker / Durable Object のテストを workerd 上で実行         |
+| `npm run typecheck`    | 型検査（Worker の型生成込み）                               |
+
+### デプロイ（Cloudflare）
+
+1. `wrangler d1 create idea-flow-lobby` で D1 を作成し、`workers/wrangler.jsonc` の `database_id` を置き換える
+2. `wrangler secret put SESSION_SECRET --config workers/wrangler.jsonc` で本番秘密鍵を設定する
+3. `wrangler deploy --config workers/wrangler.jsonc` で api-worker をデプロイする
+4. `npm run build:cf && wrangler deploy` で Next.js ワーカーをデプロイする
 
 ### MSW (Mock Service Worker)
 
@@ -94,7 +98,6 @@ Node.js のバージョンは `mise.toml` で LTS に固定しています。CI 
 `.mcp.json` でプロジェクト共通の MCP サーバーを定義しています。
 
 - **playwright** — 実ブラウザでの UI 確認・スクリーンショット取得に使用します
-- **supabase** — ローカル Supabase の MCP エンドポイント (`http://localhost:54321/mcp`) に接続します。`npm run supabase:start` で起動中のみ利用できます
 
 ## スクラム運用
 

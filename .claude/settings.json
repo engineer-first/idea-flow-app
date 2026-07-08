@@ -18,6 +18,10 @@
           {
             "type": "command",
             "command": ".claude/hooks/format-on-edit.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/check-boundaries.sh"
           }
         ]
       }

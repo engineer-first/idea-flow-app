@@ -32,7 +32,7 @@ disable-model-invocation: true
 2. spec を書き、`npx vitest run <spec のパス>` で **失敗を確認** する
 3. 実装して同じテストが green になることを確認する
 4. stories を作成する。データに依存するコンポーネントは loading / empty / success / error の各状態を story とテストの両方でカバーする
-5. Supabase や外部 API に依存する場合は MSW handler を用意し、fixture を handler と共有する
+5. 外部 API に依存する場合は MSW handler を、WebSocket に依存する場合はフェイク（webSocketFactory 注入）を用意し、fixture を共有する
 
 ## チェックリスト
 

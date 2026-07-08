@@ -9,12 +9,21 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],
-    include: ["app/**/*.{test,spec}.{ts,tsx}", ".claude/hooks/**/*.spec.ts"],
+    include: [
+      "app/**/*.{test,spec}.{ts,tsx}",
+      "lib/**/*.{test,spec}.{ts,tsx}",
+      "contracts/**/*.{test,spec}.{ts,tsx}",
+      ".claude/hooks/**/*.spec.ts",
+    ],
     coverage: {
       provider: "v8",
       reporter: ["text"],
-      include: ["app/**/*.{ts,tsx}"],
-      exclude: ["app/**/*.{test,spec}.{ts,tsx}"],
+      include: [
+        "app/**/*.{ts,tsx}",
+        "lib/**/*.{ts,tsx}",
+        "contracts/**/*.{ts,tsx}",
+      ],
+      exclude: ["**/*.{test,spec}.{ts,tsx}"],
     },
   },
 });

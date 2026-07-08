@@ -1,75 +1,100 @@
 "use server";
 
+// 認証の Server Actions。
+// - 開発用ログイン: 固定ユーザー + 固定パスワード（development のみ）
+// - Google ログイン: OIDC authorization code flow を開始する
+// どちらも最終的に lib/session/establish.ts の establishSession に合流し、
+// api-worker へのユーザー upsert とセッション Cookie の発行を行う。
+//
+// next: ログイン後の戻り先。招待URL（/invite/[code]）をログアウト状態で開いた
+// ときに元のURLへ戻すため、page 側から .bind(null, next) で渡される。
+// 値は必ず sanitizeNextPath でアプリ内相対パスに限定する（オープンリダイレクト防止）。
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { isDevAuthEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
-import { createClient } from "@/lib/supabase/server";
+import { getLoginPath, sanitizeNextPath } from "@/app/auth/redirects";
+import { clearSessionCookie, OAUTH_STATE_COOKIE } from "@/lib/session/cookie";
+import { DEV_PASSWORD, findDevUser } from "@/lib/session/dev-users";
+import {
+  getBaseUrl,
+  getGoogleClientId,
+  isDevAuthEnabled,
+  isGoogleAuthConfigured,
+} from "@/lib/session/env";
+import { establishSession } from "@/lib/session/establish";
 
-function loginError(message: string): never {
-  redirect(`/login?error=${encodeURIComponent(message)}`);
+function loginError(message: string, next?: string): never {
+  const base = getLoginPath(next);
+  const separator = base.includes("?") ? "&" : "?";
+  redirect(`${base}${separator}error=${encodeURIComponent(message)}`);
 }
 
-function getBaseUrl() {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-
-  if (siteUrl) {
-    return siteUrl;
-  }
-
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("NEXT_PUBLIC_SITE_URL is required in production.");
-  }
-
-  return "http://localhost:3000";
-}
-
-export async function signInWithGoogle() {
-  if (!isSupabaseConfigured()) {
-    loginError("Supabaseの環境変数を設定してください。");
-  }
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: `${getBaseUrl()}/auth/callback`,
-    },
-  });
-  const url = data.url;
-
-  if (error || !url) {
-    loginError(error?.message ?? "Googleログインを開始できませんでした。");
-  }
-
-  redirect(url);
-}
-
-export async function signInWithPassword(formData: FormData) {
+export async function signInWithDevPassword(
+  next: string,
+  formData: FormData,
+): Promise<void> {
   if (!isDevAuthEnabled()) {
-    loginError("開発用ログインは無効です。");
-  }
-
-  if (!isSupabaseConfigured()) {
-    loginError("Supabaseの環境変数を設定してください。");
+    loginError("開発用ログインは無効です。", next);
   }
 
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-
-  if (error) {
-    loginError(error.message);
+  const devUser = findDevUser(email);
+  if (!devUser || password !== DEV_PASSWORD) {
+    loginError("メールアドレスまたはパスワードが違います。", next);
   }
 
-  redirect("/");
+  const result = await establishSession({
+    kind: "dev",
+    userId: devUser.id,
+    email: devUser.email,
+    name: devUser.name,
+  });
+
+  if (!result.ok) {
+    loginError(result.error, next);
+  }
+
+  redirect(sanitizeNextPath(next));
 }
 
-export async function signOut() {
-  if (isSupabaseConfigured()) {
-    const supabase = await createClient();
-    await supabase.auth.signOut();
+export async function signInWithGoogle(next: string): Promise<void> {
+  if (!isGoogleAuthConfigured()) {
+    loginError("Google ログインの環境変数を設定してください。", next);
   }
 
+  const state = crypto.randomUUID();
+  const nonce = crypto.randomUUID();
+
+  const cookieStore = await cookies();
+  cookieStore.set(
+    OAUTH_STATE_COOKIE,
+    JSON.stringify({ state, nonce, next: sanitizeNextPath(next) }),
+    {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 600,
+    },
+  );
+
+  const authorizeUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+  authorizeUrl.searchParams.set("client_id", getGoogleClientId());
+  authorizeUrl.searchParams.set(
+    "redirect_uri",
+    `${getBaseUrl()}/auth/callback`,
+  );
+  authorizeUrl.searchParams.set("response_type", "code");
+  authorizeUrl.searchParams.set("scope", "openid email profile");
+  authorizeUrl.searchParams.set("state", state);
+  authorizeUrl.searchParams.set("nonce", nonce);
+  authorizeUrl.searchParams.set("prompt", "select_account");
+
+  redirect(authorizeUrl.toString());
+}
+
+export async function signOut(): Promise<void> {
+  await clearSessionCookie();
   redirect("/login");
 }
