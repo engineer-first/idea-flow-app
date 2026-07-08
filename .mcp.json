@@ -4,9 +4,9 @@
       "command": "npx",
       "args": ["-y", "@playwright/mcp@latest"]
     },
-    "supabase": {
-      "type": "http",
-      "url": "http://localhost:54321/mcp"
+    "cloudflare-docs": {
+      "type": "sse",
+      "url": "https://docs.mcp.cloudflare.com/sse"
     }
   }
 }

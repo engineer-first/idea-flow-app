@@ -1,6 +1,6 @@
 # docs/site — GitHub Pages 公開ディレクトリ
 
-このディレクトリ配下がそのまま <https://engineer-first.github.io/idea-flow-app/> として公開される。
+このディレクトリ配下がそのまま [https://engineer-first.github.io/idea-flow-app/](https://engineer-first.github.io/idea-flow-app/) として公開される。
 主な読者・書き手は AI エージェント。ここへページを追加・変更する前にこのファイルを読むこと。
 
 ## デプロイの仕組み
@@ -12,21 +12,12 @@
 - デプロイ状況の確認: `gh run list --workflow=deploy-pages.yml`
 - この README.md も公開対象に含まれ、URL 直打ちで取得できる。公開されて問題ない内容だけを書く（サイト内に導線は置かない）。
 
-## 現在の構成
-
-| パス | 内容 | URL |
-| --- | --- | --- |
-| `index.html` | 目次ページ（全ページへのリンク） | `/` |
-| `realtime/index.html` | Supabase Realtime 解説 | `/realtime/` |
-| `vrt-operations/index.html` | VRT（Chromatic）運用ガイド | `/vrt-operations/` |
-
 ## ページ追加の手順
 
 1. slug を kebab-case で決める（例: `realtime-explainer`）。
 2. `docs/site/<slug>/index.html` として作成する。1 ページ = 1 ディレクトリ。
-   - 理由: URL が `/<slug>/` と綺麗になり、画像などの付属アセットを同じディレクトリに同居させられる。ページが育って分割しても URL が壊れない。
+  - 理由: URL が `/<slug>/` と綺麗になり、画像などの付属アセットを同じディレクトリに同居させられる。ページが育って分割しても URL が壊れない。
 3. ルートの `index.html`（目次）に新ページへのリンクを追加する。
-4. この README の「現在の構成」表を更新する。
 
 ## lint の扱い
 
@@ -50,3 +41,4 @@
 - 公開済みページの URL（= ディレクトリ名）は変えない。外部にリンクが共有されている前提で扱う。
 - ページの削除・改名は URL を壊す操作なので、ユーザーの明示的な指示があるときだけ行う。
 - 既存ページの内容更新は自由。ただし slug と `<title>` の同一性は保つ（別テーマになるなら新ページとして追加する）。
+

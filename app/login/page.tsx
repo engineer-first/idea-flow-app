@@ -1,74 +1,33 @@
 import { redirect } from "next/navigation";
-import { signInWithGoogle, signInWithPassword } from "@/app/auth/actions";
-import { getCurrentUser } from "@/lib/supabase/auth";
-import { isDevAuthEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
+import { signInWithDevPassword, signInWithGoogle } from "@/app/auth/actions";
+import { sanitizeNextPath } from "@/app/auth/redirects";
+import { getCurrentUser } from "@/lib/session/current-user";
+import { isAuthConfigured, isDevAuthEnabled } from "@/lib/session/env";
+import LoginCard from "./login-card";
 
 export const dynamic = "force-dynamic";
 
-type LoginPageProps = {
-  searchParams: Promise<{
-    error?: string;
-  }>;
-};
-
-export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const params = await searchParams;
-
-  const user = await getCurrentUser();
-
-  if (user) {
-    redirect("/");
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; next?: string }>;
+}) {
+  const { error, next } = await searchParams;
+  if (await getCurrentUser()) {
+    // 既にログイン済みなら戻り先（招待URL 等）へ直行する。
+    redirect(sanitizeNextPath(next));
   }
 
-  const showDevAuth = isDevAuthEnabled();
+  // next を各アクションに束縛して渡す（LoginCard の API は変えない）。
+  const safeNext = sanitizeNextPath(next);
 
   return (
-    <main>
-      <h1>IdeaFlow</h1>
-      <p>ログインしてください。</p>
-
-      {params.error ? <p>{params.error}</p> : null}
-
-      {!isSupabaseConfigured() ? (
-        <p>
-          Supabaseの環境変数が未設定です。<code>.env.example</code>
-          を参考に<code>.env.local</code>を作成してください。
-        </p>
-      ) : null}
-
-      <form action={signInWithGoogle}>
-        <button type="submit">Googleでログイン</button>
-      </form>
-
-      {showDevAuth ? (
-        <>
-          <hr />
-          <h2>開発用ログイン</h2>
-          <form action={signInWithPassword}>
-            <label htmlFor="email">
-              メール
-              <input
-                id="email"
-                name="email"
-                type="email"
-                defaultValue="owner@example.test"
-                required
-              />
-            </label>
-            <label htmlFor="password">
-              パスワード
-              <input
-                id="password"
-                name="password"
-                type="password"
-                defaultValue="password"
-                required
-              />
-            </label>
-            <button type="submit">開発用ユーザーでログイン</button>
-          </form>
-        </>
-      ) : null}
-    </main>
+    <LoginCard
+      error={error}
+      isConfigured={isAuthConfigured()}
+      showDevAuth={isDevAuthEnabled()}
+      googleAction={signInWithGoogle.bind(null, safeNext)}
+      passwordAction={signInWithDevPassword.bind(null, safeNext)}
+    />
   );
 }

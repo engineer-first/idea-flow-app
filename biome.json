@@ -14,7 +14,10 @@
       "!package-lock.json",
       "!public",
       "!docs/site",
-      "!supabase/.temp"
+      "!.open-next",
+      "!.wrangler",
+      "!**/.wrangler",
+      "!workers/worker-configuration.d.ts"
     ]
   },
   "formatter": {
