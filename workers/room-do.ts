@@ -17,6 +17,7 @@ import {
   parseClientMessage,
   type ServerMessage,
 } from "../contracts/room-protocol";
+import { migrateRoomStorage } from "./room-do-migrations";
 import { filterVisible, visibleTo } from "./visibility";
 
 // api-worker がセッション検証済みのユーザーIDを DO へ引き継ぐヘッダー。
@@ -40,26 +41,11 @@ type NoteRow = {
 export class RoomDO extends DurableObject {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
+    // スキーマは room-do-migrations.ts の版管理で管理する。
+    // マイグレーション完了までイベント配信を止め、移行中のストレージに
+    // 古い・新しいスキーマ前提の操作が届かないようにする。
     this.ctx.blockConcurrencyWhile(async () => {
-      this.ctx.storage.sql.exec(
-        `CREATE TABLE IF NOT EXISTS members (
-           user_id TEXT PRIMARY KEY,
-           joined_at TEXT NOT NULL DEFAULT (datetime('now'))
-         );
-         CREATE TABLE IF NOT EXISTS notes (
-           id TEXT PRIMARY KEY,
-           author_id TEXT NOT NULL,
-           content TEXT NOT NULL DEFAULT '',
-           x REAL NOT NULL,
-           y REAL NOT NULL,
-           created_at TEXT NOT NULL,
-           updated_at TEXT NOT NULL
-         );
-         -- 旧バージョンが招待コード等をキャッシュしていた meta テーブルの掃除。
-         -- 招待コードはベアラートークン相当の秘密なので、どこからも読まれない
-         -- 複製を既存 DO のストレージに残さない（全 DO 移行後にこの行は削除可）。
-         DROP TABLE IF EXISTS meta;`,
-      );
+      migrateRoomStorage(this.ctx.storage);
     });
   }
 
