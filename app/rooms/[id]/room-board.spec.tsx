@@ -92,14 +92,24 @@ function renderBoard(options: { open?: boolean } = {}) {
   return { view, socket };
 }
 
-function connectWithSnapshot(notes: ProtocolNote[] = []) {
+function connectWithSnapshot(
+  notes: ProtocolNote[] = [],
+  options?: {
+    phase?: "phase1" | "phase2" | "phase3";
+    isHost?: boolean;
+  },
+) {
   const { view, socket } = renderBoard();
+
   act(() =>
     socket.simulateServerMessage({
       type: "snapshot",
       notes,
+      phase: options?.phase ?? "phase1",
+      isHost: options?.isHost ?? true,
     }),
   );
+
   return { view, socket };
 }
 

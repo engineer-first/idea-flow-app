@@ -13,6 +13,8 @@ const meta = {
     notes: buildNotes(3),
     inviteCode: "AB12CD",
     inviteUrl: "https://idea-flow.example/invite/AB12CD",
+    phase: "phase1",
+    isHost: false,
     connectionStatus: "open",
     draggingNoteId: null,
     onAddNote: fn(),
@@ -21,6 +23,7 @@ const meta = {
     onNoteDragEnd: fn(),
     onNoteContentChange: fn(),
     onNoteDelete: fn(),
+    onNextPhase: fn(),
   },
   decorators: [
     (Story) => (
