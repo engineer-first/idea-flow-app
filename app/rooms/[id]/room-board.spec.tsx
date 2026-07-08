@@ -81,6 +81,10 @@ function renderBoard(options: { open?: boolean } = {}) {
       roomId={ROOM_ID}
       inviteCode="AB12CD"
       inviteUrl="https://idea-flow.example/invite/AB12CD"
+      currentUserId={USER_ID}
+      isHost
+      initialMembers={[]}
+      initialPhase="writing"
       webSocketFactory={factory}
     />,
   );
@@ -98,6 +102,7 @@ function connectWithSnapshot(notes: ProtocolNote[] = []) {
     socket.simulateServerMessage({
       type: "snapshot",
       notes,
+      members: [],
     }),
   );
   return { view, socket };

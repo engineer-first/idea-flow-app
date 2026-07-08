@@ -49,7 +49,7 @@ describe("GET /invite/[inviteCode]", () => {
     );
   });
 
-  it("参加に成功したらルームページへリダイレクトする", async () => {
+  it("参加に成功したらスタート画面へリダイレクトする", async () => {
     apiFetchMock.mockResolvedValue(
       Response.json({ roomId: "123e4567-e89b-12d3-a456-426614174000" }),
     );
@@ -58,7 +58,7 @@ describe("GET /invite/[inviteCode]", () => {
     const res = await GET(request, context);
 
     expect(res.headers.get("location")).toBe(
-      "https://app.example.com/rooms/123e4567-e89b-12d3-a456-426614174000",
+      "https://app.example.com/rooms/123e4567-e89b-12d3-a456-426614174000/start",
     );
   });
 

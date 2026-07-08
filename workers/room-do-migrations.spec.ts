@@ -46,6 +46,7 @@ describe("migrateRoomStorage", () => {
       expect(tableNames(state.storage)).toEqual([
         "members",
         "notes",
+        "room_state",
         "schema_version",
       ]);
       expect(schemaVersion(state.storage)).toBe(ROOM_DO_MIGRATIONS.length);
@@ -155,8 +156,40 @@ describe("RoomDO constructor の配線", () => {
       expect(tableNames(state.storage)).toEqual([
         "members",
         "notes",
+        "room_state",
         "schema_version",
       ]);
+    });
+  });
+
+  it("v1 → v2: members.name カラムが追加され、既存行は空文字のまま保持される", async () => {
+    await runInRoomDO("mig-v2-alter", (_instance, state) => {
+      dropAllTables(state.storage);
+      const v1 = ROOM_DO_MIGRATIONS[0];
+      migrateRoomStorage(state.storage, [v1]);
+
+      // v1 時点でメンバーを追加（name カラムがまだ無い）
+      state.storage.sql.exec(
+        "INSERT INTO members (user_id) VALUES (?1)",
+        USER_A,
+      );
+      expect(
+        state.storage.sql.exec("SELECT user_id FROM members").toArray(),
+      ).toEqual([{ user_id: USER_A }]);
+
+      migrateRoomStorage(state.storage);
+
+      // v2 適用後もメンバー行が残り、name は空文字
+      const rows = state.storage.sql
+        .exec("SELECT user_id, name FROM members")
+        .toArray();
+      expect(rows).toEqual([{ user_id: USER_A, name: "" }]);
+
+      // room_state に 1 行できている
+      const stateRows = state.storage.sql
+        .exec("SELECT phase FROM room_state")
+        .toArray();
+      expect(stateRows).toEqual([{ phase: "lobby" }]);
     });
   });
 });

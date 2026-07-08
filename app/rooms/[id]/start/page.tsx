@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { buildInviteUrl } from "@/app/invite/invite-url";
-import { RoomBoard } from "@/app/rooms/[id]/room-board";
+import { RoomStartBoard } from "@/app/rooms/[id]/start/room-start-board";
 import {
   RoomInfoResponseSchema,
   RoomMembersResponseSchema,
@@ -12,11 +12,11 @@ import { getBaseUrl } from "@/lib/session/env";
 
 export const dynamic = "force-dynamic";
 
-type RoomPageProps = {
+type StartPageProps = {
   params: Promise<{ id: string }>;
 };
 
-export default async function RoomPage({ params }: RoomPageProps) {
+export default async function StartPage({ params }: StartPageProps) {
   const { id } = await params;
 
   if (!isUuid(id)) {
@@ -28,52 +28,42 @@ export default async function RoomPage({ params }: RoomPageProps) {
     redirect("/login");
   }
 
-  // メンバーシップは api-worker（の先の RoomDO）が判定する。
-  // 非メンバー・存在しないルームはどちらも 404 で返るため、そのまま notFound() へ。
+  // セッション必須・メンバー必須（api-worker 側で判定、404 なら notFound）。
   const res = await apiFetch(`/api/rooms/${id}`);
   if (!res.ok) {
     notFound();
   }
-
   const parsed = RoomInfoResponseSchema.safeParse(await res.json());
   if (!parsed.success) {
     notFound();
   }
 
-  // lobby 状態なら付箋画面に直行させず、スタート画面へ誘導する（#70 仕様）。
-  // 既に writing 状態なら、ボードを直接開く。
-  if (parsed.data.phase === "lobby") {
-    redirect(`/rooms/${parsed.data.roomId}/start`);
+  // 既に writing ならボードへ直行（スタート画面に留まる意味がない）。
+  if (parsed.data.phase === "writing") {
+    redirect(`/rooms/${parsed.data.roomId}`);
   }
 
-  // メンバー一覧を SSR で取得して初回描画時の flicker を抑える。
-  // 失敗しても board の snapshot で復元できるので、フォールバックは空配列。
+  // メンバー一覧を SSR で取得（初期表示用）。失敗しても snapshot で復元できる。
   const membersRes = await apiFetch(`/api/rooms/${id}/members`);
   const initialMembers = membersRes.ok
     ? RoomMembersResponseSchema.parse(await membersRes.json()).members
     : [];
 
-  // 招待URL の origin は設定値（NEXT_PUBLIC_SITE_URL、本番では必須）から作る。
-  // x-forwarded-host / host はクライアントが偽装できるヘッダーで、Cloudflare も
-  // 既定では剥がさない。共有される URL の origin をそこから組み立てない。
   const inviteUrl = buildInviteUrl(getBaseUrl(), parsed.data.inviteCode);
 
-  // key={roomId} で、クライアント遷移（/rooms/A → /rooms/B）時に RoomBoard を
-  // 強制的に再マウントする。これがないと notes state（や draggingNoteId）が
-  // 旧ルームの値を保持し、新ルームの snapshot が届くまで旧データが表示される。
   return (
-    <main className="flex h-screen flex-col gap-4 p-4">
+    <main className="flex h-screen flex-col gap-6 p-4">
       <h1 className="text-lg font-semibold">IdeaFlow ルーム</h1>
       <div className="min-h-0 flex-1">
-        <RoomBoard
+        <RoomStartBoard
           key={parsed.data.roomId}
           roomId={parsed.data.roomId}
           inviteCode={parsed.data.inviteCode}
           inviteUrl={inviteUrl}
           currentUserId={user.sub}
           isHost={parsed.data.isHost}
-          initialMembers={initialMembers}
           initialPhase={parsed.data.phase}
+          initialMembers={initialMembers}
         />
       </div>
     </main>

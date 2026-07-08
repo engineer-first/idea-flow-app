@@ -27,6 +27,18 @@ export const ROOM_DO_MIGRATIONS: readonly string[] = [
      updated_at TEXT NOT NULL
    );
    DROP TABLE IF EXISTS meta;`,
+  // v2: ルームの進行状態 (lobby / writing) とメンバー名表示を保持する。
+  // - members に name を追加: #70 でメンバー一覧 UI を出すため、RoomDO 内に
+  //   スナップショット用の名前を持たせる。D1 の users.name の更新に追従する
+  //   ため、upsertMember は name を受け取り UPDATE も行う。
+  // - room_state: 進行状態を 1 行で持つ。lobby がデフォルト。
+  `ALTER TABLE members ADD COLUMN name TEXT NOT NULL DEFAULT '';
+   CREATE TABLE IF NOT EXISTS room_state (
+     id INTEGER PRIMARY KEY CHECK (id = 1),
+     phase TEXT NOT NULL DEFAULT 'lobby',
+     changed_at TEXT NOT NULL DEFAULT (datetime('now'))
+   );
+   INSERT OR IGNORE INTO room_state (id, phase) VALUES (1, 'lobby');`,
 ];
 
 export function migrateRoomStorage(

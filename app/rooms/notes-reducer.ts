@@ -5,6 +5,9 @@
 // からの位置更新を無視し、ローカルの操作を優先する。そうしないと、ドラッグ中に
 // 古い位置を運ぶ note:updated/note:drag イベントを受信した瞬間に付箋が
 // 巻き戻って見えてしまう。
+//
+// メンバー参加・進行状態などノート以外のメッセージは、members / phase を
+// 別リデューサで扱うため、ここでは notes をそのまま返す（既定挙動）。
 import type { ProtocolNote, ServerMessage } from "@/contracts/room-protocol";
 
 // アプリケーションで扱うドメインモデル。プロトコル上の付箋と同一の形なので
@@ -61,6 +64,13 @@ export function applyServerMessage(
       return notes.map((n) =>
         n.id === message.noteId ? { ...n, x: message.x, y: message.y } : n,
       );
+    }
+
+    case "member_joined":
+    case "phase_changed": {
+      // ノート以外の状態は別リデューサが担当する（app/rooms/room-reducer.ts）。
+      // ここでは notes に触れない（早期 return）。
+      return notes;
     }
 
     case "error": {

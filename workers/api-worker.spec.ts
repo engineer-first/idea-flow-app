@@ -7,7 +7,7 @@ import { env, SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { TOKEN_AUDIENCE } from "../contracts/session";
 import { signToken } from "../lib/session/token";
-import { listMemberIds } from "./test-helpers";
+import { joinRoomAs, listMemberIds } from "./test-helpers";
 
 const OWNER = {
   sub: "11111111-1111-4111-8111-111111111111",
@@ -90,13 +90,70 @@ describe("ルーム作成", () => {
     expect(memberIds).toEqual([OWNER.sub]);
   });
 
-  it("作成した host はルーム情報を取得できる", async () => {
+  it("作成した host はルーム情報を取得できる（isHost=true, phase=lobby）", async () => {
     const { roomId, inviteCode } = await createRoomAs(OWNER);
     const res = await SELF.fetch(`https://api.test/api/rooms/${roomId}`, {
       headers: { Cookie: await sessionCookie(OWNER) },
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ roomId, inviteCode });
+    expect(await res.json()).toEqual({
+      roomId,
+      inviteCode,
+      isHost: true,
+      phase: "lobby",
+    });
+  });
+});
+
+describe("ルーム情報（isHost / phase）", () => {
+  it("参加者は isHost=false で取得できる", async () => {
+    const { roomId, inviteCode } = await createRoomAs(OWNER);
+    await joinRoomAs(MEMBER, inviteCode);
+    const res = await SELF.fetch(`https://api.test/api/rooms/${roomId}`, {
+      headers: { Cookie: await sessionCookie(MEMBER) },
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      roomId,
+      inviteCode,
+      isHost: false,
+      phase: "lobby",
+    });
+  });
+});
+
+describe("メンバー一覧（GET /api/rooms/:id/members）", () => {
+  it("メンバーは name 付きの参加者一覧を取得できる", async () => {
+    const { roomId, inviteCode } = await createRoomAs(OWNER);
+    await joinRoomAs(MEMBER, inviteCode);
+    const res = await SELF.fetch(
+      `https://api.test/api/rooms/${roomId}/members`,
+      { headers: { Cookie: await sessionCookie(OWNER) } },
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      members: [
+        { userId: OWNER.sub, name: OWNER.name },
+        { userId: MEMBER.sub, name: MEMBER.name },
+      ],
+    });
+  });
+
+  it("非メンバーは 404（ルームの存在自体を見せない）", async () => {
+    const { roomId } = await createRoomAs(OWNER);
+    const res = await SELF.fetch(
+      `https://api.test/api/rooms/${roomId}/members`,
+      { headers: { Cookie: await sessionCookie(OUTSIDER) } },
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("セッションなしでは 401", async () => {
+    const { roomId } = await createRoomAs(OWNER);
+    const res = await SELF.fetch(
+      `https://api.test/api/rooms/${roomId}/members`,
+    );
+    expect(res.status).toBe(401);
   });
 });
 

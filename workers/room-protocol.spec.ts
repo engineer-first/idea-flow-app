@@ -8,6 +8,7 @@
 // 加えて PoC の同期セマンティクスを検証する:
 // - note:drag は永続化されず、送信者自身にはエコーされない
 // - 再接続時は snapshot で現在状態へ復帰できる（R1 復帰パス）
+import { SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import {
   NOTE_SPAWN_JITTER,
@@ -20,6 +21,7 @@ import {
   createRoomAs,
   joinRoomAs,
   type RoomSocket,
+  sessionCookieFor,
   type TestUser,
 } from "./test-helpers";
 
@@ -85,6 +87,7 @@ describe("snapshot（接続・再接続の復帰パス）", () => {
     const snapshot = await expectType(socket, "snapshot");
 
     expect(snapshot.notes).toEqual([]);
+    expect(snapshot.members).toEqual([{ userId: OWNER.sub, name: OWNER.name }]);
     expect(snapshot).not.toHaveProperty("room");
     expect(snapshot).not.toHaveProperty("self");
     socket.close();
@@ -115,11 +118,111 @@ describe("snapshot（接続・再接続の復帰パス）", () => {
       y: 480,
       authorId: OWNER.sub,
     });
+    // members にも両方が居る（host 切断中も RoomDO の members は不変）
+    expect(snapshot.members).toEqual([
+      { userId: OWNER.sub, name: OWNER.name },
+      { userId: MEMBER.sub, name: MEMBER.name },
+    ]);
 
     reconnected.close();
     member.close();
   });
 });
+
+describe("member_joined（Realtime 反映）", () => {
+  it("第三者が join して WS 接続すると、既存メンバーにも本人にも member_joined は届かない（REST の join は WS 接続を伴わないため）", async () => {
+    // member_joined は「WS が開いている間に RoomDO.join が呼ばれた」時に
+    // 発生するイベント。REST の /api/rooms/join は WS 接続とは独立して動く
+    // ので、既存メンバーには通知されない（これは仕様）。
+    // 一方、参加者一覧の Realtime 反映は snapshot で行う: 新規参加者の
+    // 接続直後の snapshot.members に全員が含まれる。
+    const { roomId, owner, member } = await setupRoom();
+
+    const newcomer: TestUser = {
+      sub: "33333333-3333-4333-8333-333333333333",
+      email: "newcomer@example.test",
+      name: "Newcomer",
+    };
+    await joinRoomAs(newcomer, await getInviteCode(roomId, OWNER));
+
+    const newSocket = await connectRoomAs(newcomer, roomId, {
+      hostId: OWNER.sub,
+    });
+    const newcomerSnapshot = await expectType(newSocket, "snapshot");
+    expect(newcomerSnapshot.members).toEqual([
+      { userId: OWNER.sub, name: OWNER.name },
+      { userId: MEMBER.sub, name: MEMBER.name },
+      { userId: newcomer.sub, name: newcomer.name },
+    ]);
+
+    newSocket.close();
+    owner.close();
+    member.close();
+  });
+});
+
+describe("start_phase / phase_changed（ホストだけ進行状態を進められる）", () => {
+  it("ホストが start_phase を送ると、phase_changed が全員に届く", async () => {
+    const { owner, member } = await setupRoom();
+
+    send(owner, { type: "start_phase" });
+    const toOwner = await expectType(owner, "phase_changed");
+    const toMember = await expectType(member, "phase_changed");
+    expect(toOwner.phase).toBe("writing");
+    expect(toMember.phase).toBe("writing");
+
+    owner.close();
+    member.close();
+  });
+
+  it("非ホストが start_phase を送ると forbidden で拒否され、phase_changed は誰にも届かない", async () => {
+    const { roomId, owner, member } = await setupRoom();
+
+    send(member, { type: "start_phase" });
+    const error = await expectType(member, "error");
+    expect(error.code).toBe("forbidden");
+
+    // phase が変わっていないことを /api/rooms/[id] で検証する。
+    const res = await SELF.fetch(`https://api.test/api/rooms/${roomId}`, {
+      headers: { Cookie: await sessionCookieFor(OWNER) },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { phase: string };
+    expect(body.phase).toBe("lobby");
+
+    owner.close();
+    member.close();
+  });
+
+  it("start_phase 後の phase は永続化され、再接続後の /api/rooms/[id] でも writing のまま", async () => {
+    const { roomId, owner, member } = await setupRoom();
+
+    send(owner, { type: "start_phase" });
+    await expectType(owner, "phase_changed");
+    await expectType(member, "phase_changed");
+    owner.close();
+    member.close();
+
+    // 永続化されているか: 新規 WS 接続を開いて snapshot ではなく REST で phase を見る。
+    const res = await SELF.fetch(`https://api.test/api/rooms/${roomId}`, {
+      headers: { Cookie: await sessionCookieFor(MEMBER) },
+    });
+    const body = (await res.json()) as { phase: string };
+    expect(body.phase).toBe("writing");
+  });
+});
+
+// テスト用ヘルパー: ルーム ID / 招待コードを info 経由で取る。
+async function getInviteCode(
+  roomId: string,
+  asUser: TestUser,
+): Promise<string> {
+  const res = await SELF.fetch(`https://api.test/api/rooms/${roomId}`, {
+    headers: { Cookie: await sessionCookieFor(asUser) },
+  });
+  expect(res.status).toBe(200);
+  return ((await res.json()) as { inviteCode: string }).inviteCode;
+}
 
 describe("note:create", () => {
   it("作成者を authorId として全メンバーに note:inserted が届く", async () => {

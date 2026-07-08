@@ -27,6 +27,7 @@ describe("applyServerMessage", () => {
     const message: ServerMessage = {
       type: "snapshot",
       notes: [note],
+      members: [],
     };
 
     const result = applyServerMessage([], message, { draggingNoteId: null });
@@ -40,6 +41,7 @@ describe("applyServerMessage", () => {
     const message: ServerMessage = {
       type: "snapshot",
       notes: [snapshotNote],
+      members: [],
     };
 
     const result = applyServerMessage([existing], message, {

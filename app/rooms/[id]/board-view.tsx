@@ -3,13 +3,16 @@
 import { useCallback, useState } from "react";
 import { CopyInviteButton } from "@/app/rooms/[id]/copy-invite-button";
 import { NoteCard } from "@/app/rooms/[id]/note-card";
+import { RoomMembers } from "@/app/rooms/[id]/room-members";
 import type { Note } from "@/app/rooms/notes-reducer";
+import type { Member } from "@/app/rooms/room-reducer";
 import { Button } from "@/components/ui/button";
 // ルームボードの表示用コンポーネント。データ層には一切依存せず、
 // 付箋の配列と各種コールバックをpropsで受け取る。
 // WebSocket接続・スロットル・プロトコル送信はroom-board.tsx（コンテナ）の責務。
 // 「どの付箋を選択中か」は同期不要な純粋にUIの関心事なので、ここでローカルに持つ。
 import { BOARD_HEIGHT, BOARD_WIDTH } from "@/contracts/board";
+import type { Phase } from "@/contracts/room-protocol";
 
 // WebSocket 接続の表示用状態。値の生成は room-board（コンテナ）の責務で、
 // ここでは受け取った状態を表示するだけ（このコンポーネントはデータ層に依存しない）。
@@ -27,6 +30,10 @@ export type BoardViewProps = {
   inviteUrl: string;
   connectionStatus: BoardConnectionStatus;
   draggingNoteId: string | null;
+  members: Member[];
+  currentUserId: string;
+  isHost: boolean;
+  phase: Phase;
   onAddNote: () => void;
   onNoteDragStart: (noteId: string) => void;
   onNoteDragMove: (noteId: string, x: number, y: number) => void;
@@ -41,6 +48,10 @@ export function BoardView({
   inviteUrl,
   connectionStatus,
   draggingNoteId,
+  members,
+  currentUserId,
+  isHost,
+  phase,
   onAddNote,
   onNoteDragStart,
   onNoteDragMove,
@@ -86,7 +97,23 @@ export function BoardView({
             </span>
           </span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <RoomMembers members={members} currentUserId={currentUserId} />
+          {isHost ? (
+            <span
+              data-testid="host-badge"
+              className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200"
+            >
+              ホスト
+            </span>
+          ) : null}
+          {phase === "writing" ? null : (
+            // ボード画面に「writing 以外」の状態で居る場合は start 画面への
+            // 導線に過ぎない（通常は page.tsx の redirect でここに来ない）。
+            <span className="text-xs text-muted-foreground">
+              開始前: {phase}
+            </span>
+          )}
           {CONNECTION_STATUS_LABELS[connectionStatus] !== null && (
             // role="status"（aria-live: polite）で、再接続をスクリーンリーダーにも通知する。
             <span

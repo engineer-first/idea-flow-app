@@ -1,7 +1,10 @@
 // 1ルーム = 1 Durable Object の権威サーバー。
 // - メンバーシップ（誰がこのルームに入れるか）の真実をここで持つ
 // - 付箋の確定状態（notes）の真実をここで持つ
+// - 進行状態 (lobby / writing) の真実をここで持つ
 // - 配信は必ず visibleTo（workers/visibility.ts）を通す（選択的送信）
+//   メンバー参加・進行状態のように参加者全員が受け取る情報は
+//   broadcastToAll という別経路で送る（visibleTo はノートにだけ適用する）
 //
 // D1 の rooms 行は「招待コード → ルーム解決」のためのディレクトリにすぎない。
 // 単一スレッドで直列化されるため、フェーズ遷移や同時編集のレースは構造的に起きない。
@@ -13,6 +16,8 @@ import {
 } from "../contracts/board";
 import {
   type ClientMessage,
+  type Phase,
+  type ProtocolMember,
   type ProtocolNote,
   parseClientMessage,
   type ServerMessage,
@@ -24,8 +29,13 @@ import { filterVisible, visibleTo } from "./visibility";
 // DO は外部から直接到達できないため、これは常に api-worker が設定する。
 export const USER_ID_HEADER = "X-Idea-Flow-User-Id";
 
+// ルーム作成者のユーザーID。start_phase の認可（ホスト判定）で使う。
+// api-worker が D1 rooms.host_id を解決してセットする。
+export const HOST_ID_HEADER = "X-Idea-Flow-Host-Id";
+
 type SocketAttachment = {
   userId: string;
+  hostId: string;
 };
 
 type NoteRow = {
@@ -36,6 +46,11 @@ type NoteRow = {
   y: number;
   created_at: string;
   updated_at: string;
+};
+
+type MemberRow = {
+  user_id: string;
+  name: string;
 };
 
 export class RoomDO extends DurableObject {
@@ -53,12 +68,23 @@ export class RoomDO extends DurableObject {
   // RPC（api-worker からのみ呼ばれる）
   // ------------------------------------------------------------
 
-  // 冪等: 既にメンバーでも何も起きない。
-  join(userId: string): void {
+  // 参加処理。name は表示用（#70 のメンバー一覧で使う）。
+  // 冪等: 既存メンバーなら name だけを最新に同期して終わる。
+  // 進行中のルームでも新規メンバーの参加は可能（#70 メモ: 途中参加OK）。
+  upsertMember(userId: string, name: string | undefined): void {
+    const safeName = name ?? "";
     this.ctx.storage.sql.exec(
-      "INSERT OR IGNORE INTO members (user_id) VALUES (?1)",
+      `INSERT INTO members (user_id, name) VALUES (?1, ?2)
+       ON CONFLICT (user_id) DO UPDATE SET name = ?2`,
       userId,
+      safeName,
     );
+  }
+
+  // 旧シグネチャ。api-worker の後方互換のために残し、内部で upsertMember に
+  // 委譲する。新規呼び出しは upsertMember を使う。
+  join(userId: string): void {
+    this.upsertMember(userId, undefined);
   }
 
   isMember(userId: string): boolean {
@@ -67,6 +93,48 @@ export class RoomDO extends DurableObject {
       userId,
     );
     return cursor.toArray().length > 0;
+  }
+
+  // メンバー一覧を参加順（joined_at 昇順）で返す。snapshot 構築に使う。
+  listMembers(): { userId: string; name: string }[] {
+    const rows = this.ctx.storage.sql
+      .exec("SELECT user_id, name FROM members ORDER BY joined_at")
+      .toArray();
+    return rows.map((row) => {
+      const member = row as unknown as MemberRow;
+      return { userId: member.user_id, name: member.name };
+    });
+  }
+
+  // 現在の進行状態を返す。レコードが無ければ lobby とする。
+  getPhase(): Phase {
+    const rows = this.ctx.storage.sql
+      .exec("SELECT phase FROM room_state WHERE id = 1")
+      .toArray();
+    const row = rows[0] as { phase: string } | undefined;
+    const phase = row?.phase ?? "lobby";
+    return phase === "writing" ? "writing" : "lobby";
+  }
+
+  // 進行状態を更新する。ホスト以外が呼ぶと reject（二重防御）。
+  // api-worker 側でも session.sub === rooms.host_id を判定しているが、
+  // RoomDO 単体で呼んだ場合の最後の砦として再判定する。
+  // Durable Object の RPC 境界は async/Promise を期待するため、
+  // throw ではなく reject で返す（unhandled rejection 回避）。
+  async setPhase(
+    phase: Phase,
+    byUserId: string,
+    expectedHostId: string,
+  ): Promise<void> {
+    if (byUserId !== expectedHostId) {
+      throw new Error("進行状態を変更する権限がありません。");
+    }
+    const now = new Date().toISOString();
+    this.ctx.storage.sql.exec(
+      `UPDATE room_state SET phase = ?1, changed_at = ?2 WHERE id = 1`,
+      phase,
+      now,
+    );
   }
 
   // ------------------------------------------------------------
@@ -86,16 +154,22 @@ export class RoomDO extends DurableObject {
       return new Response("forbidden", { status: 403 });
     }
 
+    const hostId = request.headers.get(HOST_ID_HEADER);
+    if (!hostId) {
+      // HOST_ID_HEADER は api-worker が必ずセットする。未設定は不正経路。
+      return new Response("forbidden", { status: 403 });
+    }
+
     const pair = new WebSocketPair();
     const client = pair[0];
     const server = pair[1];
-    // Hibernation API で受け入れ、接続にユーザーIDを添付する。
+    // Hibernation API で受け入れ、接続にユーザーIDと hostId を添付する。
     // ハイバネーション復帰後も deserializeAttachment で取り出せる。
     this.ctx.acceptWebSocket(server);
-    const attachment: SocketAttachment = { userId };
+    const attachment: SocketAttachment = { userId, hostId };
     server.serializeAttachment(attachment);
 
-    this.sendSnapshot(server, userId);
+    this.sendSnapshot(server);
 
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -120,7 +194,7 @@ export class RoomDO extends DurableObject {
       return;
     }
 
-    this.handleClientMessage(ws, attachment.userId, message);
+    this.handleClientMessage(ws, attachment, message);
   }
 
   override async webSocketClose(
@@ -129,7 +203,8 @@ export class RoomDO extends DurableObject {
     _reason: string,
     _wasClean: boolean,
   ): Promise<void> {
-    // プレゼンス（在室表示）の導入時に退室通知をここへ実装する。
+    // 退室通知は #70 のスコープ外（Issue メモ: 退室機能は対象外）。
+    // プレゼンス（在室表示）の導入時にここに member_left を実装する。
   }
 
   override async webSocketError(ws: WebSocket, _error: unknown): Promise<void> {
@@ -142,9 +217,10 @@ export class RoomDO extends DurableObject {
 
   private handleClientMessage(
     ws: WebSocket,
-    userId: string,
+    attachment: SocketAttachment,
     message: ClientMessage,
   ): void {
+    const { userId, hostId } = attachment;
     switch (message.type) {
       case "note:create": {
         const now = new Date().toISOString();
@@ -169,7 +245,7 @@ export class RoomDO extends DurableObject {
           note.createdAt,
           note.updatedAt,
         );
-        this.broadcast({ type: "note:inserted", note }, note);
+        this.broadcastNote({ type: "note:inserted", note }, note);
         return;
       }
 
@@ -190,7 +266,7 @@ export class RoomDO extends DurableObject {
           content: message.content,
           updated_at: updatedAt,
         });
-        this.broadcast({ type: "note:updated", note }, note);
+        this.broadcastNote({ type: "note:updated", note }, note);
         return;
       }
 
@@ -211,7 +287,7 @@ export class RoomDO extends DurableObject {
           y: message.y,
           updated_at: updatedAt,
         });
-        this.broadcast({ type: "note:updated", note }, note);
+        this.broadcastNote({ type: "note:updated", note }, note);
         return;
       }
 
@@ -224,7 +300,7 @@ export class RoomDO extends DurableObject {
         }
         // 永続化しない。送信者自身へはエコーしない（クライアントは自分の
         // ドラッグをローカル反映済みのため、エコーは巻き戻りの原因になる）。
-        this.broadcast(
+        this.broadcastNote(
           {
             type: "note:drag",
             noteId: message.noteId,
@@ -253,10 +329,29 @@ export class RoomDO extends DurableObject {
           "DELETE FROM notes WHERE id = ?1",
           message.noteId,
         );
-        this.broadcast(
+        this.broadcastNote(
           { type: "note:deleted", noteId: message.noteId },
           this.toProtocolNote(row),
         );
+        return;
+      }
+
+      case "start_phase": {
+        // 進行状態の変更はホストだけが行える。attachment.hostId は api-worker
+        // が D1 rooms.host_id から詰めた信頼値、userId は api-worker が
+        // セッションから詰めた信頼値。両方を再照合する（二重防御）。
+        if (userId !== hostId) {
+          this.sendTo(ws, {
+            type: "error",
+            code: "forbidden",
+            message: "進行状態を変更する権限がありません。",
+          });
+          return;
+        }
+        // 現時点では lobby → writing の1方向のみ。逆方向や別フェーズは
+        // #71 のスコープで拡張する。
+        this.setPhase("writing", userId, hostId);
+        this.broadcastToAll({ type: "phase_changed", phase: "writing" });
         return;
       }
 
@@ -270,19 +365,24 @@ export class RoomDO extends DurableObject {
   }
 
   // ------------------------------------------------------------
-  // 配信（必ず visibleTo を通す）
+  // 配信（ノートは visibleTo を通す / メンバー・進行状態は全員に送る）
   // ------------------------------------------------------------
 
-  private sendSnapshot(ws: WebSocket, userId: string): void {
+  private sendSnapshot(ws: WebSocket): void {
     const notes = this.listNotes();
+    // snapshot の notes は「接続してきた本人に対する可視性」だけで絞る。
+    // 現状は全員に同じだが、将来の分岐のため viewer を受け取れる形にする。
+    const viewerId = this.viewerIdOf(ws);
     this.sendTo(ws, {
       type: "snapshot",
-      notes: filterVisible({ viewerId: userId }, notes),
+      notes: filterVisible({ viewerId }, notes),
+      members: this.listMembers().map((m) => this.toProtocolMember(m)),
     });
   }
 
-  // subject の可視性を受信者ごとに判定して配信する。except は送信者除外用。
-  private broadcast(
+  // ノートを含むメッセージの配信。送信者ごとに visibleTo を見て、
+  // 見えない接続には送らない。
+  private broadcastNote(
     message: ServerMessage,
     subject: ProtocolNote,
     except?: WebSocket,
@@ -298,6 +398,16 @@ export class RoomDO extends DurableObject {
     }
   }
 
+  // メンバー参加・進行状態など「参加者全員が受け取る」メッセージの配信。
+  // visibleTo は使わない（ノートの可視性とは独立した概念のため）。
+  private broadcastToAll(message: ServerMessage, except?: WebSocket): void {
+    const payload = JSON.stringify(message);
+    for (const socket of this.ctx.getWebSockets()) {
+      if (socket === except) continue;
+      socket.send(payload);
+    }
+  }
+
   private sendTo(ws: WebSocket, message: ServerMessage): void {
     ws.send(JSON.stringify(message));
   }
@@ -308,6 +418,11 @@ export class RoomDO extends DurableObject {
       code: "not-found",
       message: "付箋が見つかりませんでした。",
     });
+  }
+
+  private viewerIdOf(ws: WebSocket): string {
+    const attachment = ws.deserializeAttachment() as SocketAttachment | null;
+    return attachment?.userId ?? "";
   }
 
   // ------------------------------------------------------------
@@ -349,6 +464,16 @@ export class RoomDO extends DurableObject {
       y: row.y,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+    };
+  }
+
+  private toProtocolMember(row: {
+    userId: string;
+    name: string;
+  }): ProtocolMember {
+    return {
+      userId: row.userId,
+      name: row.name,
     };
   }
 }

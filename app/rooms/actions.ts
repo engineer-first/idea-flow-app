@@ -46,7 +46,8 @@ export async function createRoom(): Promise<void> {
     redirect(`/?error=${encodeURIComponent("ルームを作成できませんでした。")}`);
   }
 
-  redirect(`/rooms/${parsed.data.roomId}`);
+  // #70: 作成直後は lobby 状態なので、ボードではなくスタート画面へ遷移する。
+  redirect(`/rooms/${parsed.data.roomId}/start`);
 }
 
 export async function joinRoom(formData: FormData): Promise<void> {
@@ -79,5 +80,6 @@ export async function joinRoom(formData: FormData): Promise<void> {
     redirect(`/?error=${encodeURIComponent("ルームが見つかりませんでした。")}`);
   }
 
-  redirect(`/rooms/${parsed.data.roomId}`);
+  // #70: 参加したらボードではなくスタート画面へ遷移する。
+  redirect(`/rooms/${parsed.data.roomId}/start`);
 }

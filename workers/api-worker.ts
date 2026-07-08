@@ -22,7 +22,7 @@ import {
 } from "./lib/db";
 import { getSessionFromRequest } from "./lib/session";
 import { requireSessionSecret } from "./lib/session-secret";
-import { RoomDO, USER_ID_HEADER } from "./room-do";
+import { HOST_ID_HEADER, RoomDO, USER_ID_HEADER } from "./room-do";
 
 export { RoomDO };
 
@@ -84,7 +84,8 @@ async function handleCreateRoom(
     name: session.name,
   });
   const room = await insertRoom(env.DB, session.sub);
-  await roomStub(env, room.roomId).join(session.sub);
+  const stub = roomStub(env, room.roomId);
+  await stub.upsertMember(session.sub, session.name);
   return json({ roomId: room.roomId, inviteCode: room.inviteCode });
 }
 
@@ -109,12 +110,15 @@ async function handleJoinRoom(
     return error(404, "ルームが見つかりませんでした。");
   }
 
-  await roomStub(env, room.roomId).join(session.sub);
+  const stub = roomStub(env, room.roomId);
+  await stub.upsertMember(session.sub, session.name);
   return json({ roomId: room.roomId });
 }
 
 // GET /api/rooms/:id — メンバーだけがルーム情報を取得できる。
 // 非メンバーには存在しないルームと同じ 404 を返し、存在を推測させない。
+// isHost / phase はこのエンドポイントでのみ返す（#70 で他人の host_id が
+// 漏れる経路を増やさないため、isHost フラグでだけ返す）。
 async function handleGetRoom(
   env: Env,
   session: SessionPayload,
@@ -125,16 +129,47 @@ async function handleGetRoom(
     return error(404, "ルームが見つかりませんでした。");
   }
 
-  const member = await roomStub(env, roomId).isMember(session.sub);
+  const stub = roomStub(env, roomId);
+  const member = await stub.isMember(session.sub);
   if (!member) {
     return error(404, "ルームが見つかりませんでした。");
   }
 
-  return json({ roomId: room.roomId, inviteCode: room.inviteCode });
+  const phase = await stub.getPhase();
+  return json({
+    roomId: room.roomId,
+    inviteCode: room.inviteCode,
+    isHost: room.hostId === session.sub,
+    phase,
+  });
+}
+
+// GET /api/rooms/:id/members — メンバーだけが参加メンバー一覧を取得できる。
+// 初期表示（SSR）のために name 付きで返す。Realtime 反映は WS の
+// member_joined / snapshot.members で行う。
+async function handleListMembers(
+  env: Env,
+  session: SessionPayload,
+  roomId: string,
+): Promise<Response> {
+  const room = await findRoomById(env.DB, roomId);
+  if (!room) {
+    return error(404, "ルームが見つかりませんでした。");
+  }
+
+  const stub = roomStub(env, roomId);
+  const member = await stub.isMember(session.sub);
+  if (!member) {
+    return error(404, "ルームが見つかりませんでした。");
+  }
+
+  const members = await stub.listMembers();
+  return json({ members });
 }
 
 // GET /api/rooms/:id/ws — メンバーのみ WebSocket 接続できる。
-// 認可はここで完結させ、DO へは検証済みユーザーIDをヘッダーで引き継ぐ。
+// 認可はここで完結させ、DO へは検証済みユーザーIDと hostId をヘッダーで
+// 引き継ぐ。hostId は start_phase の認可で RoomDO が再判定に使う。
 async function handleRoomWebSocket(
   request: Request,
   env: Env,
@@ -158,6 +193,7 @@ async function handleRoomWebSocket(
 
   const headers = new Headers(request.headers);
   headers.set(USER_ID_HEADER, session.sub);
+  headers.set(HOST_ID_HEADER, room.hostId);
   return stub.fetch(request.url, { headers });
 }
 
@@ -199,6 +235,16 @@ export default {
         return error(404, "ルームが見つかりませんでした。");
       }
       return handleRoomWebSocket(request, env, session, wsMatch[1]);
+    }
+
+    // /members は /ws より先に評価する必要はない（path が違う）が、
+    // /rooms/:id 直下の GET と区別するためパスを明示する。
+    const membersMatch = pathname.match(/^\/api\/rooms\/([^/]+)\/members$/);
+    if (method === "GET" && membersMatch?.[1]) {
+      if (!isUuid(membersMatch[1])) {
+        return error(404, "ルームが見つかりませんでした。");
+      }
+      return handleListMembers(env, session, membersMatch[1]);
     }
 
     const roomMatch = pathname.match(/^\/api\/rooms\/([^/]+)$/);

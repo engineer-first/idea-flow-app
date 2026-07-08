@@ -1,0 +1,113 @@
+// api-worker の REST 境界スキーマの単体テスト。
+import { describe, expect, it } from "vitest";
+import {
+  CreateRoomResponseSchema,
+  JoinRoomResponseSchema,
+  RoomInfoResponseSchema,
+  RoomMembersResponseSchema,
+  SyncUserResponseSchema,
+} from "./api";
+
+const UUID = "11111111-1111-4111-8111-111111111111";
+
+describe("SyncUserResponseSchema", () => {
+  it("userId を受け入れる", () => {
+    expect(SyncUserResponseSchema.parse({ userId: UUID })).toEqual({
+      userId: UUID,
+    });
+  });
+
+  it("UUID でない userId は拒否する", () => {
+    expect(SyncUserResponseSchema.safeParse({ userId: "x" }).success).toBe(
+      false,
+    );
+  });
+});
+
+describe("CreateRoomResponseSchema", () => {
+  it("roomId と inviteCode を受け入れる", () => {
+    expect(
+      CreateRoomResponseSchema.parse({ roomId: UUID, inviteCode: "ABC234" }),
+    ).toEqual({ roomId: UUID, inviteCode: "ABC234" });
+  });
+});
+
+describe("JoinRoomResponseSchema", () => {
+  it("roomId だけを受け入れる", () => {
+    expect(JoinRoomResponseSchema.parse({ roomId: UUID })).toEqual({
+      roomId: UUID,
+    });
+  });
+});
+
+describe("RoomInfoResponseSchema", () => {
+  it("isHost と phase を含む拡張形を受け入れる", () => {
+    const parsed = RoomInfoResponseSchema.parse({
+      roomId: UUID,
+      inviteCode: "ABC234",
+      isHost: true,
+      phase: "lobby",
+    });
+    expect(parsed).toEqual({
+      roomId: UUID,
+      inviteCode: "ABC234",
+      isHost: true,
+      phase: "lobby",
+    });
+  });
+
+  it("isHost が無いと拒否する", () => {
+    expect(
+      RoomInfoResponseSchema.safeParse({
+        roomId: UUID,
+        inviteCode: "ABC234",
+        phase: "lobby",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("phase が未知の値だと拒否する", () => {
+    expect(
+      RoomInfoResponseSchema.safeParse({
+        roomId: UUID,
+        inviteCode: "ABC234",
+        isHost: false,
+        phase: "done",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("isHost は boolean のみ", () => {
+    expect(
+      RoomInfoResponseSchema.safeParse({
+        roomId: UUID,
+        inviteCode: "ABC234",
+        isHost: "true",
+        phase: "lobby",
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("RoomMembersResponseSchema", () => {
+  it("members 配列を受け入れる", () => {
+    expect(
+      RoomMembersResponseSchema.parse({
+        members: [
+          { userId: UUID, name: "Owner" },
+          { userId: "22222222-2222-4222-8222-222222222222", name: "Member" },
+        ],
+      }).members,
+    ).toHaveLength(2);
+  });
+
+  it("空配列も受け入れる", () => {
+    expect(RoomMembersResponseSchema.parse({ members: [] })).toEqual({
+      members: [],
+    });
+  });
+
+  it("members キー無しは拒否する", () => {
+    expect(RoomMembersResponseSchema.safeParse({}).success).toBe(false);
+  });
+});

@@ -2,6 +2,9 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { BoardView } from "@/app/rooms/[id]/board-view";
 import { buildNotes } from "@/app/rooms/[id]/board-view.fixture";
+import { buildMembers } from "@/app/rooms/[id]/room-members.fixture";
+
+const ME = "11111111-1111-4111-8111-111111111111";
 
 function setup(overrides: Partial<Parameters<typeof BoardView>[0]> = {}) {
   const props = {
@@ -9,6 +12,10 @@ function setup(overrides: Partial<Parameters<typeof BoardView>[0]> = {}) {
     inviteCode: "AB12CD",
     inviteUrl: "https://idea-flow.example/invite/AB12CD",
     draggingNoteId: null,
+    members: buildMembers(2, ME),
+    currentUserId: ME,
+    isHost: true,
+    phase: "writing" as const,
     onAddNote: vi.fn(),
     onNoteDragStart: vi.fn(),
     onNoteDragMove: vi.fn(),

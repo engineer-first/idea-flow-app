@@ -1,11 +1,13 @@
 "use client";
 
 // ルームボードのコンテナ（状態・副作用を持つ側）。
-// 表示は BoardView / NoteCard に委譲し、ここでは
+// 表示は BoardView / NoteCard / RoomMembers に委譲し、ここでは
 //   - RoomDO への WebSocket 接続（lib/room-client）とサーバーメッセージの適用
 //   - ドラッグ中イベントのスロットル送信
 //   - 操作のプロトコルメッセージ化（contracts/room-protocol.ts）
-// を担当する。関心の分離のため、room-client や notes-reducer への依存はこのファイルに閉じ込める。
+//   - members / phase state の管理（app/rooms/room-reducer.ts）
+// を担当する。関心の分離のため、room-client や notes/room-reducer への依存は
+// このファイルに閉じ込める。
 //
 // 確定状態の真実はサーバー（RoomDO）側にあり、再接続時は snapshot で復元される。
 // 削除は楽観更新しない: author 以外の削除はサーバーが forbidden で拒否するため、
@@ -17,9 +19,14 @@ import {
   moveNoteLocally,
   type Note,
 } from "@/app/rooms/notes-reducer";
+import {
+  applyMemberServerMessage,
+  applyPhaseServerMessage,
+  type Member,
+} from "@/app/rooms/room-reducer";
 import { createThrottled } from "@/app/rooms/throttle";
 import { DRAG_BROADCAST_THROTTLE_MS } from "@/contracts/board";
-import type { ServerMessage } from "@/contracts/room-protocol";
+import type { Phase, ServerMessage } from "@/contracts/room-protocol";
 import {
   createRoomClient,
   type RoomClient,
@@ -32,6 +39,12 @@ export type RoomBoardProps = {
   roomId: string;
   inviteCode: string;
   inviteUrl: string;
+  currentUserId: string;
+  // 自分がこのルームのホストかどうか（表示用。#70 では機能制御には使わない）。
+  isHost: boolean;
+  // SSR 時にサーバーから取得した初期状態。再接続時の flicker を抑える。
+  initialMembers: Member[];
+  initialPhase: Phase;
   // テストからフェイク WebSocket を注入するための口。本番では未指定。
   webSocketFactory?: RoomSocketFactory;
 };
@@ -42,11 +55,18 @@ export function RoomBoard({
   roomId,
   inviteCode,
   inviteUrl,
+  currentUserId,
+  isHost,
+  initialMembers,
+  initialPhase,
   webSocketFactory,
 }: RoomBoardProps) {
   // 付箋の初期状態は空。確定状態の真実はサーバー（RoomDO）側にあり、
   // 接続直後に送られてくる snapshot で復元される。
   const [notes, setNotes] = useState<Note[]>([]);
+  // メンバー一覧と進行状態は SSR で初期値を渡せるので、初回の白画面を防ぐ。
+  const [members, setMembers] = useState<Member[]>(initialMembers);
+  const [phase, setPhase] = useState<Phase>(initialPhase);
   // createRoomClient が生成直後に "connecting" を通知するので初期値と一致する。
   const [connectionStatus, setConnectionStatus] =
     useState<RoomConnectionStatus>("connecting");
@@ -71,6 +91,8 @@ export function RoomBoard({
         draggingNoteId: draggingNoteIdRef.current,
       }),
     );
+    setMembers((current) => applyMemberServerMessage(current, message));
+    setPhase((current) => applyPhaseServerMessage(current, message));
   }, []);
 
   useEffect(() => {
@@ -153,6 +175,10 @@ export function RoomBoard({
       inviteUrl={inviteUrl}
       connectionStatus={connectionStatus}
       draggingNoteId={draggingNoteId}
+      members={members}
+      currentUserId={currentUserId}
+      isHost={isHost}
+      phase={phase}
       onAddNote={handleAddNote}
       onNoteDragStart={handleNoteDragStart}
       onNoteDragMove={handleNoteDragMove}

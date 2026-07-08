@@ -63,6 +63,8 @@ export async function GET(
   }
 
   return NextResponse.redirect(
-    new URL(`/rooms/${parsed.data.roomId}`, request.url),
+    // #70: 参加したらボードではなくスタート画面へ遷移する。スタート画面で
+    // メンバーが揃ったのを確認してから、ホストが「開始」を押すとボードへ移る。
+    new URL(`/rooms/${parsed.data.roomId}/start`, request.url),
   );
 }

@@ -10,6 +10,10 @@
 //   接続先（どの DO に繋いでいるか）自体が roomId を意味しており、
 //   メッセージの中に含めて信頼する必要がない。
 // - note:drag は永続化されない一時データ。確定は note:move だけが行う。
+// - member_joined / phase_changed は閲覧者全員に届く共有情報。名前や
+//   ロールをクライアントが書き換えるプロトコルは存在しない（host 判定は
+//   api-worker が SessionPayload と D1 rooms.host_id で行い、RoomDO は
+//   その結果だけを受け取って setPhase する）。
 import { z } from "zod";
 import { BOARD_HEIGHT, BOARD_WIDTH } from "./board";
 
@@ -26,6 +30,19 @@ export const NoteSchema = z.object({
 });
 
 export type ProtocolNote = z.infer<typeof NoteSchema>;
+
+// ルームの進行状態。サーバーが真実をもち、phase_changed で全員に同期する。
+// クライアントから書き換える経路は存在しない（host でも start_phase を送るだけ）。
+export const PhaseSchema = z.enum(["lobby", "writing"]);
+export type Phase = z.infer<typeof PhaseSchema>;
+
+// メンバー一覧スナップショットの単位。userId と表示名だけを持ち、
+// 画像 URL や権限フラグはここに載せない（#70 のスコープで画像は出さない）。
+export const MemberSchema = z.object({
+  userId: z.string().uuid(),
+  name: z.string(),
+});
+export type ProtocolMember = z.infer<typeof MemberSchema>;
 
 const NotePositionSchema = {
   x: z.number().finite().min(0).max(BOARD_WIDTH),
@@ -61,6 +78,8 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
     type: z.literal("note:delete"),
     noteId: z.string().uuid(),
   }),
+  // ホストがルームの進行状態を次に進める（サーバーが host 判定して通す/落とす）。
+  z.object({ type: z.literal("start_phase") }),
 ]);
 
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;
@@ -70,10 +89,12 @@ export type ClientMessage = z.infer<typeof ClientMessageSchema>;
 // ---------------------------------------------------------------
 
 export const ServerMessageSchema = z.discriminatedUnion("type", [
-  // 接続直後・再接続時に現在状態を一括送信する（復帰パスの本体）
+  // 接続直後・再接続時に現在状態を一括送信する（復帰パスの本体）。
+  // members は「現在のメンバー一覧（参加順）」をスナップショットに含める形。
   z.object({
     type: z.literal("snapshot"),
     notes: z.array(NoteSchema),
+    members: z.array(MemberSchema),
   }),
   z.object({ type: z.literal("note:inserted"), note: NoteSchema }),
   z.object({ type: z.literal("note:updated"), note: NoteSchema }),
@@ -83,6 +104,16 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
     noteId: z.string().uuid(),
     x: z.number(),
     y: z.number(),
+  }),
+  // 新しいメンバーが参加したことを全員に通知する（Realtime 反映）。
+  z.object({
+    type: z.literal("member_joined"),
+    member: MemberSchema,
+  }),
+  // ホストが進行状態を進めたことを全員に通知する。
+  z.object({
+    type: z.literal("phase_changed"),
+    phase: PhaseSchema,
   }),
   z.object({
     type: z.literal("error"),
