@@ -13,7 +13,7 @@ import type {
 
 export type Member = ProtocolMember;
 
-// snapshot / member_joined を受けて members state を更新する純粋関数。
+// snapshot / member_joined / member_left を受けて members state を更新する純粋関数。
 // 進行状態メッセージは早期 return。
 export function applyMemberServerMessage(
   members: Member[],
@@ -32,6 +32,12 @@ export function applyMemberServerMessage(
         );
       }
       return [...members, message.member];
+    }
+    case "member_left": {
+      // 退出者を members から取り除く（#70 退室機能）。
+      // サーバ側で broadcastToAllExcept により本人には届かないため、
+      // ここで受け取る userId は常に「他人の退出」を意味する。
+      return members.filter((m) => m.userId !== message.userId);
     }
     case "note:inserted":
     case "note:updated":
@@ -66,6 +72,7 @@ export function applyPhaseServerMessage(
     case "note:deleted":
     case "note:drag":
     case "member_joined":
+    case "member_left":
     case "error":
       return phase;
     default: {

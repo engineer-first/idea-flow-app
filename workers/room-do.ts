@@ -71,20 +71,33 @@ export class RoomDO extends DurableObject {
   // 参加処理。name は表示用（#70 のメンバー一覧で使う）。
   // 冪等: 既存メンバーなら name だけを最新に同期して終わる。
   // 進行中のルームでも新規メンバーの参加は可能（#70 メモ: 途中参加OK）。
-  upsertMember(userId: string, name: string | undefined): void {
+  //
+  // 新規メンバーの場合のみ、既存メンバー全員の WS に member_joined を
+  // broadcast する（#70 の Realtime 反映）。新規メンバー本人には
+  // snapshot.members が届くので送らない（本人除外）。
+  async upsertMember(userId: string, name: string | undefined): Promise<void> {
     const safeName = name ?? "";
+    const existed = this.isMember(userId);
     this.ctx.storage.sql.exec(
       `INSERT INTO members (user_id, name) VALUES (?1, ?2)
        ON CONFLICT (user_id) DO UPDATE SET name = ?2`,
       userId,
       safeName,
     );
+    if (!existed) {
+      this.broadcastToAllExcept(
+        { type: "member_joined", member: { userId, name: safeName } },
+        userId,
+      );
+    }
   }
 
   // 旧シグネチャ。api-worker の後方互換のために残し、内部で upsertMember に
   // 委譲する。新規呼び出しは upsertMember を使う。
-  join(userId: string): void {
-    this.upsertMember(userId, undefined);
+  // upsertMember が async になったので、Promise を返して呼び出し側を
+  // await できる形にする（テストや呼び出し箇所の単純化のため）。
+  join(userId: string): Promise<void> {
+    return this.upsertMember(userId, undefined);
   }
 
   isMember(userId: string): boolean {
@@ -93,6 +106,38 @@ export class RoomDO extends DurableObject {
       userId,
     );
     return cursor.toArray().length > 0;
+  }
+
+  // 退出処理（#70 退室機能）。
+  // - 同じ userId で複数の WS が開いている場合（複数タブ）すべて close する
+  // - members テーブルから該当行を削除する
+  // - 他メンバー全員に member_left を broadcast する（退室者本人には送らない）
+  // 冪等: メンバーでない userId で呼んでも no-op。再参加は同じ招待URLから可能。
+  // 1 度 close した WS は getWebSockets() からも除去されるが、タイミング
+  // によっては残っていることもあるので broadcastToAllExcept は userId で
+  // 除外する。
+  async leave(userId: string): Promise<void> {
+    if (!this.isMember(userId)) {
+      // 既に退出済み（または元々非メンバー）なら何もしない。
+      return;
+    }
+    // 1. 該当 userId の WS をすべて close
+    for (const socket of this.ctx.getWebSockets()) {
+      const attachment =
+        socket.deserializeAttachment() as SocketAttachment | null;
+      if (attachment?.userId === userId) {
+        // 1000 = Normal Closure（WebSocket 標準の正常終了コード）
+        try {
+          socket.close(1000, "left the room");
+        } catch {
+          // 既に閉じている等のエラーは握りつぶす
+        }
+      }
+    }
+    // 2. members から削除
+    this.ctx.storage.sql.exec("DELETE FROM members WHERE user_id = ?1", userId);
+    // 3. 他メンバー全員に member_left を broadcast（本人除外）
+    this.broadcastToAllExcept({ type: "member_left", userId }, userId);
   }
 
   // メンバー一覧を参加順（joined_at 昇順）で返す。snapshot 構築に使う。
@@ -404,6 +449,24 @@ export class RoomDO extends DurableObject {
     const payload = JSON.stringify(message);
     for (const socket of this.ctx.getWebSockets()) {
       if (socket === except) continue;
+      socket.send(payload);
+    }
+  }
+
+  // 「参加者全員が受け取る」が、特定 userId の WS だけ除外するパターン。
+  // member_joined で新規メンバー本人を宛先から除くために使う。
+  // RPC 経由（upsertMember など）で「送信者の WS」が存在しない経路でも
+  // 安全（userId 単位の除外なので、attachment の userId を見ている）。
+  private broadcastToAllExcept(
+    message: ServerMessage,
+    exceptUserId: string,
+  ): void {
+    const payload = JSON.stringify(message);
+    for (const socket of this.ctx.getWebSockets()) {
+      const attachment =
+        socket.deserializeAttachment() as SocketAttachment | null;
+      if (!attachment) continue;
+      if (attachment.userId === exceptUserId) continue;
       socket.send(payload);
     }
   }

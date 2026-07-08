@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { CopyInviteButton } from "@/app/rooms/[id]/copy-invite-button";
 import { NoteCard } from "@/app/rooms/[id]/note-card";
 import { RoomMembers } from "@/app/rooms/[id]/room-members";
+import { LeaveConfirmDialog } from "@/app/rooms/leave-confirm-dialog";
 import type { Note } from "@/app/rooms/notes-reducer";
 import type { Member } from "@/app/rooms/room-reducer";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,10 @@ export type BoardViewProps = {
   onNoteDragEnd: (noteId: string, x: number, y: number) => void;
   onNoteContentChange: (noteId: string, content: string) => void;
   onNoteDelete: (noteId: string) => void;
+  // 退出（#70 退室機能）。
+  onLeave: () => void;
+  // 退出処理中（多重押下防止）。true の間「退出する」ボタンは disabled。
+  isLeaving: boolean;
 };
 
 export function BoardView({
@@ -58,8 +63,11 @@ export function BoardView({
   onNoteDragEnd,
   onNoteContentChange,
   onNoteDelete,
+  onLeave,
+  isLeaving,
 }: BoardViewProps) {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   // 未接続中は room-client が送信を黙って破棄するため、操作自体を無効化する。
   const isDisconnected = connectionStatus !== "open";
 
@@ -83,19 +91,25 @@ export function BoardView({
     <div className="flex h-full flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-3">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          <span className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>招待URL</span>
-            <span className="max-w-[18rem] truncate font-mono text-xs text-foreground">
-              {inviteUrl}
-            </span>
-            <CopyInviteButton url={inviteUrl} />
-          </span>
-          <span className="text-sm text-muted-foreground">
-            または招待コード:{" "}
-            <span className="font-mono text-base font-semibold text-foreground">
-              {inviteCode}
-            </span>
-          </span>
+          {isHost ? (
+            // 招待URL / 招待コードはホストだけが共有できる情報。
+            // 非ホストには伏せて、誤って共有するリスクを避ける。
+            <>
+              <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>招待URL</span>
+                <span className="max-w-[18rem] truncate font-mono text-xs text-foreground">
+                  {inviteUrl}
+                </span>
+                <CopyInviteButton url={inviteUrl} />
+              </span>
+              <span className="text-sm text-muted-foreground">
+                または招待コード:{" "}
+                <span className="font-mono text-base font-semibold text-foreground">
+                  {inviteCode}
+                </span>
+              </span>
+            </>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <RoomMembers members={members} currentUserId={currentUserId} />
@@ -130,6 +144,15 @@ export function BoardView({
           <Button type="button" onClick={onAddNote} disabled={isDisconnected}>
             付箋を追加
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setLeaveDialogOpen(true)}
+            disabled={isLeaving}
+            data-testid="leave-button"
+          >
+            {isLeaving ? "退出中…" : "退出する"}
+          </Button>
         </div>
       </div>
 
@@ -163,6 +186,13 @@ export function BoardView({
           ))}
         </div>
       </div>
+
+      <LeaveConfirmDialog
+        open={leaveDialogOpen}
+        onOpenChange={setLeaveDialogOpen}
+        onConfirm={onLeave}
+        isLeaving={isLeaving}
+      />
     </div>
   );
 }

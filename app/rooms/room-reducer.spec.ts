@@ -68,6 +68,22 @@ describe("applyMemberServerMessage", () => {
     const message: ServerMessage = { type: "phase_changed", phase: "writing" };
     expect(applyMemberServerMessage([A], message)).toEqual([A]);
   });
+
+  it("member_left で退出したユーザーを members から取り除く", () => {
+    const message: ServerMessage = {
+      type: "member_left",
+      userId: A.userId,
+    };
+    expect(applyMemberServerMessage([A, B], message)).toEqual([B]);
+  });
+
+  it("member_left で存在しない userId は何も変えない", () => {
+    const message: ServerMessage = {
+      type: "member_left",
+      userId: "44444444-4444-4444-8444-444444444444",
+    };
+    expect(applyMemberServerMessage([A, B], message)).toEqual([A, B]);
+  });
 });
 
 describe("applyPhaseServerMessage", () => {

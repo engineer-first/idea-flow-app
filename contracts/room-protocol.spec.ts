@@ -94,6 +94,30 @@ describe("ServerMessageSchema", () => {
     ).toBe(false);
   });
 
+  it("member_left を受け入れる", () => {
+    const parsed = ServerMessageSchema.parse({
+      type: "member_left",
+      userId: "11111111-1111-4111-8111-111111111111",
+    });
+    expect(parsed).toEqual({
+      type: "member_left",
+      userId: "11111111-1111-4111-8111-111111111111",
+    });
+  });
+
+  it("member_left は userId が必要", () => {
+    expect(ServerMessageSchema.safeParse({ type: "member_left" }).success).toBe(
+      false,
+    );
+  });
+
+  it("member_left の userId は UUID 形式", () => {
+    expect(
+      ServerMessageSchema.safeParse({ type: "member_left", userId: "not-uuid" })
+        .success,
+    ).toBe(false);
+  });
+
   it("未知の type は拒否する", () => {
     expect(
       ServerMessageSchema.safeParse({ type: "unknown", payload: {} }).success,
@@ -113,6 +137,14 @@ describe("ClientMessageSchema", () => {
       ClientMessageSchema.safeParse({ type: "start_phase", phase: "writing" })
         .success,
     ).toBe(true);
+  });
+
+  it("leave_room はクライアント送信メッセージに存在しない（REST で退出する）", () => {
+    // 退出は api-worker の POST /api/rooms/:id/leave 経由で行う。WS には
+    // 退出メッセージを送らない（クライアントが明示的に REST で抜ける）。
+    expect(ClientMessageSchema.safeParse({ type: "leave_room" }).success).toBe(
+      false,
+    );
   });
 
   it("未知の type は拒否する", () => {

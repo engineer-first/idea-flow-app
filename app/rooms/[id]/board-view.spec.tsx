@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { BoardView } from "@/app/rooms/[id]/board-view";
 import { buildNotes } from "@/app/rooms/[id]/board-view.fixture";
@@ -22,6 +23,8 @@ function setup(overrides: Partial<Parameters<typeof BoardView>[0]> = {}) {
     onNoteDragEnd: vi.fn(),
     onNoteContentChange: vi.fn(),
     onNoteDelete: vi.fn(),
+    onLeave: vi.fn(),
+    isLeaving: false,
     connectionStatus: "open" as const,
     ...overrides,
   };
@@ -178,5 +181,72 @@ describe("BoardView", () => {
 
       expect(onNoteDelete).toHaveBeenCalledWith("note-1");
     });
+  });
+});
+
+describe("退出ボタン（#70 退室機能）", () => {
+  it("「退出する」ボタンが描画される", () => {
+    setup();
+    expect(
+      screen.getByRole("button", { name: "退出する" }),
+    ).toBeInTheDocument();
+  });
+
+  it("「退出する」クリックで確認 Dialog が開き、確定で onLeave が呼ばれる", async () => {
+    const onLeave = vi.fn();
+    const user = userEvent.setup();
+    setup({ onLeave });
+    // 初期状態では Dialog が閉じている
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    // 「退出する」クリックで Dialog が開く
+    await user.click(screen.getByRole("button", { name: "退出する" }));
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    // Dialog の「退出する」確定で onLeave が呼ばれる
+    await user.click(screen.getByTestId("leave-confirm-action"));
+    expect(onLeave).toHaveBeenCalledTimes(1);
+  });
+
+  it("「キャンセル」で Dialog が閉じて onLeave は呼ばれない", async () => {
+    const onLeave = vi.fn();
+    const user = userEvent.setup();
+    setup({ onLeave });
+    await user.click(screen.getByRole("button", { name: "退出する" }));
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "キャンセル" }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(onLeave).not.toHaveBeenCalled();
+  });
+
+  it("isLeaving=true のときボタンは disabled で文言が「退出中…」になる", () => {
+    setup({ isLeaving: true });
+    const button = screen.getByRole("button", { name: /退出/ });
+    expect(button).toBeDisabled();
+    expect(button).toHaveTextContent("退出中…");
+  });
+});
+
+describe("招待URL/コード（host 限定表示）", () => {
+  it("host のとき招待URLと招待コードが表示される", () => {
+    setup({
+      isHost: true,
+      inviteCode: "ZZ99XX",
+      inviteUrl: "https://example/invite/ZZ99XX",
+    });
+    expect(
+      screen.getByText("https://example/invite/ZZ99XX"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("ZZ99XX")).toBeInTheDocument();
+  });
+
+  it("非 host のとき招待URLと招待コードが表示されない", () => {
+    setup({
+      isHost: false,
+      inviteCode: "ZZ99XX",
+      inviteUrl: "https://example/invite/ZZ99XX",
+    });
+    expect(
+      screen.queryByText("https://example/invite/ZZ99XX"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("ZZ99XX")).not.toBeInTheDocument();
   });
 });

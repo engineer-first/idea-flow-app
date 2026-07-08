@@ -19,6 +19,8 @@ const meta = {
     connectionStatus: "open",
     isStarting: false,
     onStart: fn(),
+    onLeave: fn(),
+    isLeaving: false,
   },
   decorators: [
     (Story) => (
@@ -32,7 +34,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// ホストが入ってすぐの状態。
+// ホストが入ってすぐの状態（Card デザイン）。
 export const Host: Story = {};
 
 // メンバー多数のホスト状態（+N 省略が発火）。
@@ -40,7 +42,7 @@ export const HostMany: Story = {
   args: { members: buildMembers(10, ME) },
 };
 
-// 参加者（ホストではない）の状態。
+// 参加者（ホストではない）の状態。招待URL は表示されない。
 export const NonHost: Story = {
   args: { isHost: false },
 };

@@ -21,6 +21,8 @@ function renderView(
       connectionStatus="open"
       isStarting={false}
       onStart={vi.fn()}
+      onLeave={vi.fn()}
+      isLeaving={false}
       {...overrides}
     />,
   );
@@ -83,5 +85,69 @@ describe("StartRoomView", () => {
     const view = screen.getByTestId("start-room-view");
     expect(view).toHaveAttribute("data-phase", "lobby");
     expect(view).toHaveAttribute("data-host", "true");
+  });
+});
+
+describe("退出ボタン（#70 退室機能）", () => {
+  it("「退出する」ボタンが描画される（ホスト／非ホスト共通）", () => {
+    renderView();
+    expect(
+      screen.getByRole("button", { name: "退出する" }),
+    ).toBeInTheDocument();
+  });
+
+  it("「退出する」クリックで確認 Dialog が開き、確定で onLeave が呼ばれる", async () => {
+    const onLeave = vi.fn();
+    const user = userEvent.setup();
+    renderView({ onLeave });
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "退出する" }));
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    await user.click(screen.getByTestId("leave-confirm-action"));
+    expect(onLeave).toHaveBeenCalledTimes(1);
+  });
+
+  it("「キャンセル」で Dialog が閉じて onLeave は呼ばれない", async () => {
+    const onLeave = vi.fn();
+    const user = userEvent.setup();
+    renderView({ onLeave });
+    await user.click(screen.getByRole("button", { name: "退出する" }));
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "キャンセル" }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(onLeave).not.toHaveBeenCalled();
+  });
+
+  it("isLeaving=true のときボタンは disabled で文言が「退出中…」", () => {
+    renderView({ isLeaving: true });
+    const button = screen.getByRole("button", { name: /退出/ });
+    expect(button).toBeDisabled();
+    expect(button).toHaveTextContent("退出中…");
+  });
+});
+
+describe("招待URL/コード（host 限定表示）", () => {
+  it("host のとき招待URLと招待コードが表示される", () => {
+    renderView({
+      isHost: true,
+      inviteCode: "ZZ99XX",
+      inviteUrl: "https://example/invite/ZZ99XX",
+    });
+    expect(
+      screen.getByText("https://example/invite/ZZ99XX"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("ZZ99XX")).toBeInTheDocument();
+  });
+
+  it("非 host のとき招待URLと招待コードが表示されない", () => {
+    renderView({
+      isHost: false,
+      inviteCode: "ZZ99XX",
+      inviteUrl: "https://example/invite/ZZ99XX",
+    });
+    expect(
+      screen.queryByText("https://example/invite/ZZ99XX"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("ZZ99XX")).not.toBeInTheDocument();
   });
 });

@@ -67,6 +67,7 @@ export function applyServerMessage(
     }
 
     case "member_joined":
+    case "member_left":
     case "phase_changed": {
       // ノート以外の状態は別リデューサが担当する（app/rooms/room-reducer.ts）。
       // ここでは notes に触れない（早期 return）。

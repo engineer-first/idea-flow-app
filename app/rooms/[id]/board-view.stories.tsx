@@ -28,6 +28,8 @@ const meta = {
     onNoteDragEnd: fn(),
     onNoteContentChange: fn(),
     onNoteDelete: fn(),
+    onLeave: fn(),
+    isLeaving: false,
   },
   decorators: [
     (Story) => (

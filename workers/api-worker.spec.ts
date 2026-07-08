@@ -333,6 +333,84 @@ describe("ユーザー同期（ログイン時の upsert）", () => {
   });
 });
 
+describe("退出（POST /api/rooms/:id/leave）", () => {
+  it("メンバーは退出でき 204 を返す", async () => {
+    const { roomId, inviteCode } = await createRoomAs(OWNER);
+    await joinRoomAs(MEMBER, inviteCode);
+
+    const res = await SELF.fetch(`https://api.test/api/rooms/${roomId}/leave`, {
+      method: "POST",
+      headers: { Cookie: await sessionCookie(MEMBER) },
+    });
+    expect(res.status).toBe(204);
+
+    // 退出後のメンバー一覧には Member が居ない
+    const membersRes = await SELF.fetch(
+      `https://api.test/api/rooms/${roomId}/members`,
+      { headers: { Cookie: await sessionCookie(OWNER) } },
+    );
+    const body = (await membersRes.json()) as { members: { userId: string }[] };
+    expect(body.members.map((m) => m.userId)).toEqual([OWNER.sub]);
+  });
+
+  it("退出は冪等（2 回呼んでもエラーにならない）", async () => {
+    const { roomId, inviteCode } = await createRoomAs(OWNER);
+    await joinRoomAs(MEMBER, inviteCode);
+
+    const first = await SELF.fetch(
+      `https://api.test/api/rooms/${roomId}/leave`,
+      { method: "POST", headers: { Cookie: await sessionCookie(MEMBER) } },
+    );
+    expect(first.status).toBe(204);
+
+    // 2 回目は既に非メンバー → 404 になる（再参加しない限り復帰しない）
+    const second = await SELF.fetch(
+      `https://api.test/api/rooms/${roomId}/leave`,
+      { method: "POST", headers: { Cookie: await sessionCookie(MEMBER) } },
+    );
+    expect(second.status).toBe(404);
+  });
+
+  it("非メンバーは 404（ルームの存在自体を見せない）", async () => {
+    const { roomId } = await createRoomAs(OWNER);
+    const res = await SELF.fetch(`https://api.test/api/rooms/${roomId}/leave`, {
+      method: "POST",
+      headers: { Cookie: await sessionCookie(OUTSIDER) },
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("未ログインは 401", async () => {
+    const { roomId } = await createRoomAs(OWNER);
+    const res = await SELF.fetch(`https://api.test/api/rooms/${roomId}/leave`, {
+      method: "POST",
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("退出したユーザーは同じ招待コードから再 join できる", async () => {
+    const { roomId, inviteCode } = await createRoomAs(OWNER);
+    await joinRoomAs(MEMBER, inviteCode);
+
+    // 退出
+    await SELF.fetch(`https://api.test/api/rooms/${roomId}/leave`, {
+      method: "POST",
+      headers: { Cookie: await sessionCookie(MEMBER) },
+    });
+
+    // 再 join
+    const rejoin = await SELF.fetch("https://api.test/api/rooms/join", {
+      method: "POST",
+      headers: {
+        Cookie: await sessionCookie(MEMBER),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ code: inviteCode }),
+    });
+    expect(rejoin.status).toBe(200);
+  });
+});
+
 describe("WebSocket 接続の認可", () => {
   it("セッションなしの WS 接続は 401", async () => {
     const { roomId } = await createRoomAs(OWNER);

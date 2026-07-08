@@ -1,6 +1,8 @@
 // RoomDO 単体の契約テスト。
 // メンバーシップの真実（join の冪等性・isMember 判定・name の保持・進行状態）と、
 // api-worker を経由しない到達への深層防御を検証する。
+// Realtime 配信（新規メンバーの member_joined broadcast）は
+// room-protocol.spec.ts の E2E テスト（実 WS 接続）で検証する。
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { HOST_ID_HEADER, USER_ID_HEADER } from "./room-do";

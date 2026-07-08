@@ -129,3 +129,39 @@ export async function connectRoomAs(
     },
   };
 }
+
+// runInDurableObject 内で acceptWebSocket した WS の外側 ([0]) を受け取り、
+// 受信メッセージを JSON 文字列のまま蓄積するヘルパ。broadcast 経路の単体テスト用。
+// WebSocketPair は [client, server] の 2-tuple を返す。
+//  - [0] (client): Durable Object の外側で、メッセージを受信する側
+//  - [1] (server): Durable Object 側で、ctx.acceptWebSocket(server) に登録する側
+export type CollectingWs = {
+  raw(): string[];
+  close(): void;
+};
+
+export function openCollectingWs(
+  pair: readonly [WebSocket, WebSocket],
+): CollectingWs {
+  const client = pair[0];
+  const server = pair[1];
+  const raw: string[] = [];
+  client.addEventListener("message", (event) => {
+    raw.push(String(event.data));
+  });
+  return {
+    raw: () => [...raw],
+    close() {
+      try {
+        client.close();
+      } catch {
+        // already closed
+      }
+      try {
+        server.close();
+      } catch {
+        // already closed
+      }
+    },
+  };
+}

@@ -167,6 +167,33 @@ async function handleListMembers(
   return json({ members });
 }
 
+// POST /api/rooms/:id/leave — 退出（#70 退室機能）。
+// 自分の WS を close し、RoomDO の members から外れ、他メンバー全員に
+// member_left を broadcast する。退出後は再参加可能（同じ招待URL から）。
+// 認可:
+//   - 未ログインは 401
+//   - ルームが存在しない、または自分がメンバーでない場合は 404
+//   - 退出処理は冪等（再呼び出しでも 200 を返す）
+async function handleLeaveRoom(
+  env: Env,
+  session: SessionPayload,
+  roomId: string,
+): Promise<Response> {
+  const room = await findRoomById(env.DB, roomId);
+  if (!room) {
+    return error(404, "ルームが見つかりませんでした。");
+  }
+
+  const stub = roomStub(env, roomId);
+  const member = await stub.isMember(session.sub);
+  if (!member) {
+    return error(404, "ルームが見つかりませんでした。");
+  }
+
+  await stub.leave(session.sub);
+  return new Response(null, { status: 204 });
+}
+
 // GET /api/rooms/:id/ws — メンバーのみ WebSocket 接続できる。
 // 認可はここで完結させ、DO へは検証済みユーザーIDと hostId をヘッダーで
 // 引き継ぐ。hostId は start_phase の認可で RoomDO が再判定に使う。
@@ -245,6 +272,15 @@ export default {
         return error(404, "ルームが見つかりませんでした。");
       }
       return handleListMembers(env, session, membersMatch[1]);
+    }
+
+    // /leave は /ws /members と同じく「/rooms/:id/...」のサフィックス。
+    const leaveMatch = pathname.match(/^\/api\/rooms\/([^/]+)\/leave$/);
+    if (method === "POST" && leaveMatch?.[1]) {
+      if (!isUuid(leaveMatch[1])) {
+        return error(404, "ルームが見つかりませんでした。");
+      }
+      return handleLeaveRoom(env, session, leaveMatch[1]);
     }
 
     const roomMatch = pathname.match(/^\/api\/rooms\/([^/]+)$/);

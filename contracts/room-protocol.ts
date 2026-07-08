@@ -110,6 +110,13 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
     type: z.literal("member_joined"),
     member: MemberSchema,
   }),
+  // メンバーが退出したことを全員に通知する（Realtime 反映）。退室者は
+  // broadcast から除外される（自身の close は api-worker 側の RoomDO.leave
+  // で行うため、本人宛の member_left は届かない）。
+  z.object({
+    type: z.literal("member_left"),
+    userId: z.string().uuid(),
+  }),
   // ホストが進行状態を進めたことを全員に通知する。
   z.object({
     type: z.literal("phase_changed"),

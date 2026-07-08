@@ -6,10 +6,12 @@
 //   - ホスト判定付きの start_phase 送信
 //   - phase_changed 受信後の /rooms/[id] への自動遷移
 //   - members / phase state の管理（app/rooms/room-reducer.ts）
+//   - 退出のトリガ（#70 退室機能）
 // を担当する。ノートは扱わない（#70 のスコープ）。
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { StartRoomView } from "@/app/rooms/[id]/start/start-room-view";
+import { leaveRoom } from "@/app/rooms/actions";
 import {
   applyMemberServerMessage,
   applyPhaseServerMessage,
@@ -56,6 +58,8 @@ export function RoomStartBoard({
   const [connectionStatus, setConnectionStatus] =
     useState<RoomConnectionStatus>("connecting");
   const [isStarting, setIsStarting] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
+  const [isLeavePending, startLeaveTransition] = useTransition();
   const clientRef = useRef<RoomClient | null>(null);
 
   // 既に writing ならボードへ直行（SSR でも redirect しているが、state 初期値が
@@ -108,6 +112,31 @@ export function RoomStartBoard({
     setTimeout(() => setIsStarting(false), 5000);
   }, [isHost, sendMessage]);
 
+  // 退出（#70 退室機能）。StartRoomView 内の LeaveConfirmDialog から呼ばれる。
+  const handleLeave = useCallback(() => {
+    if (isLeaving || isLeavePending) return;
+    setIsLeaving(true);
+    clientRef.current?.close();
+    startLeaveTransition(async () => {
+      const formData = new FormData();
+      formData.append("roomId", roomId);
+      try {
+        await leaveRoom(formData);
+      } catch (error) {
+        if (
+          error &&
+          typeof error === "object" &&
+          "digest" in error &&
+          typeof (error as { digest?: unknown }).digest === "string" &&
+          (error as { digest: string }).digest.startsWith("NEXT_REDIRECT")
+        ) {
+          return;
+        }
+        throw error;
+      }
+    });
+  }, [isLeaving, isLeavePending, roomId]);
+
   return (
     <StartRoomView
       members={members}
@@ -119,6 +148,8 @@ export function RoomStartBoard({
       connectionStatus={connectionStatus}
       isStarting={isStarting}
       onStart={handleStart}
+      onLeave={handleLeave}
+      isLeaving={isLeaving}
     />
   );
 }

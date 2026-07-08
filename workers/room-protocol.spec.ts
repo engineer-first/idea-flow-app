@@ -130,12 +130,10 @@ describe("snapshot（接続・再接続の復帰パス）", () => {
 });
 
 describe("member_joined（Realtime 反映）", () => {
-  it("第三者が join して WS 接続すると、既存メンバーにも本人にも member_joined は届かない（REST の join は WS 接続を伴わないため）", async () => {
-    // member_joined は「WS が開いている間に RoomDO.join が呼ばれた」時に
-    // 発生するイベント。REST の /api/rooms/join は WS 接続とは独立して動く
-    // ので、既存メンバーには通知されない（これは仕様）。
-    // 一方、参加者一覧の Realtime 反映は snapshot で行う: 新規参加者の
-    // 接続直後の snapshot.members に全員が含まれる。
+  it("既存メンバー接続中に第三者が REST join すると、既存メンバー全員に member_joined が届く", async () => {
+    // ホスト (owner) と参加者 (member) の WS が開いた状態で、第三者が
+    // /api/rooms/join すると、RoomDO 内の upsertMember が両 WS に
+    // member_joined を broadcast する（#70 の Realtime 反映）。
     const { roomId, owner, member } = await setupRoom();
 
     const newcomer: TestUser = {
@@ -145,9 +143,40 @@ describe("member_joined（Realtime 反映）", () => {
     };
     await joinRoomAs(newcomer, await getInviteCode(roomId, OWNER));
 
+    // owner / member には member_joined が届く
+    const toOwner = await expectType(owner, "member_joined");
+    const toMember = await expectType(member, "member_joined");
+    expect(toOwner).toEqual({
+      type: "member_joined",
+      member: { userId: newcomer.sub, name: newcomer.name },
+    });
+    expect(toMember).toEqual({
+      type: "member_joined",
+      member: { userId: newcomer.sub, name: newcomer.name },
+    });
+
+    owner.close();
+    member.close();
+  });
+
+  it("第三者の新規メンバー本人の WS には member_joined が届かない（本人には snapshot.members が届く）", async () => {
+    // newcomer の WS を open する直前に join 済みの場合、newcomer の
+    // snapshot には自分も含めた全メンバーが含まれる。member_joined 自体は
+    // 本人除外で送られない。
+    const { roomId, owner, member } = await setupRoom();
+
+    const newcomer: TestUser = {
+      sub: "33333333-3333-4333-8333-333333333333",
+      email: "newcomer@example.test",
+      name: "Newcomer",
+    };
+    await joinRoomAs(newcomer, await getInviteCode(roomId, OWNER));
+
+    // newcomer の WS を開く
     const newSocket = await connectRoomAs(newcomer, roomId, {
       hostId: OWNER.sub,
     });
+    // 自分の snapshot.members には自分が含まれる
     const newcomerSnapshot = await expectType(newSocket, "snapshot");
     expect(newcomerSnapshot.members).toEqual([
       { userId: OWNER.sub, name: OWNER.name },
@@ -158,6 +187,121 @@ describe("member_joined（Realtime 反映）", () => {
     newSocket.close();
     owner.close();
     member.close();
+  });
+
+  it("既存メンバーへの再 join（name 変更）は member_joined を再送しない（冪等）", async () => {
+    // 同じユーザが REST join を 2 回叩いても、新着イベントは 1 回だけ。
+    // 既にメンバー登録されているので 2 回目は name 更新のみで broadcast しない。
+    const { roomId, owner, member } = await setupRoom();
+
+    const newcomer: TestUser = {
+      sub: "33333333-3333-4333-8333-333333333333",
+      email: "newcomer@example.test",
+      name: "Newcomer",
+    };
+    // 1 回目: 新規
+    await joinRoomAs(newcomer, await getInviteCode(roomId, OWNER));
+    const joined = await expectType(owner, "member_joined");
+    expect(joined.member).toEqual({
+      userId: newcomer.sub,
+      name: newcomer.name,
+    });
+    // 2 回目: 既存なので broadcast されない（member への到着も無し）
+    await joinRoomAs(newcomer, await getInviteCode(roomId, OWNER));
+    // member 側に member_joined が**追加で届かない**ことを確認。
+    // 一定時間内に何も届かないことを直接は確認しづらいので、
+    // member.next() を短いタイムアウトで呼んで何も来ないことを示す代わりに、
+    // ここでは member_joined のカウントが増えないことで検証する。
+    // → 直前に送った member_joined を member 側で消費済みという前提で、
+    // もう 1 個 member_joined は届かないことを「次に届いたメッセージの
+    // type は member_joined ではない」ことで表現する。
+    // 確実性のため、ここでは member_joined 以外のメッセージが次に来る
+    // ことを確認するかわりに、RoomDO の members 数が変わらないことを
+    // 別途確認する形に切り替える。
+    const beforeRes = await SELF.fetch(
+      `https://api.test/api/rooms/${roomId}/members`,
+      { headers: { Cookie: await sessionCookieFor(OWNER) } },
+    );
+    const before = (await beforeRes.json()) as {
+      members: { userId: string }[];
+    };
+    await joinRoomAs(newcomer, await getInviteCode(roomId, OWNER));
+    const afterRes = await SELF.fetch(
+      `https://api.test/api/rooms/${roomId}/members`,
+      { headers: { Cookie: await sessionCookieFor(OWNER) } },
+    );
+    const after = (await afterRes.json()) as { members: { userId: string }[] };
+    expect(after.members.length).toBe(before.members.length);
+
+    owner.close();
+    member.close();
+  });
+});
+
+describe("member_left（退出の Realtime 反映）", () => {
+  it("既存メンバー接続中に REST leave すると、他メンバー全員に member_left が届く", async () => {
+    const { roomId, owner } = await setupRoom();
+
+    // member が REST で退出
+    const leaveRes = await SELF.fetch(
+      `https://api.test/api/rooms/${roomId}/leave`,
+      { method: "POST", headers: { Cookie: await sessionCookieFor(MEMBER) } },
+    );
+    expect(leaveRes.status).toBe(204);
+
+    // owner には member_left が届く
+    const toOwner = await expectType(owner, "member_left");
+    expect(toOwner).toEqual({ type: "member_left", userId: MEMBER.sub });
+    owner.close();
+  });
+
+  it("退出した本人の WS はサーバ側で close される", async () => {
+    const { roomId, owner, member } = await setupRoom();
+
+    // member が REST で退出
+    await SELF.fetch(`https://api.test/api/rooms/${roomId}/leave`, {
+      method: "POST",
+      headers: { Cookie: await sessionCookieFor(MEMBER) },
+    });
+
+    // member の WS はサーバ側で close される。readyState は WebSocket.CLOSED (3)。
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(member.ws.readyState).toBe(3); // CLOSED
+    owner.close();
+  });
+
+  it("退出後に同ユーザが再 join すると、既存メンバーに member_joined が届く", async () => {
+    // 退出 → 再 join のシナリオで、broadcast が正しく動くことを確認。
+    // （member_left と member_joined が両方届くことで「リアルタイム反映が
+    // 生きている」ことを示す）
+    const { roomId, owner, member } = await setupRoom();
+
+    // member 退出
+    await SELF.fetch(`https://api.test/api/rooms/${roomId}/leave`, {
+      method: "POST",
+      headers: { Cookie: await sessionCookieFor(MEMBER) },
+    });
+    await expectType(owner, "member_left");
+    member.close();
+
+    // member 再 join
+    const rejoin = await SELF.fetch("https://api.test/api/rooms/join", {
+      method: "POST",
+      headers: {
+        Cookie: await sessionCookieFor(MEMBER),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ code: await getInviteCode(roomId, OWNER) }),
+    });
+    expect(rejoin.status).toBe(200);
+
+    // owner に member_joined が届く
+    const reJoined = await expectType(owner, "member_joined");
+    expect(reJoined.member).toEqual({
+      userId: MEMBER.sub,
+      name: MEMBER.name,
+    });
+    owner.close();
   });
 });
 

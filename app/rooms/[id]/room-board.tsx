@@ -6,14 +6,16 @@
 //   - ドラッグ中イベントのスロットル送信
 //   - 操作のプロトコルメッセージ化（contracts/room-protocol.ts）
 //   - members / phase state の管理（app/rooms/room-reducer.ts）
+//   - 退出のトリガ（#70 退室機能）
 // を担当する。関心の分離のため、room-client や notes/room-reducer への依存は
 // このファイルに閉じ込める。
 //
 // 確定状態の真実はサーバー（RoomDO）側にあり、再接続時は snapshot で復元される。
 // 削除は楽観更新しない: author 以外の削除はサーバーが forbidden で拒否するため、
 // 確定（note:deleted）を待ってから消すことで「消えたのに戻る」揺れを避ける。
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { BoardView } from "@/app/rooms/[id]/board-view";
+import { leaveRoom } from "@/app/rooms/actions";
 import {
   applyServerMessage,
   moveNoteLocally,
@@ -71,6 +73,8 @@ export function RoomBoard({
   const [connectionStatus, setConnectionStatus] =
     useState<RoomConnectionStatus>("connecting");
   const [draggingNoteId, setDraggingNoteId] = useState<string | null>(null);
+  const [isLeaving, setIsLeaving] = useState(false);
+  const [isLeavePending, startLeaveTransition] = useTransition();
   const draggingNoteIdRef = useRef<string | null>(null);
   const clientRef = useRef<RoomClient | null>(null);
   const sendDragRef = useRef<ReturnType<
@@ -168,6 +172,41 @@ export function RoomBoard({
     clientRef.current?.send({ type: "note:delete", noteId });
   }, []);
 
+  // 退出（#70 退室機能）。BoardView 内の LeaveConfirmDialog から呼ばれる。
+  // 1. 自分の WS を能動的に閉じる（再接続を抑制し、UX として「もう受信しない」を即時反映）
+  // 2. Server Action leaveRoom(formData) を呼ぶ。内部で api-worker を fetch し
+  //    redirect("/") でホームへ戻る。
+  // redirect は NEXT_REDIRECT エラーを throw するので、useTransition の枠内で
+  // 呼んで throw を握りつぶす（Next.js がクライアントの遷移を処理する）。
+  // 確認 Dialog 自体は BoardView 側の state として持つ。
+  const handleLeave = useCallback(() => {
+    if (isLeaving || isLeavePending) return;
+    setIsLeaving(true);
+    // 自分の WS を能動的に閉じる。RoomDO.leave でも閉じられるが、
+    // 早く「閉じた」体験にすることで再接続を試みない。
+    clientRef.current?.close();
+    startLeaveTransition(async () => {
+      const formData = new FormData();
+      formData.append("roomId", roomId);
+      try {
+        await leaveRoom(formData);
+      } catch (error) {
+        // redirect は NEXT_REDIRECT を throw する仕様（Next.js の内部）なので
+        // それを握りつぶす。next/navigation が router に遷移を通知する。
+        if (
+          error &&
+          typeof error === "object" &&
+          "digest" in error &&
+          typeof (error as { digest?: unknown }).digest === "string" &&
+          (error as { digest: string }).digest.startsWith("NEXT_REDIRECT")
+        ) {
+          return;
+        }
+        throw error;
+      }
+    });
+  }, [isLeaving, isLeavePending, roomId]);
+
   return (
     <BoardView
       notes={notes}
@@ -185,6 +224,8 @@ export function RoomBoard({
       onNoteDragEnd={handleNoteDragEnd}
       onNoteContentChange={handleNoteContentChange}
       onNoteDelete={handleNoteDelete}
+      onLeave={handleLeave}
+      isLeaving={isLeaving}
     />
   );
 }

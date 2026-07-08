@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { signOut } from "@/app/auth/actions";
-import { createRoom, joinRoom } from "@/app/rooms/actions";
+import { createRoom } from "@/app/rooms/actions";
+import { JoinRoomForm } from "@/app/rooms/join-room-form";
 import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/session/current-user";
 import { isAuthConfigured } from "@/lib/session/env";
@@ -55,20 +56,7 @@ export default async function Home({ searchParams }: HomeProps) {
 
       <section>
         <h2>招待コードで参加</h2>
-        <form action={joinRoom}>
-          <label htmlFor="code">
-            招待コード
-            <input
-              id="code"
-              name="code"
-              type="text"
-              maxLength={6}
-              placeholder="AB12CD"
-              required
-            />
-          </label>
-          <Button type="submit">参加する</Button>
-        </form>
+        <JoinRoomForm />
       </section>
     </main>
   );

@@ -17,7 +17,7 @@ vi.mock("@/lib/session/current-user", () => ({
 }));
 vi.mock("next/navigation", () => ({ redirect: redirectMock }));
 
-import { createRoom, joinRoom } from "@/app/rooms/actions";
+import { createRoom, joinRoom, leaveRoom } from "@/app/rooms/actions";
 
 // 実物の redirect() は例外を投げて以降の処理を打ち切る。同じ制御フローを再現する。
 class RedirectSignal extends Error {
@@ -120,3 +120,57 @@ describe("joinRoom", () => {
     ).toContain("/?error=");
   });
 });
+
+describe("leaveRoom", () => {
+  function leaveFormData(roomId: string): FormData {
+    const formData = new FormData();
+    formData.set("roomId", roomId);
+    return formData;
+  }
+
+  it("未認証なら /login へリダイレクトする", async () => {
+    getCurrentUserMock.mockResolvedValue(null);
+
+    expect(
+      await callAndGetRedirect(() => leaveRoom(leaveFormData(VALID_ROOM_ID))),
+    ).toBe("/login");
+    expect(apiFetchMock).not.toHaveBeenCalled();
+  });
+
+  it("roomId が UUID 形式でなければ / へリダイレクトする", async () => {
+    expect(
+      await callAndGetRedirect(() => leaveRoom(leaveFormData("not-uuid"))),
+    ).toBe("/");
+    expect(apiFetchMock).not.toHaveBeenCalled();
+  });
+
+  it("退出に成功したら / へリダイレクトする", async () => {
+    apiFetchMock.mockResolvedValue(new Response(null, { status: 204 }));
+
+    expect(
+      await callAndGetRedirect(() => leaveRoom(leaveFormData(VALID_ROOM_ID))),
+    ).toBe("/");
+    expect(apiFetchMock).toHaveBeenCalledWith(
+      `/api/rooms/${VALID_ROOM_ID}/leave`,
+      { method: "POST" },
+    );
+  });
+
+  it("404（既に退出済み・非メンバー）は / へリダイレクトする", async () => {
+    apiFetchMock.mockResolvedValue(new Response("not found", { status: 404 }));
+
+    expect(
+      await callAndGetRedirect(() => leaveRoom(leaveFormData(VALID_ROOM_ID))),
+    ).toBe("/");
+  });
+
+  it("5xx は例外を投げて error boundary 行き", async () => {
+    apiFetchMock.mockResolvedValue(new Response("oops", { status: 503 }));
+
+    await expect(
+      callAndGetRedirect(() => leaveRoom(leaveFormData(VALID_ROOM_ID))),
+    ).rejects.toThrow();
+  });
+});
+
+const VALID_ROOM_ID = "123e4567-e89b-42d3-a456-426614174000";
