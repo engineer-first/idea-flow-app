@@ -46,6 +46,8 @@ describe("migrateRoomStorage", () => {
       expect(tableNames(state.storage)).toEqual([
         "members",
         "notes",
+        "room_owner",
+        "room_state",
         "schema_version",
       ]);
       expect(schemaVersion(state.storage)).toBe(ROOM_DO_MIGRATIONS.length);
@@ -155,6 +157,8 @@ describe("RoomDO constructor の配線", () => {
       expect(tableNames(state.storage)).toEqual([
         "members",
         "notes",
+        "room_owner",
+        "room_state",
         "schema_version",
       ]);
     });

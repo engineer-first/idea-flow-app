@@ -27,6 +27,28 @@ export const ROOM_DO_MIGRATIONS: readonly string[] = [
      updated_at TEXT NOT NULL
    );
    DROP TABLE IF EXISTS meta;`,
+
+  // v2: フェーズ管理追加
+  `
+  CREATE TABLE IF NOT EXISTS room_state (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    phase TEXT NOT NULL DEFAULT 'phase1'
+  );
+
+  INSERT OR IGNORE INTO room_state (id, phase)
+  VALUES (1, 'phase1');
+  `,
+
+  // v3: host管理追加
+  `
+  CREATE TABLE IF NOT EXISTS room_owner (
+    id INTEGER PRIMARY KEY CHECK(id = 1),
+    host_id TEXT
+  );
+
+  INSERT OR IGNORE INTO room_owner (id)
+  VALUES (1);
+  `,
 ];
 
 export function migrateRoomStorage(

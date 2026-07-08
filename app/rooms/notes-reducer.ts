@@ -68,6 +68,9 @@ export function applyServerMessage(
       return notes;
     }
 
+    case "phase:updated":
+      return notes;
+
     default: {
       const _exhaustive: never = message;
       return _exhaustive;

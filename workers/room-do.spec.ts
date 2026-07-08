@@ -68,3 +68,64 @@ describe("RoomDO WebSocket の深層防御", () => {
     res.webSocket?.close();
   });
 });
+
+describe("RoomDO snapshot", () => {
+  it("host は snapshot で isHost=true になる", async () => {
+    const stub = roomStub("room-snapshot-host");
+
+    await stub.join(USER_A, true);
+
+    const res = await stub.fetch("https://do/ws", {
+      headers: {
+        Upgrade: "websocket",
+        [USER_ID_HEADER]: USER_A,
+      },
+    });
+
+    expect(res.status).toBe(101);
+
+    const ws = res.webSocket!;
+    ws.accept();
+
+    const message = await new Promise<MessageEvent>((resolve) => {
+      ws.addEventListener("message", resolve);
+    });
+
+    const snapshot = JSON.parse(String(message.data));
+
+    expect(snapshot.type).toBe("snapshot");
+    expect(snapshot.isHost).toBe(true);
+
+    ws.close();
+  });
+
+  it("member は snapshot で isHost=false になる", async () => {
+    const stub = roomStub("room-snapshot-member");
+
+    await stub.join(USER_A, true);
+    await stub.join(USER_B);
+
+    const res = await stub.fetch("https://do/ws", {
+      headers: {
+        Upgrade: "websocket",
+        [USER_ID_HEADER]: USER_B,
+      },
+    });
+
+    expect(res.status).toBe(101);
+
+    const ws = res.webSocket!;
+    ws.accept();
+
+    const message = await new Promise<MessageEvent>((resolve) => {
+      ws.addEventListener("message", resolve);
+    });
+
+    const snapshot = JSON.parse(String(message.data));
+
+    expect(snapshot.type).toBe("snapshot");
+    expect(snapshot.isHost).toBe(false);
+
+    ws.close();
+  });
+});

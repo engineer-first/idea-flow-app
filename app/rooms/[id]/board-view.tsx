@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 // WebSocket接続・スロットル・プロトコル送信はroom-board.tsx（コンテナ）の責務。
 // 「どの付箋を選択中か」は同期不要な純粋にUIの関心事なので、ここでローカルに持つ。
 import { BOARD_HEIGHT, BOARD_WIDTH } from "@/contracts/board";
+import type { Phase } from "@/contracts/room-protocol";
 
 // WebSocket 接続の表示用状態。値の生成は room-board（コンテナ）の責務で、
 // ここでは受け取った状態を表示するだけ（このコンポーネントはデータ層に依存しない）。
@@ -25,6 +26,8 @@ export type BoardViewProps = {
   notes: Note[];
   inviteCode: string;
   inviteUrl: string;
+  phase: Phase;
+  isHost: boolean;
   connectionStatus: BoardConnectionStatus;
   draggingNoteId: string | null;
   onAddNote: () => void;
@@ -33,12 +36,15 @@ export type BoardViewProps = {
   onNoteDragEnd: (noteId: string, x: number, y: number) => void;
   onNoteContentChange: (noteId: string, content: string) => void;
   onNoteDelete: (noteId: string) => void;
+  onNextPhase: () => void;
 };
 
 export function BoardView({
   notes,
   inviteCode,
   inviteUrl,
+  phase,
+  isHost,
   connectionStatus,
   draggingNoteId,
   onAddNote,
@@ -47,6 +53,7 @@ export function BoardView({
   onNoteDragEnd,
   onNoteContentChange,
   onNoteDelete,
+  onNextPhase,
 }: BoardViewProps) {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   // 未接続中は room-client が送信を黙って破棄するため、操作自体を無効化する。
@@ -87,6 +94,25 @@ export function BoardView({
           </span>
         </div>
         <div className="flex items-center gap-3">
+          <span className="text-sm text-muted-foreground">
+            Phase:
+            <span className="ml-1 font-semibold text-foreground">{phase}</span>
+          </span>
+
+          {isHost && (
+            <span className="text-xs text-muted-foreground">ホスト</span>
+          )}
+
+          {isHost && (
+            <Button
+              type="button"
+              onClick={onNextPhase}
+              disabled={isDisconnected}
+            >
+              次のフェーズへ
+            </Button>
+          )}
+
           {CONNECTION_STATUS_LABELS[connectionStatus] !== null && (
             // role="status"（aria-live: polite）で、再接続をスクリーンリーダーにも通知する。
             <span

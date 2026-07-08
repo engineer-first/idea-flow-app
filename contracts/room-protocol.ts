@@ -27,6 +27,10 @@ export const NoteSchema = z.object({
 
 export type ProtocolNote = z.infer<typeof NoteSchema>;
 
+export const PhaseSchema = z.enum(["phase1", "phase2", "phase3"]);
+
+export type Phase = z.infer<typeof PhaseSchema>;
+
 const NotePositionSchema = {
   x: z.number().finite().min(0).max(BOARD_WIDTH),
   y: z.number().finite().min(0).max(BOARD_HEIGHT),
@@ -61,6 +65,9 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
     type: z.literal("note:delete"),
     noteId: z.string().uuid(),
   }),
+  z.object({
+    type: z.literal("phase:next"),
+  }),
 ]);
 
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;
@@ -74,6 +81,8 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("snapshot"),
     notes: z.array(NoteSchema),
+    phase: PhaseSchema,
+    isHost: z.boolean(),
   }),
   z.object({ type: z.literal("note:inserted"), note: NoteSchema }),
   z.object({ type: z.literal("note:updated"), note: NoteSchema }),
@@ -83,6 +92,10 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
     noteId: z.string().uuid(),
     x: z.number(),
     y: z.number(),
+  }),
+  z.object({
+    type: z.literal("phase:updated"),
+    phase: PhaseSchema,
   }),
   z.object({
     type: z.literal("error"),
