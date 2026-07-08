@@ -61,3 +61,6 @@ build-storybook.log
 .dev.vars
 workers/.dev.vars
 workers/.wrangler/
+
+# schema doc生成用の一時sqliteファイル（scripts/build-*-schema.ts が生成）
+/tmp/*.sqlite

@@ -1,0 +1,119 @@
+{
+  "name": "RoomDO (room内部)",
+  "desc": "ルーム1つにつき1つ生成される SQLite-backed Durable Object の内部スキーマ。 メンバーシップと付箋の確定状態の真実をここで持つ。D1 の rooms.id はこの DO インスタンスに対応するが、DBレベルでの結合は存在しない（アプリケーション コード上でのみ対応づけられる）。D1 側は .tbls/d1.yml を参照。",
+  "tables": [
+    {
+      "name": "members",
+      "type": "table",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "nullable": true
+        },
+        {
+          "name": "joined_at",
+          "type": "TEXT",
+          "nullable": false,
+          "default": "datetime('now')"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_members_1",
+          "def": "PRIMARY KEY (user_id)",
+          "table": "members",
+          "columns": ["user_id"]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "user_id",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (user_id)",
+          "table": "members",
+          "columns": ["user_id"]
+        },
+        {
+          "name": "sqlite_autoindex_members_1",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (user_id)",
+          "table": "members",
+          "columns": ["user_id"]
+        }
+      ],
+      "def": "CREATE TABLE members (\n     user_id TEXT PRIMARY KEY,\n     joined_at TEXT NOT NULL DEFAULT (datetime('now'))\n   )"
+    },
+    {
+      "name": "notes",
+      "type": "table",
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "nullable": true
+        },
+        {
+          "name": "author_id",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "content",
+          "type": "TEXT",
+          "nullable": false,
+          "default": "''"
+        },
+        {
+          "name": "x",
+          "type": "REAL",
+          "nullable": false
+        },
+        {
+          "name": "y",
+          "type": "REAL",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "nullable": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_notes_1",
+          "def": "PRIMARY KEY (id)",
+          "table": "notes",
+          "columns": ["id"]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "id",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "notes",
+          "columns": ["id"]
+        },
+        {
+          "name": "sqlite_autoindex_notes_1",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "notes",
+          "columns": ["id"]
+        }
+      ],
+      "def": "CREATE TABLE notes (\n     id TEXT PRIMARY KEY,\n     author_id TEXT NOT NULL,\n     content TEXT NOT NULL DEFAULT '',\n     x REAL NOT NULL,\n     y REAL NOT NULL,\n     created_at TEXT NOT NULL,\n     updated_at TEXT NOT NULL\n   )"
+    }
+  ],
+  "driver": {
+    "name": "sqlite",
+    "database_version": "3.51.3"
+  }
+}
