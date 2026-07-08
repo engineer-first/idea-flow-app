@@ -95,6 +95,37 @@ describe("BoardView", () => {
     });
   });
 
+  describe("未接続時の操作無効化", () => {
+    // WebSocket が connecting / closed の間に編集させると、room-client が
+    // 送信を黙って破棄するため「入力したのに再接続後のsnapshotで消える」
+    // ことになる。未接続中はボタン・付箋の操作自体を無効化する。
+    it.each([
+      "connecting",
+      "closed",
+    ] as const)("%sの間は「付箋を追加」ボタンが無効化される", (connectionStatus) => {
+      setup({ connectionStatus });
+
+      expect(screen.getByRole("button", { name: "付箋を追加" })).toBeDisabled();
+    });
+
+    it("openの間は「付箋を追加」ボタンが有効", () => {
+      setup({ connectionStatus: "open" });
+
+      expect(
+        screen.getByRole("button", { name: "付箋を追加" }),
+      ).not.toBeDisabled();
+    });
+
+    it("closedの間は付箋をクリックしても選択されない", () => {
+      setup({ connectionStatus: "closed" });
+
+      const [first] = screen.getAllByTestId("note-card");
+      clickNote(first);
+
+      expect(first).not.toHaveAttribute("data-selected");
+    });
+  });
+
   describe("付箋の選択", () => {
     it("付箋をクリックすると選択され、ボード背景のクリックで解除される", () => {
       setup();

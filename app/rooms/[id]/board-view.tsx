@@ -49,6 +49,8 @@ export function BoardView({
   onNoteDelete,
 }: BoardViewProps) {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  // 未接続中は room-client が送信を黙って破棄するため、操作自体を無効化する。
+  const isDisconnected = connectionStatus !== "open";
 
   function handleBoardPointerDown(event: React.PointerEvent<HTMLDivElement>) {
     // 付箋の上のpointerdownはバブリングしてくるので、ボード背景を
@@ -98,7 +100,7 @@ export function BoardView({
               {CONNECTION_STATUS_LABELS[connectionStatus]}
             </span>
           )}
-          <Button type="button" onClick={onAddNote}>
+          <Button type="button" onClick={onAddNote} disabled={isDisconnected}>
             付箋を追加
           </Button>
         </div>
@@ -123,6 +125,7 @@ export function BoardView({
               note={note}
               isOwnDrag={draggingNoteId === note.id}
               isSelected={selectedNoteId === note.id}
+              disabled={isDisconnected}
               onSelect={setSelectedNoteId}
               onDragStart={onNoteDragStart}
               onDragMove={onNoteDragMove}

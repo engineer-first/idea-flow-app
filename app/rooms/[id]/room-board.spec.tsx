@@ -200,4 +200,23 @@ describe("ユーザー操作 → プロトコルメッセージ送信", () => {
     view.unmount();
     expect(socket.readyState).toBe(3);
   });
+
+  // room-client.send() は未openだとメッセージを黙って破棄するため、
+  // 未接続中は操作自体を無効化し「送ったつもりが届かない」を防ぐ。
+  it("接続確立前は「付箋を追加」ボタンが無効化され、クリックしても何も送信されない", () => {
+    const { socket } = renderBoard({ open: false });
+
+    fireEvent.click(screen.getByRole("button", { name: "付箋を追加" }));
+
+    expect(socket.sent).toHaveLength(0);
+  });
+
+  it("予期しない切断後も「付箋を追加」ボタンが無効化され、クリックしても何も送信されない", () => {
+    const { socket } = connectWithSnapshot([]);
+
+    act(() => socket.simulateUnexpectedClose());
+    fireEvent.click(screen.getByRole("button", { name: "付箋を追加" }));
+
+    expect(socket.sent).toHaveLength(0);
+  });
 });

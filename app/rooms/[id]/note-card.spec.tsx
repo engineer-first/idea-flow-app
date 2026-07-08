@@ -270,6 +270,109 @@ describe("NoteCard", () => {
     });
   });
 
+  describe("無効化（未接続時）", () => {
+    // WebSocket が connecting / closed の間は、操作してもサーバーに
+    // 届かず（room-client が握りつぶす）画面だけ変化してしまう。
+    // それを防ぐため disabled=true の間は選択・ドラッグ・編集開始・削除を
+    // すべて無効化する。
+    it("disabled中のpointerdownはonSelectを呼ばない", () => {
+      const onSelect = vi.fn();
+      setup({ disabled: true, onSelect });
+
+      fireEvent.pointerDown(getNoteSurface(), {
+        pointerId: 1,
+        clientX: 0,
+        clientY: 0,
+      });
+
+      expect(onSelect).not.toHaveBeenCalled();
+    });
+
+    it("disabled中はドラッグしてもonDragStart/onDragMove/onDragEndを呼ばない", () => {
+      const onDragStart = vi.fn();
+      const onDragMove = vi.fn();
+      const onDragEnd = vi.fn();
+      setup({
+        disabled: true,
+        note: buildNote({ x: 100, y: 100 }),
+        onDragStart,
+        onDragMove,
+        onDragEnd,
+      });
+
+      const surface = getNoteSurface();
+      fireEvent.pointerDown(surface, {
+        pointerId: 1,
+        clientX: 50,
+        clientY: 50,
+      });
+      fireEvent.pointerMove(surface, {
+        pointerId: 1,
+        clientX: 80,
+        clientY: 70,
+      });
+      fireEvent.pointerUp(surface, { pointerId: 1, clientX: 80, clientY: 70 });
+
+      expect(onDragStart).not.toHaveBeenCalled();
+      expect(onDragMove).not.toHaveBeenCalled();
+      expect(onDragEnd).not.toHaveBeenCalled();
+    });
+
+    it("disabled中は選択済みでもEnterで編集モードに入らない", () => {
+      setup({ disabled: true, isSelected: true });
+
+      fireEvent.keyDown(getNoteSurface(), { key: "Enter" });
+
+      expect(screen.getByRole("textbox")).toHaveAttribute("readonly");
+    });
+
+    it("disabled中は選択済みでもBackspace/DeleteでonDeleteを呼ばない", () => {
+      const onDelete = vi.fn();
+      setup({ disabled: true, isSelected: true, onDelete });
+
+      fireEvent.keyDown(getNoteSurface(), { key: "Backspace" });
+      fireEvent.keyDown(getNoteSurface(), { key: "Delete" });
+
+      expect(onDelete).not.toHaveBeenCalled();
+    });
+
+    it("編集中に切断されると編集を強制終了し、onContentChangeを呼ばずに本文を巻き戻す", () => {
+      const onContentChange = vi.fn();
+      const { props, view } = setup({
+        isSelected: true,
+        onContentChange,
+        note: buildNote({ content: "サーバー上の本文" }),
+      });
+
+      clickNote();
+      fireEvent.change(screen.getByRole("textbox"), {
+        target: { value: "未送信の下書き" },
+      });
+
+      view.rerender(<NoteCard {...props} disabled />);
+
+      expect(onContentChange).not.toHaveBeenCalled();
+      expect(screen.getByRole("textbox")).toHaveAttribute("readonly");
+      expect(screen.getByDisplayValue("サーバー上の本文")).toBeInTheDocument();
+    });
+
+    it("disabled中に手動でblurしてもonContentChangeを呼ばない", () => {
+      const onContentChange = vi.fn();
+      setup({ isSelected: true, disabled: true, onContentChange });
+
+      const textarea = screen.getByRole("textbox");
+      fireEvent.blur(textarea);
+
+      expect(onContentChange).not.toHaveBeenCalled();
+    });
+
+    it("付箋のサーフェスにaria-disabledが付く", () => {
+      setup({ disabled: true });
+
+      expect(getNoteSurface()).toHaveAttribute("aria-disabled", "true");
+    });
+  });
+
   describe("他ユーザーの更新の反映", () => {
     it("非編集時はnote.contentの更新を本文へ反映する", () => {
       const { props, view } = setup();

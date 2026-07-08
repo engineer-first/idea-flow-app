@@ -27,6 +27,11 @@ export type NoteCardProps = {
   // 自分自身が現在ドラッグ中かどうか。trueの間は影を深くして「持ち上げた」見た目にする。
   isOwnDrag: boolean;
   isSelected: boolean;
+  // WebSocket未接続時（connecting/closed）に親から渡す。true の間は選択・
+  // ドラッグ・編集開始・削除を無効化する。room-client.send() は未openだと
+  // メッセージを黙って破棄するため、UI操作自体を止めないと「入力したのに
+  // サーバーへ届かず再接続後の snapshot で消える」体験になってしまう。
+  disabled?: boolean;
   onSelect: (noteId: string) => void;
   onDragStart: (noteId: string) => void;
   onDragMove: (noteId: string, x: number, y: number) => void;
@@ -55,6 +60,7 @@ export function NoteCard({
   note,
   isOwnDrag,
   isSelected,
+  disabled = false,
   onSelect,
   onDragStart,
   onDragMove,
@@ -83,6 +89,15 @@ export function NoteCard({
       setIsEditing(false);
     }
   }, [isSelected]);
+
+  // 編集中に切断されたら、未送信の下書きを送らずに編集を強制終了する。
+  // onContentChange は呼ばない（onBlur側のガードにも依存しない二重の安全策）。
+  useEffect(() => {
+    if (disabled && isEditing) {
+      setIsEditing(false);
+      setLocalContent(note.content);
+    }
+  }, [disabled, isEditing, note.content]);
 
   // 状態に応じてフォーカスを移す。サーフェスにフォーカスがないと
   // Backspace削除などのキー操作を受け取れない。
@@ -113,6 +128,9 @@ export function NoteCard({
   }
 
   function handlePointerDown(event: React.PointerEvent<HTMLButtonElement>) {
+    if (disabled) {
+      return;
+    }
     event.currentTarget.setPointerCapture?.(event.pointerId);
     pointerOriginRef.current = {
       pointerId: event.pointerId,
@@ -171,6 +189,9 @@ export function NoteCard({
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
+    if (disabled) {
+      return;
+    }
     if (event.key === "Backspace" || event.key === "Delete") {
       event.preventDefault();
       onDelete(note.id);
@@ -212,6 +233,9 @@ export function NoteCard({
         onChange={(event) => setLocalContent(event.target.value)}
         onBlur={(event) => {
           setIsEditing(false);
+          if (disabled) {
+            return;
+          }
           onContentChange(note.id, event.target.value);
         }}
         onKeyDown={(event) => {
@@ -238,12 +262,17 @@ export function NoteCard({
           ref={surfaceRef}
           type="button"
           aria-label="付箋"
+          aria-disabled={disabled || undefined}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onKeyDown={handleKeyDown}
           className={`absolute inset-0 touch-none select-none outline-none ${
-            isOwnDrag ? "cursor-grabbing" : "cursor-grab"
+            disabled
+              ? "cursor-not-allowed"
+              : isOwnDrag
+                ? "cursor-grabbing"
+                : "cursor-grab"
           }`}
         />
       )}
