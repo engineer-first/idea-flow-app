@@ -165,7 +165,6 @@ export default function WhiteboardCanvas() {
       setStoreVersion((version) => version + 1);
     };
 
-    editor.on("frame", handleUpdate);
     editor.on("resize", handleUpdate);
 
     const unlistenStore = store.listen(() => {
@@ -173,7 +172,6 @@ export default function WhiteboardCanvas() {
     });
 
     return () => {
-      editor.off("frame", handleUpdate);
       editor.off("resize", handleUpdate);
       unlistenStore();
     };
