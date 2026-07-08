@@ -130,7 +130,8 @@
   ul.plain { margin: 0 0 14px; padding-left: 1.3em; max-width: 42em; }
   ul.plain li { font-size: 14px; margin-bottom: 6px; }
   ul.plain li::marker { color: var(--accent); }
-  pre.gitgraph {
+  pre.gitgraph,
+  pre.codeblock {
     background: var(--code-bg);
     color: var(--code-ink);
     border-radius: 10px;
@@ -141,8 +142,8 @@
     line-height: 1.9;
     margin: 16px 0;
   }
-  pre.gitgraph .gm { color: #7d8aa0; }
-  pre.gitgraph .ga { color: #f0a5c0; }
+  pre.gitgraph .gm, pre.codeblock .gm { color: #7d8aa0; }
+  pre.gitgraph .ga, pre.codeblock .ga { color: #f0a5c0; }
 
   /* ---------- status banner ---------- */
   .status-banner {
@@ -376,7 +377,7 @@
     <div class="status-banner">
       <div class="stat"><span class="l">Status</span><div class="v ok">導入済み（PR #90）</div></div>
       <div class="stat"><span class="l">対象</span><div class="v">全 *.stories.tsx</div></div>
-      <div class="stat"><span class="l">消費</span><div class="v">2 snapshots / push</div></div>
+      <div class="stat"><span class="l">消費</span><div class="v">16 snapshots / push</div></div>
       <div class="stat"><span class="l">無料枠</span><div class="v">5,000 / 月</div></div>
     </div>
   </header>
@@ -526,6 +527,7 @@ feature/89        <span class="ga">C───D</span>               <span class=
 
     <h3 style="margin-top: 32px;">課金の仕組み（story の書き方に効く）</h3>
     <p>課金単位はスナップショットで、<strong>スナップショット数 = story 数 × viewport 数 × ブラウザ数</strong>。story 1 つにつき毎 push 1 枚撮影される。だから Button の story は variant × size を個別 story（50 枚超/push）にせず、<em>全組み合わせを 1 枚のグリッドに敷き詰めて 1 スナップショット</em>にしている。グリッド内のどのセルが 1px 変わっても画像全体の差分として検出されるので、検出力は落ちない。viewport やブラウザを追加すると乗算で増えるため、増やす前に月間消費を再試算すること。</p>
+    <p>現在の対象は 5 ファイル・16 story（= 16 枚/push）。Cloudflare 移行時のリファクタリングで login-card・note-card・board-view などの story が増えた。story が増えたときにコストと開発体験をどう両立するかは、次のセクションの「story の増やし方」を参照。</p>
   </section>
 
   <!-- ============ 3. 運用 ============ -->
@@ -600,7 +602,62 @@ feature/89        <span class="ga">C───D</span>               <span class=
           <span class="fix">古い承認まで遡って戻したい場合は、git で該当変更を revert するのが確実。</span>
         </p>
       </div>
+      <div class="rule">
+        <span class="n2">MSW 依存</span>
+        <p>Storybook の MSW 起動は <code>NEXT_PUBLIC_USE_MSW=true</code> のときだけ有効（<code>.storybook/preview.tsx</code>）。現在の story はすべて props 注入なので無関係だが、api-worker への fetch に依存する story を作る場合、Chromatic のビルドにこの環境変数を渡さないと<strong>クラウド撮影時だけ error 状態で撮られる</strong>。
+          <span class="fix">そうなる前に、そもそも fetch を story に持ち込まず fixture を props で渡せないかを先に検討する（通信状態を props に落とすパターンと同方向）。</span>
+        </p>
+      </div>
     </div>
+
+    <h3 style="margin-top: 32px;">story の増やし方：開発用 story は自由に、VRT 観測点は絞る</h3>
+    <p>課金対象は story の数なので、状態ごとに個別 story を増やすほど消費が線形に増えます。かといって story を減らすと、component-driven 開発・状態網羅・公開 Storybook でのレビューという開発体験が犠牲になる。そこでこのリポジトリでは<em>「開発用 story」と「VRT の観測点」を分離する</em>方針を取ります。</p>
+    <ul class="plain">
+      <li><strong>個別 story はこれまで通り自由に書く</strong> — loading / empty / success / error の網羅（CLAUDE.md 規約）、Storybook 上での隔離開発、レビュアーが操作できる公開 Storybook。開発体験の核なので削らない</li>
+      <li><strong>表示コンポーネントは「カタログ story」1 枚で撮る</strong> — 全状態をグリッドに敷き詰めた story（Button の AllVariants が実例）だけを撮影対象にし、個別 story は <code>chromatic: { disableSnapshot: true }</code> で撮影から外す</li>
+      <li><strong>fullscreen・レイアウト系は個別 story のまま撮る</strong> — BoardView のような画面全体のコンポーネントをグリッドのセルに縮めると、幅・折返し・スクロールの描画条件が本番と変わり「本番と違うもの」を守ることになる。ここは 1 状態 = 1 枚が正しい</li>
+    </ul>
+    <p><code>disableSnapshot</code> を付けた story も<strong>公開 Storybook には残ります</strong>（Chromatic の Library に表示され、Snapshot タブが消えるだけ）。失うのは「その story 単体のピクセル比較」だけで、開発・レビューの導線は無傷。カタログが同じ状態を敷き詰めていれば検出力も落ちません。書き方は「meta で一括 disable + カタログだけ有効に戻す」が推奨——個別 story を後から足しても撮影対象が勝手に増えないためです。</p>
+    <pre class="codeblock"><span class="gm">// note-card.stories.tsx — 個別 story は開発用、撮影はカタログ 1 枚だけ</span>
+const meta = {
+  component: NoteCard,
+  <span class="ga">parameters: { chromatic: { disableSnapshot: true } },</span> <span class="gm">// 一括で撮影対象外に</span>
+} satisfies Meta&lt;typeof NoteCard&gt;;
+
+<span class="gm">// 開発用: Storybook には残る。撮影だけスキップされる</span>
+export const Default: Story = {};
+export const Selected: Story = { args: { selected: true } };
+
+<span class="gm">// VRT 用: 全状態を 1 グリッドに敷き詰め、ここだけ撮影を有効に戻す</span>
+export const Catalog: Story = {
+  <span class="ga">parameters: { chromatic: { disableSnapshot: false } },</span>
+  render: () =&gt; (
+    <span class="gm">/* Default / Empty / LongContent / Selected / Dragging を並べる */</span>
+  ),
+};</pre>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th style="width: 300px;">コンポーネントの性質</th><th>撮り方</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>幅が固有で、状態が props だけで決まる表示系<br><span class="note">Button・NoteCard・LoginCard など</span></td>
+            <td>カタログ 1 枚に集約 + 個別 story は <code>disableSnapshot</code>。グリッドでも描画条件が変わらないので、1 枚で全状態を検出できる。</td>
+          </tr>
+          <tr>
+            <td>fullscreen・ビューポート幅に応答するレイアウト系<br><span class="note">BoardView など</span></td>
+            <td>個別 story をそのまま撮影。縮めると描画条件が本番と乖離するため集約しない。</td>
+          </tr>
+          <tr>
+            <td>play function やインタラクション後の見た目を持つ story</td>
+            <td>個別撮影のまま。操作後の状態はグリッドに敷き詰められない（静的に再現できる場合はカタログへ寄せてよい）。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top: 16px;">通信状態も props に落とせば観測点にできます。board-view は WebSocket を持つフック層と表示層が分離され、<code>connectionStatus</code> を props で受けるため、「接続中」「再接続待ち」という一見動的な状態も固定画像として監視できています（Connecting / Reconnecting story）。Cloudflare（Durable Objects）移行後に通信がらみの story を書くときは、このパターン——<em>WebSocket は story に持ち込まず、接続状態を props に落としてから撮る</em>——に従ってください。</p>
+    <p><strong>適用タイミング</strong>：新しいコンポーネントは最初からこの形で書く。既存 story（note-card・login-card）の改修は急がなくてよい——集約するとベースラインの張り替えが発生するので、月間消費が無料枠の半分（2,500）に近づいたタイミングでまとめて移行する。全適用すると現在の 16 枚/push は約 10 枚/push になり、以降はコンポーネントが増えても消費は「1 コンポーネント ≒ +1 枚」に漸近します。</p>
 
     <h3 style="margin-top: 32px;">意識すること（作業ではなく心構え）</h3>
     <div class="rules">
@@ -618,15 +675,14 @@ feature/89        <span class="ga">C───D</span>               <span class=
       </div>
       <div class="rule">
         <span class="w">コスト</span>
-        <p>push のたびにスナップショットを消費する（現在 2 枚/push）。story が増えたら Chromatic のダッシュボードで月間消費を時々確認する。
-          <span class="fix">目安式: story 数 × 月の push 回数。無料枠 5,000 の半分を超えたら workflow コメントの TurboSnap を有効化。</span>
+        <p>push のたびにスナップショットを消費する（現在 16 枚/push）。story が増えたら Chromatic のダッシュボードで月間消費を時々確認する。
+          <span class="fix">目安式: story 数 × 月の push 回数。無料枠 5,000 の半分を超えたら、まず上記の方針で表示系 story をカタログに集約し、それでも超えるなら workflow コメントの TurboSnap を有効化。</span>
         </p>
       </div>
     </div>
 
     <h3 style="margin-top: 32px;">任意で決めておく選択肢</h3>
     <p><strong>UI Tests の required check 化</strong> — 現状は pending でもマージ自体は可能。承認漏れマージを機械的に防ぎたくなったら、ブランチ保護ルールの required status checks に <code>UI Tests</code> を追加する。チームが小さいうちは任意運用で十分。</p>
-    <p><strong>未マージブランチの story</strong> — feature/44 の story 2 件はマージされると自動で VRT 対象に加わる。特別な操作は不要（develop 上での初回撮影がそのままベースラインになる）。</p>
   </section>
 
   <!-- ============ quick reference ============ -->
