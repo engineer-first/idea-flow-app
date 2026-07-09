@@ -17,6 +17,7 @@ import {
   isValidInviteCode,
   normalizeInviteCode,
 } from "@/contracts/invite-code";
+import { setRoomFlash } from "@/app/rooms/flash";
 import { apiFetch } from "@/lib/api-client";
 import { getCurrentUser } from "@/lib/session/current-user";
 
@@ -29,7 +30,13 @@ const JoinRoomInputSchema = z.object({
     }),
 });
 
-export async function createRoom(): Promise<void> {
+// 作成成功時はクライアントで toast → start へ遷移する。
+// （Server Action の redirect 後に flash を読む方式は Cookie 制約で不安定なため）
+export type CreateRoomResult =
+  | { ok: true; roomId: string }
+  | { ok: false; error: string };
+
+export async function createRoom(): Promise<CreateRoomResult> {
   const user = await getCurrentUser();
 
   if (!user) {
@@ -38,20 +45,17 @@ export async function createRoom(): Promise<void> {
 
   const res = await apiFetch("/api/rooms", { method: "POST" });
   // 2xx でもボディが不正 JSON（プロキシの HTML エラーページ等）のことがある。
-  // 例外で落とさず、非 2xx と同じエラーリダイレクトへ倒す。
   const parsed = res.ok
     ? CreateRoomResponseSchema.safeParse(await res.json().catch(() => null))
     : null;
 
   if (!parsed?.success) {
-    redirect(
-      `/home?error=${encodeURIComponent("ルームを作成できませんでした。")}`,
-    );
+    return { ok: false, error: "ルームを作成できませんでした。" };
   }
 
   // #70: 作成直後は lobby 状態なので、ボードではなくスタート画面へ遷移する。
-  // ?created=1 クエリで「ルームを作成しました」通知を start ページで出す。
-  redirect(`/rooms/${parsed.data.roomId}/start?created=1`);
+  // 遷移と「ルームを作成しました」toast は呼び出し側クライアントが行う。
+  return { ok: true, roomId: parsed.data.roomId };
 }
 
 export async function joinRoom(formData: FormData): Promise<void> {
@@ -87,8 +91,9 @@ export async function joinRoom(formData: FormData): Promise<void> {
   }
 
   // #70: 参加したらボードではなくスタート画面へ遷移する。
-  // ?joined=1 クエリで「ルームに参加しました」通知を出す。
-  redirect(`/rooms/${parsed.data.roomId}/start?joined=1`);
+  // フラッシュ Cookie で「参加直後」だけ toast を出す。
+  await setRoomFlash("room-joined");
+  redirect(`/rooms/${parsed.data.roomId}/start`);
 }
 
 // #70 退室機能。

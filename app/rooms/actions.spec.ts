@@ -4,18 +4,21 @@
 // せずエラーリダイレクトへ倒れること（利用者に汎用 500 を見せない）を検証する。
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { apiFetchMock, getCurrentUserMock, redirectMock } = vi.hoisted(() => ({
-  apiFetchMock:
-    vi.fn<(path: string, init?: RequestInit) => Promise<Response>>(),
-  getCurrentUserMock: vi.fn(),
-  redirectMock: vi.fn<(url: string) => never>(),
-}));
+const { apiFetchMock, getCurrentUserMock, redirectMock, setRoomFlashMock } =
+  vi.hoisted(() => ({
+    apiFetchMock:
+      vi.fn<(path: string, init?: RequestInit) => Promise<Response>>(),
+    getCurrentUserMock: vi.fn(),
+    redirectMock: vi.fn<(url: string) => never>(),
+    setRoomFlashMock: vi.fn(),
+  }));
 
 vi.mock("@/lib/api-client", () => ({ apiFetch: apiFetchMock }));
 vi.mock("@/lib/session/current-user", () => ({
   getCurrentUser: getCurrentUserMock,
 }));
 vi.mock("next/navigation", () => ({ redirect: redirectMock }));
+vi.mock("@/app/rooms/flash", () => ({ setRoomFlash: setRoomFlashMock }));
 
 import { createRoom, joinRoom, leaveRoom } from "@/app/rooms/actions";
 
@@ -68,7 +71,7 @@ describe("createRoom", () => {
     expect(apiFetchMock).not.toHaveBeenCalled();
   });
 
-  it("作成に成功したらスタート画面へリダイレクトする", async () => {
+  it("作成に成功したら roomId を返す（遷移と toast はクライアント側）", async () => {
     apiFetchMock.mockResolvedValue(
       Response.json({
         roomId: "123e4567-e89b-42d3-a456-426614174000",
@@ -76,26 +79,32 @@ describe("createRoom", () => {
       }),
     );
 
-    // ?created=1 クエリで start ページ側に「ルームを作成しました」通知を出す
-    expect(await callAndGetRedirect(() => createRoom())).toBe(
-      "/rooms/123e4567-e89b-42d3-a456-426614174000/start?created=1",
-    );
+    await expect(createRoom()).resolves.toEqual({
+      ok: true,
+      roomId: "123e4567-e89b-42d3-a456-426614174000",
+    });
+    expect(setRoomFlashMock).not.toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
   });
 
-  it("API が非 2xx ならエラー付きでホームへ戻す", async () => {
+  it("API が非 2xx なら ok: false を返す", async () => {
     apiFetchMock.mockResolvedValue(new Response("error", { status: 500 }));
 
-    expect(await callAndGetRedirect(() => createRoom())).toContain(
-      "/home?error=",
-    );
+    await expect(createRoom()).resolves.toEqual({
+      ok: false,
+      error: "ルームを作成できませんでした。",
+    });
+    expect(redirectMock).not.toHaveBeenCalled();
   });
 
-  it("API が 2xx でも不正 JSON ならエラー付きでホームへ戻す", async () => {
+  it("API が 2xx でも不正 JSON なら ok: false を返す", async () => {
     apiFetchMock.mockResolvedValue(new Response("<html>gateway error</html>"));
 
-    expect(await callAndGetRedirect(() => createRoom())).toContain(
-      "/home?error=",
-    );
+    await expect(createRoom()).resolves.toEqual({
+      ok: false,
+      error: "ルームを作成できませんでした。",
+    });
+    expect(redirectMock).not.toHaveBeenCalled();
   });
 });
 
@@ -112,10 +121,11 @@ describe("joinRoom", () => {
       Response.json({ roomId: "123e4567-e89b-42d3-a456-426614174000" }),
     );
 
-    // ?joined=1 クエリで start ページ側に「ルームに参加しました」通知を出す
+    // フラッシュ Cookie で start 側が「ルームに参加しました」を出す
     expect(
       await callAndGetRedirect(() => joinRoom(joinFormData("ABC123"))),
-    ).toBe("/rooms/123e4567-e89b-42d3-a456-426614174000/start?joined=1");
+    ).toBe("/rooms/123e4567-e89b-42d3-a456-426614174000/start");
+    expect(setRoomFlashMock).toHaveBeenCalledWith("room-joined");
   });
 
   it("API が 2xx でも不正 JSON ならエラー付きでホームへ戻す", async () => {

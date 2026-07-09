@@ -8,10 +8,9 @@ import { Card, CardContent } from "@/components/ui/card";
 
 export type HomeViewProps = {
   error?: string;
-  createRoomAction: (formData: FormData) => void | Promise<void>;
 };
 
-export function HomeView({ error, createRoomAction }: HomeViewProps) {
+export function HomeView({ error }: HomeViewProps) {
   return (
     <div
       className="flex h-full flex-1 items-center justify-center p-4"
@@ -20,7 +19,7 @@ export function HomeView({ error, createRoomAction }: HomeViewProps) {
       <Card className="w-full max-w-md">
         <CardContent className="flex flex-col gap-6 p-6">
           {error ? <HomeErrorAlert message={error} /> : null}
-          <CreateRoomSection createRoomAction={createRoomAction} />
+          <CreateRoomSection />
           <div className="border-t border-border" />
           <JoinRoomSection />
         </CardContent>

@@ -35,6 +35,11 @@ vi.mock("@/app/_lib/notify", () => ({
   },
 }));
 
+vi.mock("@/app/rooms/flash", () => ({
+  consumeRoomFlash: vi.fn(async () => null),
+  setRoomFlash: vi.fn(async () => {}),
+}));
+
 import { RoomStartBoard } from "@/app/rooms/[id]/start/room-start-board";
 import type { ProtocolMember, ServerMessage } from "@/contracts/room-protocol";
 

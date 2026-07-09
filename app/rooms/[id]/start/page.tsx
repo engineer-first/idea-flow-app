@@ -14,19 +14,10 @@ export const dynamic = "force-dynamic";
 
 type StartPageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ created?: string; joined?: string }>;
 };
 
-export default async function StartPage({
-  params,
-  searchParams,
-}: StartPageProps) {
+export default async function StartPage({ params }: StartPageProps) {
   const { id } = await params;
-  const sp = await searchParams;
-  // 直前の遷移が「ルーム作成」か「招待URL から参加」かを URL クエリで伝える。
-  // RoomStartBoard がクライアント側で通知（toast）を発火する。
-  const justCreated = sp.created === "1";
-  const justJoined = sp.joined === "1";
 
   if (!isUuid(id)) {
     notFound();
@@ -60,6 +51,8 @@ export default async function StartPage({
 
   const inviteUrl = buildInviteUrl(getBaseUrl(), parsed.data.inviteCode);
 
+  // 作成/参加直後の toast は RoomStartBoard が Server Action でフラッシュを
+  // consume して出す（Cookie 削除は Server Component ではできない）。
   return (
     <main className="flex h-screen flex-col gap-6 p-4">
       <div className="min-h-0 flex-1">
@@ -73,8 +66,6 @@ export default async function StartPage({
           hostUserId={parsed.data.hostUserId}
           initialPhase={parsed.data.phase}
           initialMembers={initialMembers}
-          justCreated={justCreated}
-          justJoined={justJoined}
         />
       </div>
     </main>

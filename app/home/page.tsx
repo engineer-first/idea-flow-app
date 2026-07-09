@@ -1,7 +1,6 @@
 // ホーム（/home）の Server Component。
 // 認証・searchParams・Server Action 配線のみ。UI は components/home/templates。
 import { redirect } from "next/navigation";
-import { createRoom } from "@/app/rooms/actions";
 import { HomeView } from "@/components/home/templates/home-view";
 import {
   Card,
@@ -54,7 +53,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
   return (
     <main className="flex flex-1 flex-col">
-      <HomeView error={params.error} createRoomAction={createRoom} />
+      <HomeView error={params.error} />
     </main>
   );
 }

@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { notify } from "@/app/_lib/notify";
 import { StartRoomView } from "@/app/rooms/[id]/start/start-room-view";
 import { leaveRoom } from "@/app/rooms/actions";
+import { consumeRoomFlash } from "@/app/rooms/flash";
 import {
   applyMemberServerMessage,
   applyPhaseServerMessage,
@@ -43,10 +44,6 @@ export type RoomStartBoardProps = {
   hostUserId: string;
   initialPhase: Phase;
   initialMembers: Member[];
-  // 直前遷移の種別（page.tsx から渡される）。
-  // それぞれ「ルームを作成しました」「ルームに参加しました」の通知を出す。
-  justCreated?: boolean;
-  justJoined?: boolean;
   // テストからフェイク WebSocket を注入するための口。本番では未指定。
   webSocketFactory?: RoomSocketFactory;
 };
@@ -60,8 +57,6 @@ export function RoomStartBoard({
   hostUserId,
   initialPhase,
   initialMembers,
-  justCreated,
-  justJoined,
   webSocketFactory,
 }: RoomStartBoardProps) {
   const router = useRouter();
@@ -158,22 +153,24 @@ export function RoomStartBoard({
     clientRef.current?.send(message);
   }, []);
 
-  // 自分自身の遷移種別に応じた通知を一度だけ発火する。
-  // - justCreated: ルーム作成直後
-  // - justJoined: 招待URL またはホーム画面からの参加直後
-  // 連続遷移（remount 等）で重複しないよう useRef で発火済みフラグを管理。
-  const notifiedRef = useRef<string | null>(null);
+  // 作成/参加直後のフラッシュ Cookie を Server Action で消費し、一度だけ toast。
+  // Cookie の delete は Server Component ではできないため、ここで行う。
   useEffect(() => {
-    if (justCreated && notifiedRef.current !== "created") {
-      notifiedRef.current = "created";
-      notify.roomCreated();
-      return;
-    }
-    if (justJoined && notifiedRef.current !== "joined") {
-      notifiedRef.current = "joined";
-      notify.joinedAsGuest();
-    }
-  }, [justCreated, justJoined]);
+    let cancelled = false;
+    void consumeRoomFlash().then((flash) => {
+      if (cancelled || !flash) return;
+      if (flash === "room-created") {
+        notify.roomCreated();
+        return;
+      }
+      if (flash === "room-joined") {
+        notify.joinedAsGuest();
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleStart = useCallback(() => {
     if (!isHost) return;

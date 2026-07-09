@@ -1,12 +1,22 @@
 // ホーム template の単体テスト。
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
+vi.mock("@/app/rooms/actions", () => ({
+  createRoom: vi.fn(),
+  joinRoom: vi.fn(),
+}));
+
 import { HomeView } from "@/components/home/templates/home-view";
 
 function renderView(
   overrides: Partial<React.ComponentProps<typeof HomeView>> = {},
 ) {
-  return render(<HomeView createRoomAction={vi.fn()} {...overrides} />);
+  return render(<HomeView {...overrides} />);
 }
 
 describe("HomeView", () => {
