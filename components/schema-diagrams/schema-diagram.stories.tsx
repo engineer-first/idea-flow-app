@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { SchemaDiagram } from "./schema-diagram";
 
 // D1 / RoomDO のER図。npm run db:schema:diagrams（storybook 起動時に自動実行）
