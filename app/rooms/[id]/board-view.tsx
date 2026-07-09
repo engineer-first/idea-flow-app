@@ -146,10 +146,6 @@ export function BoardView({
             members={members}
             currentUserId={currentUserId}
             hostUserId={hostUserId}
-            // ボード画面の上部バーは招待URL/状態/ボタン群で幅を取られるため、
-            // 名前は Avatar の隣に常時表示しつつ、maxVisible=3 で 4 人目以降は
-            // +N バッジに置き換える（start 画面は既定 5）。
-            maxVisible={3}
           />
           <DotVoteSummary voteRemaining={voteRemaining} />
           {phase === "writing" ? null : (

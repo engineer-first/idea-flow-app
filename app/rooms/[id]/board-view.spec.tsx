@@ -304,9 +304,15 @@ describe("メンバー一覧（名前常時表示）", () => {
     );
   });
 
-  it("ボード画面は maxVisible=3（5 人いても 3 個表示 + +2 バッジ）", () => {
-    setup({ members: buildMembers(5) });
-    expect(screen.getAllByTestId("avatar")).toHaveLength(3);
+  it("ボード画面は最大 8 人まで表示し、9 人目以降は +N になる", () => {
+    setup({ members: buildMembers(10) });
+    expect(screen.getAllByTestId("avatar")).toHaveLength(8);
     expect(screen.getByLabelText("他 2 名")).toBeInTheDocument();
+  });
+
+  it("8 人以下なら全員表示され +N は出ない", () => {
+    setup({ members: buildMembers(5) });
+    expect(screen.getAllByTestId("avatar")).toHaveLength(5);
+    expect(screen.queryByLabelText(/他 \d+ 名/)).not.toBeInTheDocument();
   });
 });

@@ -1,11 +1,25 @@
+"use client";
+
 // ルーム内メンバー一覧の表示用コンポーネント。
-// Avatar + 名前を横並びで表示し、自分は ring で識別（「（あなた）」文言は付けない）。
-// ホストは名前の下に「ホスト」ラベルを出す。多人数なら +N バッジで省略する。
+// Avatar + 名前を 2 列グリッドで表示し、自分は ring で識別（「（あなた）」文言は付けない）。
+// ホストは名前の下に「ホスト」ラベルを出す。
+// 最大 8 人まで表示し、超過分は +N バッジ。クリックで隠れメンバーの Dialog を開く
+// （アイコン + 名前のみ）。
 // データ層に一切依存せず、members / currentUserId / hostUserId を props で受け取るだけ。
+import { useState } from "react";
 import { Avatar } from "@/app/rooms/[id]/avatar";
 import type { Member } from "@/app/rooms/room-reducer";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+
+// 一覧に同時表示するメンバー数の上限。これを超えると +N になる。
+export const ROOM_MEMBERS_MAX_VISIBLE = 8;
 
 export type RoomMembersProps = {
   members: Member[];
@@ -13,8 +27,7 @@ export type RoomMembersProps = {
   // ホストの userId。該当メンバーの名前下に「ホスト」を表示する。
   hostUserId?: string;
   // 先頭から何個まで Avatar + 名前で描画するか。超過分は +N バッジ。
-  // 既定は 5。ボード画面の上部バーなどスペースが限られる場面では 3 程度を
-  // 利用側に指定することを想定。
+  // 既定は ROOM_MEMBERS_MAX_VISIBLE（8）。
   maxVisible?: number;
 };
 
@@ -22,17 +35,19 @@ export function RoomMembers({
   members,
   currentUserId,
   hostUserId,
-  maxVisible = 5,
+  maxVisible = ROOM_MEMBERS_MAX_VISIBLE,
 }: RoomMembersProps) {
+  const [overflowOpen, setOverflowOpen] = useState(false);
   const visible = members.slice(0, maxVisible);
-  const hidden = members.length - visible.length;
+  const overflow = members.slice(maxVisible);
+  const hidden = overflow.length;
 
   return (
     <TooltipProvider delayDuration={300}>
       <fieldset
         aria-label="参加者"
         data-testid="room-members"
-        className="m-0 flex flex-wrap items-center gap-3 border-0 p-0"
+        className="m-0 grid max-w-md grid-cols-2 gap-x-4 gap-y-2 border-0 p-0"
       >
         {visible.map((member) => {
           const isMe = member.userId === currentUserId;
@@ -44,7 +59,7 @@ export function RoomMembers({
               data-testid={`member-row-${member.userId}`}
               data-self={isMe ? "true" : undefined}
               data-host={isHostMember ? "true" : undefined}
-              className="flex items-center gap-1.5"
+              className="flex min-w-0 items-center gap-1.5"
             >
               <Avatar name={member.name} isMe={isMe} />
               <span className="flex min-w-0 flex-col">
@@ -71,16 +86,48 @@ export function RoomMembers({
           );
         })}
         {hidden > 0 ? (
-          <div
-            role="img"
+          <button
+            type="button"
             aria-label={`他 ${hidden} 名`}
             data-testid="room-members-overflow"
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-background bg-muted text-xs font-semibold text-muted-foreground"
+            onClick={() => setOverflowOpen(true)}
+            className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center self-center rounded-full border-2 border-background bg-muted text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             +{hidden}
-          </div>
+          </button>
         ) : null}
       </fieldset>
+
+      <Dialog open={overflowOpen} onOpenChange={setOverflowOpen}>
+        <DialogContent
+          className="max-w-sm"
+          data-testid="room-members-overflow-dialog"
+        >
+          <DialogHeader>
+            <DialogTitle>他のメンバー</DialogTitle>
+          </DialogHeader>
+          <ul
+            className="flex max-h-72 flex-col gap-3 overflow-y-auto"
+            data-testid="room-members-overflow-list"
+          >
+            {overflow.map((member) => (
+              <li
+                key={member.userId}
+                data-testid={`overflow-member-${member.userId}`}
+                className="flex min-w-0 items-center gap-2"
+              >
+                <Avatar
+                  name={member.name}
+                  isMe={member.userId === currentUserId}
+                />
+                <span className="truncate text-sm text-foreground">
+                  {member.name}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   );
 }

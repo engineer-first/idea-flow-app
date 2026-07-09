@@ -12,7 +12,6 @@ const meta = {
     members: buildMembers(3, ME),
     currentUserId: ME,
     hostUserId: ME,
-    maxVisible: 5,
   },
   decorators: [
     (Story) => (
@@ -32,6 +31,11 @@ export const OnlyMe: Story = {
   args: { members: buildMembers(1, ME) },
 };
 
+export const TwoColumns: Story = {
+  args: { members: buildMembers(6, ME) },
+};
+
 export const ManyWithHidden: Story = {
-  args: { members: buildMembers(10, ME), maxVisible: 4 },
+  // 既定 maxVisible=8 を超えると +N
+  args: { members: buildMembers(11, ME) },
 };
