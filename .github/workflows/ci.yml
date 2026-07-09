@@ -24,6 +24,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Create .dev.vars for type generation
+        run: cp workers/.dev.vars.example workers/.dev.vars
+
       - name: Lint & format check
         run: npm run lint -- --reporter=github
 
