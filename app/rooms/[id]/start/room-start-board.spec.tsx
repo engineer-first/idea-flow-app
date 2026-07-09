@@ -30,7 +30,7 @@ vi.mock("@/app/_lib/notify", () => ({
 }));
 
 import { RoomStartBoard } from "@/app/rooms/[id]/start/room-start-board";
-import type { ProtocolMember, ServerMessage } from "@/contracts/room-protocol";
+import type { ProtocolMember } from "@/contracts/room-protocol";
 
 const ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const HOST_ID = "11111111-1111-4111-8111-111111111111";
@@ -287,9 +287,3 @@ describe("ユーザー操作 → プロトコルメッセージ送信", () => {
     expect(socket.sent).toHaveLength(0);
   });
 });
-
-// サーバーメッセージヘルパ（将来 serverMessage の送信テストで再利用する想定で
-// 置いておく）。型ガードの役割。
-function isServerMessage(value: unknown): value is ServerMessage {
-  return typeof value === "object" && value !== null && "type" in value;
-}

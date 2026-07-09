@@ -63,7 +63,7 @@ describe("RoomMembers", () => {
 
   it("hostUserId に一致するメンバーの名前下に「ホスト」が出る", () => {
     const members = buildMembers(2, ME);
-    const hostId = members[1]!.userId;
+    const hostId = members.find((m) => m.userId !== ME)?.userId ?? ME;
     render(
       <RoomMembers members={members} currentUserId={ME} hostUserId={hostId} />,
     );

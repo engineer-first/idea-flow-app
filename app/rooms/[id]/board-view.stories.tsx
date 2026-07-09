@@ -82,7 +82,7 @@ export const NonHost: Story = {
   args: {
     isHost: false,
     // 自分以外をホストにする（fixture の 2 人目）。
-    hostUserId: buildMembers(3, ME)[1]!.userId,
+    hostUserId: buildMembers(3, ME).find((m) => m.userId !== ME)?.userId ?? ME,
   },
 };
 
