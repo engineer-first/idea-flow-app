@@ -30,6 +30,7 @@ export type BoardViewProps = {
   isHost: boolean;
   connectionStatus: BoardConnectionStatus;
   draggingNoteId: string | null;
+  isNextPhasePending: boolean;
   onAddNote: () => void;
   onNoteDragStart: (noteId: string) => void;
   onNoteDragMove: (noteId: string, x: number, y: number) => void;
@@ -47,6 +48,7 @@ export function BoardView({
   isHost,
   connectionStatus,
   draggingNoteId,
+  isNextPhasePending,
   onAddNote,
   onNoteDragStart,
   onNoteDragMove,
@@ -107,7 +109,7 @@ export function BoardView({
             <Button
               type="button"
               onClick={onNextPhase}
-              disabled={isDisconnected}
+              disabled={isDisconnected || isNextPhasePending}
             >
               次のフェーズへ
             </Button>

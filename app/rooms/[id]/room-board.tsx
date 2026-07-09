@@ -58,6 +58,7 @@ export function RoomBoard({
   const sendDragRef = useRef<ReturnType<
     typeof createThrottled<[NoteDragPayload]>
   > | null>(null);
+  const [isNextPhasePending, setIsNextPhasePending] = useState(false);
 
   useEffect(() => {
     draggingNoteIdRef.current = draggingNoteId;
@@ -76,6 +77,7 @@ export function RoomBoard({
 
     if (message.type === "phase:updated") {
       setPhase(message.phase);
+      setIsNextPhasePending(false);
       return;
     }
 
@@ -119,10 +121,14 @@ export function RoomBoard({
   }, []);
 
   const handleNextPhase = useCallback(() => {
+    if (isNextPhasePending) return;
+
+    setIsNextPhasePending(true);
+
     clientRef.current?.send({
       type: "phase:next",
     });
-  }, []);
+  }, [isNextPhasePending]);
 
   const handleNoteDragStart = useCallback((noteId: string) => {
     setDraggingNoteId(noteId);
@@ -174,6 +180,7 @@ export function RoomBoard({
       isHost={isHost}
       connectionStatus={connectionStatus}
       draggingNoteId={draggingNoteId}
+      isNextPhasePending={isNextPhasePending}
       onAddNote={handleAddNote}
       onNextPhase={handleNextPhase}
       onNoteDragStart={handleNoteDragStart}
