@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { fn } from "storybook/test";
 import { BoardView } from "@/app/rooms/[id]/board-view";
 import { buildNotes } from "@/app/rooms/[id]/board-view.fixture";
+import { userEvent, within } from "storybook/test";
 
 const meta = {
   title: "Rooms/BoardView",
@@ -104,5 +105,22 @@ export const HostCanMovePhase: Story = {
   args: {
     isHost: true,
     phase: "phase1",
+  },
+};
+
+// 「次のフェーズへ」押下後、確認ダイアログが表示されている状態。
+export const NextPhaseConfirmDialog: Story = {
+  args: {
+    isHost: true,
+    phase: "phase1",
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(
+      await canvas.findByRole("button", {
+        name: "次のフェーズへ",
+      }),
+    );
   },
 };
