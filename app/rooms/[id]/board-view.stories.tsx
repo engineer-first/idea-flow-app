@@ -1,8 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { fn } from "storybook/test";
+import { fn, userEvent, within } from "storybook/test";
 import { BoardView } from "@/app/rooms/[id]/board-view";
 import { buildNotes } from "@/app/rooms/[id]/board-view.fixture";
-import { userEvent, within } from "storybook/test";
 
 const meta = {
   title: "Rooms/BoardView",
