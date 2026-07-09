@@ -49,6 +49,24 @@ describe("notify", () => {
     expect(mocks.success).toHaveBeenCalledTimes(2);
   });
 
+  it("roomLeft は toast を「ルームから退出しました」で呼ぶ", () => {
+    notify.roomLeft();
+    expect(mocks.toast).toHaveBeenCalledTimes(1);
+    expect(mocks.toast).toHaveBeenCalledWith("ルームから退出しました");
+  });
+
+  it("roomDisbanded は toast を「ルームが解散されました」で呼ぶ", () => {
+    notify.roomDisbanded();
+    expect(mocks.toast).toHaveBeenCalledTimes(1);
+    expect(mocks.toast).toHaveBeenCalledWith("ルームが解散されました");
+  });
+
+  it("roomDisbandedBySelf は toast を「ルームを解散しました」で呼ぶ", () => {
+    notify.roomDisbandedBySelf();
+    expect(mocks.toast).toHaveBeenCalledTimes(1);
+    expect(mocks.toast).toHaveBeenCalledWith("ルームを解散しました");
+  });
+
   it("error は toast.error でメッセージを表示する", () => {
     notify.error("失敗しました");
     expect(mocks.error).toHaveBeenCalledTimes(1);

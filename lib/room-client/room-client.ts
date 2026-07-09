@@ -4,13 +4,15 @@
 // 再接続の考え方: 予期しない切断では指数バックオフで再接続する。
 // 再接続後はサーバー（RoomDO）が snapshot を送ってくるため、クライアント側で
 // 差分の取りこぼしを追跡する必要がない（復帰パスをサーバーの契約にしている）。
-// 退出（RoomDO.leave）による close は再接続しない。
+// 退出・解散による close は再接続せず ended / disbanded を通知する。
 import {
   type ClientMessage,
   parseServerMessage,
   type ServerMessage,
   WS_CLOSE_LEFT_ROOM,
   WS_CLOSE_LEFT_ROOM_REASON,
+  WS_CLOSE_ROOM_DISBANDED,
+  WS_CLOSE_ROOM_DISBANDED_REASON,
 } from "@/contracts/room-protocol";
 
 const WEBSOCKET_OPEN = 1;
@@ -20,17 +22,23 @@ const DEFAULT_RECONNECT_DELAYS_MS = [1000, 2000, 4000, 8000];
 
 export type RoomSocketFactory = (url: string) => WebSocket;
 
-// UI が「接続中 / 接続済み / 切断（再接続待ち）」を表示するための状態。
-// closed は「予期しない切断」のみで、close() による意図的な終了では通知しない
-// （終了時は呼び出し側がアンマウント中で、表示する画面がもう無いため）。
-// 退出によるサーバ close（WS_CLOSE_LEFT_ROOM）でも closed を通知し、再接続はしない。
-export type RoomConnectionStatus = "connecting" | "open" | "closed";
+// UI が接続状態を表示するための状態。
+// - connecting / open: 通常
+// - closed: 予期しない切断（再接続待ち）
+// - ended: 個人の退出など（再接続しない・ホームへ）
+// - disbanded: ホストがルームを解散（再接続しない・理由通知してホームへ）
+// close() によるクライアント主導の終了では通知しない。
+export type RoomConnectionStatus =
+  | "connecting"
+  | "open"
+  | "closed"
+  | "ended"
+  | "disbanded";
 
 export type RoomClientOptions = {
   url: string;
   onMessage: (message: ServerMessage) => void;
   onStatusChange?: (status: RoomConnectionStatus) => void;
-  // テストや Storybook からフェイクを注入するための口。
   webSocketFactory?: RoomSocketFactory;
   reconnectDelaysMs?: number[];
 };
@@ -44,6 +52,13 @@ function isLeftRoomClose(event: { code?: number; reason?: string }): boolean {
   return (
     event.code === WS_CLOSE_LEFT_ROOM ||
     event.reason === WS_CLOSE_LEFT_ROOM_REASON
+  );
+}
+
+function isDisbandedClose(event: { code?: number; reason?: string }): boolean {
+  return (
+    event.code === WS_CLOSE_ROOM_DISBANDED ||
+    event.reason === WS_CLOSE_ROOM_DISBANDED_REASON
   );
 }
 
@@ -83,10 +98,16 @@ export function createRoomClient(options: RoomClientOptions): RoomClient {
       if (closedByUser || socket !== ws) {
         return;
       }
-      // 退出によるサーバ close: 再接続しない（マルチタブでの無限再接続を防ぐ）。
+      // 解散: 再接続せず disbanded（UI が理由を出してホームへ）
+      if (isDisbandedClose(event)) {
+        closedByUser = true;
+        options.onStatusChange?.("disbanded");
+        return;
+      }
+      // 個人退出: 再接続せず ended
       if (isLeftRoomClose(event)) {
         closedByUser = true;
-        options.onStatusChange?.("closed");
+        options.onStatusChange?.("ended");
         return;
       }
       options.onStatusChange?.("closed");

@@ -67,8 +67,10 @@ export function RoomStartBoard({
   const router = useRouter();
   const [members, setMembers] = useState<Member[]>(initialMembers);
   const [phase, setPhase] = useState<Phase>(initialPhase);
-  const [connectionStatus, setConnectionStatus] =
-    useState<RoomConnectionStatus>("connecting");
+  // ended / disbanded は set せずホームへ redirect する。
+  const [connectionStatus, setConnectionStatus] = useState<
+    Exclude<RoomConnectionStatus, "ended" | "disbanded">
+  >("connecting");
   const [isStarting, setIsStarting] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
   const [isLeavePending, startLeaveTransition] = useTransition();
@@ -116,11 +118,33 @@ export function RoomStartBoard({
     setPhase((current) => applyPhaseServerMessage(current, message));
   }, []);
 
+  const isLeavingRef = useRef(false);
+  useEffect(() => {
+    isLeavingRef.current = isLeaving;
+  }, [isLeaving]);
+
+  const handleStatusChange = useCallback(
+    (status: RoomConnectionStatus) => {
+      // 退出・解散による意図的切断: 再接続せずホームへ戻す。
+      if (status === "ended" || status === "disbanded") {
+        // 他メンバーが解散されたときだけここで理由を出す。
+        // 自分の操作による通知は handleLeave 成功時に出す（二重 toast 防止）。
+        if (status === "disbanded" && !isLeavingRef.current) {
+          notify.roomDisbanded();
+        }
+        router.replace("/home");
+        return;
+      }
+      setConnectionStatus(status);
+    },
+    [router],
+  );
+
   useEffect(() => {
     const client = createRoomClient({
       url: roomWebSocketUrl(roomId),
       onMessage: handleServerMessage,
-      onStatusChange: setConnectionStatus,
+      onStatusChange: handleStatusChange,
       webSocketFactory,
     });
     clientRef.current = client;
@@ -128,7 +152,7 @@ export function RoomStartBoard({
       clientRef.current = null;
       client.close();
     };
-  }, [roomId, handleServerMessage, webSocketFactory]);
+  }, [roomId, handleServerMessage, handleStatusChange, webSocketFactory]);
 
   const sendMessage = useCallback((message: ClientMessage) => {
     clientRef.current?.send(message);
@@ -161,7 +185,7 @@ export function RoomStartBoard({
     setTimeout(() => setIsStarting(false), 5000);
   }, [isHost, sendMessage]);
 
-  // 退出（#70 退室機能）。StartRoomView 内の LeaveConfirmDialog から呼ばれる。
+  // 退出 / 解散（#70）。StartRoomView 内の LeaveConfirmDialog から呼ばれる。
   // API 成功後に redirect。失敗時は WS を維持し isLeaving を戻す。
   const handleLeave = useCallback(() => {
     if (isLeaving || isLeavePending) return;
@@ -179,6 +203,12 @@ export function RoomStartBoard({
           typeof (error as { digest?: unknown }).digest === "string" &&
           (error as { digest: string }).digest.startsWith("NEXT_REDIRECT")
         ) {
+          // 自分の操作成功をトーストで伝える。
+          if (isHost) {
+            notify.roomDisbandedBySelf();
+          } else {
+            notify.roomLeft();
+          }
           return;
         }
         setIsLeaving(false);
@@ -189,7 +219,7 @@ export function RoomStartBoard({
         notify.error(message);
       }
     });
-  }, [isLeaving, isLeavePending, roomId]);
+  }, [isLeaving, isLeavePending, roomId, isHost]);
 
   return (
     <StartRoomView

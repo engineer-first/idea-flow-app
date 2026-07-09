@@ -23,6 +23,8 @@ import {
   type ServerMessage,
   WS_CLOSE_LEFT_ROOM,
   WS_CLOSE_LEFT_ROOM_REASON,
+  WS_CLOSE_ROOM_DISBANDED,
+  WS_CLOSE_ROOM_DISBANDED_REASON,
 } from "../contracts/room-protocol";
 import { migrateRoomStorage } from "./room-do-migrations";
 import { filterVisible, visibleTo } from "./visibility";
@@ -144,10 +146,11 @@ export class RoomDO extends DurableObject {
 
   // ルーム解散（ホスト操作）。全 WS を閉じ、members / notes を空にする。
   // D1 rooms 行の削除は api-worker 側の責務。
+  // close code 4001 で「解散」と個人退出 (4000) を区別し、クライアントが理由を表示する。
   async disband(): Promise<void> {
     for (const socket of this.ctx.getWebSockets()) {
       try {
-        socket.close(WS_CLOSE_LEFT_ROOM, WS_CLOSE_LEFT_ROOM_REASON);
+        socket.close(WS_CLOSE_ROOM_DISBANDED, WS_CLOSE_ROOM_DISBANDED_REASON);
       } catch {
         // 既に閉じている等のエラーは握りつぶす
       }

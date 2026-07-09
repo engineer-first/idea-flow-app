@@ -13,6 +13,7 @@
 // 確定状態の真実はサーバー（RoomDO）側にあり、再接続時は snapshot で復元される。
 // 削除は楽観更新しない: author 以外の削除はサーバーが forbidden で拒否するため、
 // 確定（note:deleted）を待ってから消すことで「消えたのに戻る」揺れを避ける。
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { notify } from "@/app/_lib/notify";
 import { BoardView } from "@/app/rooms/[id]/board-view";
@@ -67,6 +68,7 @@ export function RoomBoard({
   initialPhase,
   webSocketFactory,
 }: RoomBoardProps) {
+  const router = useRouter();
   // 付箋の初期状態は空。確定状態の真実はサーバー（RoomDO）側にあり、
   // 接続直後に送られてくる snapshot で復元される。
   const [notes, setNotes] = useState<Note[]>([]);
@@ -74,8 +76,10 @@ export function RoomBoard({
   const [members, setMembers] = useState<Member[]>(initialMembers);
   const [phase, setPhase] = useState<Phase>(initialPhase);
   // createRoomClient が生成直後に "connecting" を通知するので初期値と一致する。
-  const [connectionStatus, setConnectionStatus] =
-    useState<RoomConnectionStatus>("connecting");
+  // ended / disbanded は set せずホームへ redirect する。
+  const [connectionStatus, setConnectionStatus] = useState<
+    Exclude<RoomConnectionStatus, "ended" | "disbanded">
+  >("connecting");
   const [draggingNoteId, setDraggingNoteId] = useState<string | null>(null);
   const [isLeaving, setIsLeaving] = useState(false);
   const [isLeavePending, startLeaveTransition] = useTransition();
@@ -123,11 +127,33 @@ export function RoomBoard({
     setPhase((current) => applyPhaseServerMessage(current, message));
   }, []);
 
+  const isLeavingRef = useRef(false);
+  useEffect(() => {
+    isLeavingRef.current = isLeaving;
+  }, [isLeaving]);
+
+  const handleStatusChange = useCallback(
+    (status: RoomConnectionStatus) => {
+      // 退出・解散による意図的切断: 再接続せずホームへ戻す。
+      if (status === "ended" || status === "disbanded") {
+        // 他メンバーが解散されたときだけここで理由を出す。
+        // 自分の操作による通知は handleLeave 成功時に出す（二重 toast 防止）。
+        if (status === "disbanded" && !isLeavingRef.current) {
+          notify.roomDisbanded();
+        }
+        router.replace("/home");
+        return;
+      }
+      setConnectionStatus(status);
+    },
+    [router],
+  );
+
   useEffect(() => {
     const client = createRoomClient({
       url: roomWebSocketUrl(roomId),
       onMessage: handleServerMessage,
-      onStatusChange: setConnectionStatus,
+      onStatusChange: handleStatusChange,
       webSocketFactory,
     });
     clientRef.current = client;
@@ -147,7 +173,7 @@ export function RoomBoard({
       clientRef.current = null;
       client.close();
     };
-  }, [roomId, handleServerMessage, webSocketFactory]);
+  }, [roomId, handleServerMessage, handleStatusChange, webSocketFactory]);
 
   const handleAddNote = useCallback(() => {
     // 楽観挿入はしない: note:inserted の配信を待つ（RoomDO は同 colo の
@@ -196,9 +222,9 @@ export function RoomBoard({
     clientRef.current?.send({ type: "note:delete", noteId });
   }, []);
 
-  // 退出（#70 退室機能）。BoardView 内の LeaveConfirmDialog から呼ばれる。
+  // 退出 / 解散（#70）。BoardView 内の LeaveConfirmDialog から呼ばれる。
   // API 成功後に redirect でホームへ戻る。失敗時は WS を維持し isLeaving を戻す。
-  // （先に close すると失敗時に再接続不能になるため、close は RoomDO.leave に任せる）
+  // （先に close すると失敗時に再接続不能になるため、close は RoomDO に任せる）
   // redirect は NEXT_REDIRECT を throw するので useTransition 内で握りつぶす。
   const handleLeave = useCallback(() => {
     if (isLeaving || isLeavePending) return;
@@ -218,9 +244,15 @@ export function RoomBoard({
           typeof (error as { digest?: unknown }).digest === "string" &&
           (error as { digest: string }).digest.startsWith("NEXT_REDIRECT")
         ) {
+          // 自分の操作成功をトーストで伝える（ホーム遷移後も Toaster は root にある）。
+          if (isHost) {
+            notify.roomDisbandedBySelf();
+          } else {
+            notify.roomLeft();
+          }
           return;
         }
-        // 409（ホスト退出拒否）や 5xx: WS は開いたまま、操作可能に戻す。
+        // 5xx 等: WS は開いたまま、操作可能に戻す。
         setIsLeaving(false);
         const message =
           error instanceof Error
@@ -229,7 +261,7 @@ export function RoomBoard({
         notify.error(message);
       }
     });
-  }, [isLeaving, isLeavePending, roomId]);
+  }, [isLeaving, isLeavePending, roomId, isHost]);
 
   return (
     <BoardView

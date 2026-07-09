@@ -4,14 +4,19 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const REPLACE = vi.fn();
+// useRouter の戻り値は毎レンダー同じ参照にする（effect の再実行ループ防止）。
+const navigationMocks = vi.hoisted(() => {
+  const replace = vi.fn();
+  return { replace, router: { replace } };
+});
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace: REPLACE }),
+  useRouter: () => navigationMocks.router,
 }));
 
 const notifyMocks = vi.hoisted(() => ({
   memberJoined: vi.fn(),
   memberLeft: vi.fn(),
+  roomDisbanded: vi.fn(),
   roomCreated: vi.fn(),
   joinedAsGuest: vi.fn(),
   joinedAsHost: vi.fn(),
@@ -22,6 +27,7 @@ vi.mock("@/app/_lib/notify", () => ({
   notify: {
     memberJoined: notifyMocks.memberJoined,
     memberLeft: notifyMocks.memberLeft,
+    roomDisbanded: notifyMocks.roomDisbanded,
     roomCreated: notifyMocks.roomCreated,
     joinedAsGuest: notifyMocks.joinedAsGuest,
     joinedAsHost: notifyMocks.joinedAsHost,
@@ -36,7 +42,11 @@ const ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const HOST_ID = "11111111-1111-4111-8111-111111111111";
 const MEMBER_ID = "22222222-2222-4222-8222-222222222222";
 
-type Listener = (event: { data?: unknown }) => void;
+type Listener = (event: {
+  data?: unknown;
+  code?: number;
+  reason?: string;
+}) => void;
 
 class FakeWebSocket {
   static instances: FakeWebSocket[] = [];
@@ -72,7 +82,16 @@ class FakeWebSocket {
     this.emit("message", { data: JSON.stringify(message) });
   }
 
-  private emit(type: string, event: { data?: unknown }): void {
+  // ホスト解散など RoomDO が WS_CLOSE_ROOM_DISBANDED で閉じたとき。
+  simulateDisbandedClose(): void {
+    this.readyState = 3;
+    this.emit("close", { code: 4001, reason: "room disbanded" });
+  }
+
+  private emit(
+    type: string,
+    event: { data?: unknown; code?: number; reason?: string },
+  ): void {
     for (const listener of this.listeners.get(type) ?? []) {
       listener(event);
     }
@@ -114,9 +133,10 @@ function renderStart(
 
 afterEach(() => {
   vi.restoreAllMocks();
-  REPLACE.mockReset();
+  navigationMocks.replace.mockReset();
   notifyMocks.memberJoined.mockReset();
   notifyMocks.memberLeft.mockReset();
+  notifyMocks.roomDisbanded.mockReset();
   notifyMocks.roomCreated.mockReset();
   notifyMocks.joinedAsGuest.mockReset();
   notifyMocks.joinedAsHost.mockReset();
@@ -209,6 +229,15 @@ describe("サーバーメッセージ → 画面反映", () => {
     expect(screen.getAllByTestId("avatar")).toHaveLength(1);
   });
 
+  it("解散による WS close で理由を通知して /home へ router.replace する", () => {
+    const { socket } = renderStart({ isHost: false });
+    act(() => socket.simulateDisbandedClose());
+    expect(notifyMocks.roomDisbanded).toHaveBeenCalledTimes(1);
+    expect(navigationMocks.replace).toHaveBeenCalledWith("/home");
+    // 再接続メッセージは出さない
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
   it("phase_changed: writing を受信すると /rooms/[id] へ router.replace する", () => {
     renderStart();
     // snapshot でメンバー確定
@@ -227,7 +256,7 @@ describe("サーバーメッセージ → 画面反映", () => {
         phase: "writing",
       }),
     );
-    expect(REPLACE).toHaveBeenCalledWith(`/rooms/${ROOM_ID}`);
+    expect(navigationMocks.replace).toHaveBeenCalledWith(`/rooms/${ROOM_ID}`);
   });
 });
 

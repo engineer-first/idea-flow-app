@@ -88,10 +88,13 @@ export type ClientMessage = z.infer<typeof ClientMessageSchema>;
 // サーバー → クライアント
 // ---------------------------------------------------------------
 
-// RoomDO.leave が当該ユーザーの全 WS を閉じるときに使う close code / reason。
-// クライアントはこれを見て再接続を打ち切る（マルチタブ退出の無限再接続防止）。
+// RoomDO が WS を閉じるときに使う close code / reason。
+// クライアントはこれを見て再接続を打ち切り、必要ならホームへ誘導する。
+// 4000: 個人の退出 / 4001: ホストによるルーム解散
 export const WS_CLOSE_LEFT_ROOM = 4000;
 export const WS_CLOSE_LEFT_ROOM_REASON = "left the room";
+export const WS_CLOSE_ROOM_DISBANDED = 4001;
+export const WS_CLOSE_ROOM_DISBANDED_REASON = "room disbanded";
 
 export const ServerMessageSchema = z.discriminatedUnion("type", [
   // 接続直後・再接続時に現在状態を一括送信する（復帰パスの本体）。

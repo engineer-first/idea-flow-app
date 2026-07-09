@@ -58,6 +58,11 @@ class FakeWebSocket {
     this.emit("close", { code: 4000, reason: "left the room" });
   }
 
+  simulateDisbandedClose(): void {
+    this.readyState = 3;
+    this.emit("close", { code: 4001, reason: "room disbanded" });
+  }
+
   private emit(
     type: string,
     event: { data?: unknown; code?: number; reason?: string },
@@ -181,7 +186,7 @@ describe("createRoomClient", () => {
     client.close();
   });
 
-  it("退出による close（code 4000）では再接続しない", () => {
+  it("個人退出の close（code 4000）では再接続せず ended を通知する", () => {
     const statuses: string[] = [];
     const client = createRoomClient({
       url: "ws://test",
@@ -193,9 +198,27 @@ describe("createRoomClient", () => {
     latestSocket().simulateLeftRoomClose();
     vi.advanceTimersByTime(10_000);
 
-    // 再接続が走っていない
     expect(FakeWebSocket.instances).toHaveLength(1);
-    expect(statuses).toContain("closed");
+    expect(statuses).toContain("ended");
+    expect(statuses).not.toContain("closed");
+    client.close();
+  });
+
+  it("解散の close（code 4001）では再接続せず disbanded を通知する", () => {
+    const statuses: string[] = [];
+    const client = createRoomClient({
+      url: "ws://test",
+      onMessage: () => {},
+      onStatusChange: (s) => statuses.push(s),
+      webSocketFactory: factory,
+    });
+    latestSocket().simulateOpen();
+    latestSocket().simulateDisbandedClose();
+    vi.advanceTimersByTime(10_000);
+
+    expect(FakeWebSocket.instances).toHaveLength(1);
+    expect(statuses).toContain("disbanded");
+    expect(statuses).not.toContain("closed");
     client.close();
   });
 

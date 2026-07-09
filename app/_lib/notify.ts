@@ -22,6 +22,18 @@ export const notify = {
   joinedAsGuest(): void {
     toast.success("ルームに参加しました");
   },
+  // 自分からルームを退出したとき。
+  roomLeft(): void {
+    toast("ルームから退出しました");
+  },
+  // ホストがルームを解散したとき（他メンバー向け）。
+  roomDisbanded(): void {
+    toast("ルームが解散されました");
+  },
+  // ホスト自身がルームを解散したとき。
+  roomDisbandedBySelf(): void {
+    toast("ルームを解散しました");
+  },
   // エラー系は Server Action 側でリダイレクトや throw されるため、
   // クライアントから呼ばれる場面は限定的。必要になったら追加。
   error(message: string): void {
