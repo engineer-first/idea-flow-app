@@ -44,16 +44,21 @@ export default async function StartPage({ params }: StartPageProps) {
   }
 
   // メンバー一覧を SSR で取得（初期表示用）。
-  // 非 2xx でも不正ボディでも snapshot で復元できるので、フォールバックは空配列。
-  const membersRes = await apiFetch(`/api/rooms/${id}/members`);
-  const membersParsed = membersRes.ok
-    ? RoomMembersResponseSchema.safeParse(
-        await membersRes.json().catch(() => null),
-      )
-    : null;
-  const initialMembers = membersParsed?.success
-    ? membersParsed.data.members
-    : [];
+  // 非 2xx・不正ボディ・ネットワーク障害でも snapshot で復元できるので空配列へ。
+  let initialMembers: { userId: string; name: string }[] = [];
+  try {
+    const membersRes = await apiFetch(`/api/rooms/${id}/members`);
+    const membersParsed = membersRes.ok
+      ? RoomMembersResponseSchema.safeParse(
+          await membersRes.json().catch(() => null),
+        )
+      : null;
+    if (membersParsed?.success) {
+      initialMembers = membersParsed.data.members;
+    }
+  } catch {
+    initialMembers = [];
+  }
 
   const inviteUrl = buildInviteUrl(getBaseUrl(), parsed.data.inviteCode);
 

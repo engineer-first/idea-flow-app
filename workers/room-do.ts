@@ -237,7 +237,7 @@ export class RoomDO extends DurableObject {
       return;
     }
 
-    this.handleClientMessage(ws, attachment, message);
+    await this.handleClientMessage(ws, attachment, message);
   }
 
   override async webSocketClose(
@@ -257,11 +257,11 @@ export class RoomDO extends DurableObject {
   // プロトコル処理
   // ------------------------------------------------------------
 
-  private handleClientMessage(
+  private async handleClientMessage(
     ws: WebSocket,
     attachment: SocketAttachment,
     message: ClientMessage,
-  ): void {
+  ): Promise<void> {
     const { userId, hostId } = attachment;
     switch (message.type) {
       case "note:create": {
@@ -461,7 +461,8 @@ export class RoomDO extends DurableObject {
           });
           return;
         }
-        this.setPhase("writing", userId, hostId);
+        // phase 永続化が終わる前に phase_changed を送らない（レース防止）。
+        await this.setPhase("writing", userId, hostId);
         this.broadcastToAll({ type: "phase_changed", phase: "writing" });
         return;
       }
@@ -513,7 +514,7 @@ export class RoomDO extends DurableObject {
       if (!attachment) continue;
       const message = buildMessage(attachment.userId);
       if (!visibleTo({ viewerId: attachment.userId }, message.note)) continue;
-      socket.send(JSON.stringify(message));
+      this.trySend(socket, JSON.stringify(message));
     }
   }
 
@@ -529,7 +530,7 @@ export class RoomDO extends DurableObject {
         socket.deserializeAttachment() as SocketAttachment | null;
       if (!attachment) continue;
       if (!visibleTo({ viewerId: attachment.userId }, subject)) continue;
-      socket.send(payload);
+      this.trySend(socket, payload);
     }
   }
 
@@ -537,7 +538,7 @@ export class RoomDO extends DurableObject {
   private broadcastToAll(message: ServerMessage): void {
     const payload = JSON.stringify(message);
     for (const socket of this.ctx.getWebSockets()) {
-      socket.send(payload);
+      this.trySend(socket, payload);
     }
   }
 
@@ -550,12 +551,21 @@ export class RoomDO extends DurableObject {
       const attachment =
         socket.deserializeAttachment() as SocketAttachment | null;
       if (!attachment || attachment.userId === exceptUserId) continue;
-      socket.send(payload);
+      this.trySend(socket, payload);
+    }
+  }
+
+  // 閉じかけのソケットで send が throw しても、他接続への配信を止めない。
+  private trySend(ws: WebSocket, payload: string): void {
+    try {
+      ws.send(payload);
+    } catch {
+      // 切断済み等はスキップ
     }
   }
 
   private sendTo(ws: WebSocket, message: ServerMessage): void {
-    ws.send(JSON.stringify(message));
+    this.trySend(ws, JSON.stringify(message));
   }
 
   private sendNotFound(ws: WebSocket): void {

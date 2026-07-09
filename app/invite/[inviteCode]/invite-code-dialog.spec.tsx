@@ -83,15 +83,19 @@ describe("InviteCodeDialog", () => {
 
   it("「キャンセル」クリックで /home へ戻る", async () => {
     const user = userEvent.setup();
-    const original = window.location.href;
+    const originalLocation = window.location;
     Object.defineProperty(window, "location", {
       value: { href: "" },
       writable: true,
+      configurable: true,
     });
     renderDialog();
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "キャンセル" }));
     expect(window.location.href).toBe("/home");
-    Object.defineProperty(window, "location", { value: original });
+    Object.defineProperty(window, "location", {
+      value: originalLocation,
+      configurable: true,
+    });
   });
 });

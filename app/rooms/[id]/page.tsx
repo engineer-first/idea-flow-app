@@ -47,16 +47,21 @@ export default async function RoomPage({ params }: RoomPageProps) {
   }
 
   // メンバー一覧を SSR で取得して初回描画時の flicker を抑える。
-  // 非 2xx でも不正ボディでも snapshot で復元できるので、フォールバックは空配列。
-  const membersRes = await apiFetch(`/api/rooms/${id}/members`);
-  const membersParsed = membersRes.ok
-    ? RoomMembersResponseSchema.safeParse(
-        await membersRes.json().catch(() => null),
-      )
-    : null;
-  const initialMembers = membersParsed?.success
-    ? membersParsed.data.members
-    : [];
+  // 非 2xx・不正ボディ・ネットワーク障害でも snapshot で復元できるので空配列へ。
+  let initialMembers: { userId: string; name: string }[] = [];
+  try {
+    const membersRes = await apiFetch(`/api/rooms/${id}/members`);
+    const membersParsed = membersRes.ok
+      ? RoomMembersResponseSchema.safeParse(
+          await membersRes.json().catch(() => null),
+        )
+      : null;
+    if (membersParsed?.success) {
+      initialMembers = membersParsed.data.members;
+    }
+  } catch {
+    initialMembers = [];
+  }
 
   // 招待URL の origin は設定値（NEXT_PUBLIC_SITE_URL、本番では必須）から作る。
   const inviteUrl = buildInviteUrl(getBaseUrl(), parsed.data.inviteCode);

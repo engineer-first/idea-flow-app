@@ -183,12 +183,42 @@ describe("joinRoom", () => {
     expect(redirectMock).not.toHaveBeenCalled();
   });
 
-  it("API が 2xx でも不正 JSON なら ok: false を返す", async () => {
-    apiFetchMock.mockResolvedValue(new Response("<html>gateway error</html>"));
+  it("API が 404 なら見つからないエラーを返す", async () => {
+    apiFetchMock.mockResolvedValue(new Response("not found", { status: 404 }));
 
     await expect(joinRoom(joinFormData("ABC123"))).resolves.toEqual({
       ok: false,
       error: "ルームが見つかりませんでした。",
+    });
+  });
+
+  it("API が 5xx なら一時障害として見つからないと誤案内しない", async () => {
+    apiFetchMock.mockResolvedValue(new Response("error", { status: 503 }));
+
+    await expect(joinRoom(joinFormData("ABC123"))).resolves.toEqual({
+      ok: false,
+      error:
+        "ルームに参加できませんでした。しばらくしてから再度お試しください。",
+    });
+  });
+
+  it("ネットワーク障害も一時障害として返す", async () => {
+    apiFetchMock.mockRejectedValueOnce(new Error("network down"));
+
+    await expect(joinRoom(joinFormData("ABC123"))).resolves.toEqual({
+      ok: false,
+      error:
+        "ルームに参加できませんでした。しばらくしてから再度お試しください。",
+    });
+  });
+
+  it("API が 2xx でも不正 JSON なら一時障害として返す", async () => {
+    apiFetchMock.mockResolvedValue(new Response("<html>gateway error</html>"));
+
+    await expect(joinRoom(joinFormData("ABC123"))).resolves.toEqual({
+      ok: false,
+      error:
+        "ルームに参加できませんでした。しばらくしてから再度お試しください。",
     });
     expect(redirectMock).not.toHaveBeenCalled();
   });

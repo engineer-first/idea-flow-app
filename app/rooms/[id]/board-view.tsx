@@ -30,6 +30,11 @@ const CONNECTION_STATUS_LABELS: Record<BoardConnectionStatus, string | null> = {
   closed: "接続が切れました。再接続します…",
 };
 
+const PHASE_LABELS: Record<Phase, string> = {
+  lobby: "開始待ち",
+  writing: "進行中",
+};
+
 export type BoardViewProps = {
   notes: Note[];
   inviteCode: string;
@@ -152,7 +157,7 @@ export function BoardView({
             // ボード画面に「writing 以外」の状態で居る場合は start 画面への
             // 導線に過ぎない（通常は page.tsx の redirect でここに来ない）。
             <span className="text-xs text-muted-foreground">
-              開始前: {phase}
+              開始前: {PHASE_LABELS[phase]}
             </span>
           )}
           {CONNECTION_STATUS_LABELS[connectionStatus] !== null && (

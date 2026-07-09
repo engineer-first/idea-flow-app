@@ -120,17 +120,43 @@ export async function joinRoom(formData: FormData): Promise<JoinRoomResult> {
     redirect("/login");
   }
 
-  const res = await apiFetch("/api/rooms/join", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code: parsedInput.data.code }),
-  });
-  const parsed = res.ok
-    ? JoinRoomResponseSchema.safeParse(await res.json().catch(() => null))
-    : null;
+  let res: Response;
+  try {
+    res = await apiFetch("/api/rooms/join", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: parsedInput.data.code }),
+    });
+  } catch {
+    // タイムアウト・ネットワーク障害は「見つからない」と誤案内しない。
+    return {
+      ok: false,
+      error:
+        "ルームに参加できませんでした。しばらくしてから再度お試しください。",
+    };
+  }
 
-  if (!parsed?.success) {
+  // 404/400 はルーム不存在・入力不正。それ以外の非 2xx は一時障害扱い。
+  if (res.status === 404 || res.status === 400) {
     return { ok: false, error: "ルームが見つかりませんでした。" };
+  }
+  if (!res.ok) {
+    return {
+      ok: false,
+      error:
+        "ルームに参加できませんでした。しばらくしてから再度お試しください。",
+    };
+  }
+
+  const parsed = JoinRoomResponseSchema.safeParse(
+    await res.json().catch(() => null),
+  );
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error:
+        "ルームに参加できませんでした。しばらくしてから再度お試しください。",
+    };
   }
 
   // #70: 参加したらボードではなくスタート画面へ遷移する。

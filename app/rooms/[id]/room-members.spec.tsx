@@ -117,7 +117,9 @@ describe("RoomMembers", () => {
     expect(screen.getAllByTestId("avatar")).toHaveLength(
       ROOM_MEMBERS_MAX_VISIBLE,
     );
-    expect(screen.queryByRole("button", { name: /他 \d+ 名/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /他 \d+ 名/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("maxVisible を超えると最終マスが +N になり 1 枠分を使う", () => {
@@ -139,9 +141,7 @@ describe("RoomMembers", () => {
     const user = userEvent.setup();
     const members = buildMembers(5, ME);
     // maxVisible=3 → 表示 2 + +3、隠れ index 2-4
-    render(
-      <RoomMembers members={members} currentUserId={ME} maxVisible={3} />,
-    );
+    render(<RoomMembers members={members} currentUserId={ME} maxVisible={3} />);
     await user.click(screen.getByRole("button", { name: "他 3 名" }));
     const dialog = await screen.findByRole("dialog");
     expect(dialog).toBeInTheDocument();
