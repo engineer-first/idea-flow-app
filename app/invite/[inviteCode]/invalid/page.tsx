@@ -17,10 +17,10 @@ export default function InvalidInvitePage() {
           発行を依頼してください。
         </p>
         <Link
-          href="/"
+          href="/home"
           className="inline-block rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
         >
-          トップへ戻る
+          ホームへ戻る
         </Link>
       </div>
     </main>

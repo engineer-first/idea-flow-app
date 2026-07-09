@@ -44,7 +44,9 @@ export async function createRoom(): Promise<void> {
     : null;
 
   if (!parsed?.success) {
-    redirect(`/?error=${encodeURIComponent("ルームを作成できませんでした。")}`);
+    redirect(
+      `/home?error=${encodeURIComponent("ルームを作成できませんでした。")}`,
+    );
   }
 
   // #70: 作成直後は lobby 状態なので、ボードではなくスタート画面へ遷移する。
@@ -59,7 +61,7 @@ export async function joinRoom(formData: FormData): Promise<void> {
 
   if (!parsedInput.success) {
     redirect(
-      `/?error=${encodeURIComponent("招待コードは英数字6桁で入力してください。")}`,
+      `/home?error=${encodeURIComponent("招待コードは英数字6桁で入力してください。")}`,
     );
   }
 
@@ -79,7 +81,9 @@ export async function joinRoom(formData: FormData): Promise<void> {
     : null;
 
   if (!parsed?.success) {
-    redirect(`/?error=${encodeURIComponent("ルームが見つかりませんでした。")}`);
+    redirect(
+      `/home?error=${encodeURIComponent("ルームが見つかりませんでした。")}`,
+    );
   }
 
   // #70: 参加したらボードではなくスタート画面へ遷移する。
@@ -95,7 +99,7 @@ export async function leaveRoom(formData: FormData): Promise<void> {
   const roomId = String(formData.get("roomId") ?? "");
 
   if (!isUuid(roomId)) {
-    redirect("/");
+    redirect("/home");
   }
 
   const user = await getCurrentUser();
@@ -103,7 +107,7 @@ export async function leaveRoom(formData: FormData): Promise<void> {
     redirect("/login");
   }
 
-  // 404（既に退出済み / 存在しない / 非メンバー）は「成功扱い」で / に戻す。
+  // 404（既に退出済み / 存在しない / 非メンバー）は「成功扱い」でホームへ。
   // 409（lobby 中のホスト退出拒否）や 5xx は呼び出し側でリカバリする。
   const res = await apiFetch(`/api/rooms/${roomId}/leave`, {
     method: "POST",
@@ -111,7 +115,7 @@ export async function leaveRoom(formData: FormData): Promise<void> {
 
   if (res.status === 404) {
     // 既に退出済み（または他人が退出させた）— ホームに戻す
-    redirect("/");
+    redirect("/home");
   }
   if (res.status === 409) {
     throw new Error("開始前のルームではホストは退出できません。");
@@ -120,5 +124,5 @@ export async function leaveRoom(formData: FormData): Promise<void> {
     throw new Error(`ルーム退出 API が失敗しました: ${res.status}`);
   }
 
-  redirect("/");
+  redirect("/home");
 }

@@ -82,24 +82,28 @@ describe("createRoom", () => {
     );
   });
 
-  it("API が非 2xx ならエラー付きでトップへ戻す", async () => {
+  it("API が非 2xx ならエラー付きでホームへ戻す", async () => {
     apiFetchMock.mockResolvedValue(new Response("error", { status: 500 }));
 
-    expect(await callAndGetRedirect(() => createRoom())).toContain("/?error=");
+    expect(await callAndGetRedirect(() => createRoom())).toContain(
+      "/home?error=",
+    );
   });
 
-  it("API が 2xx でも不正 JSON ならエラー付きでトップへ戻す", async () => {
+  it("API が 2xx でも不正 JSON ならエラー付きでホームへ戻す", async () => {
     apiFetchMock.mockResolvedValue(new Response("<html>gateway error</html>"));
 
-    expect(await callAndGetRedirect(() => createRoom())).toContain("/?error=");
+    expect(await callAndGetRedirect(() => createRoom())).toContain(
+      "/home?error=",
+    );
   });
 });
 
 describe("joinRoom", () => {
-  it("形式不正の招待コードはエラー付きでトップへ戻す", async () => {
+  it("形式不正の招待コードはエラー付きでホームへ戻す", async () => {
     expect(
       await callAndGetRedirect(() => joinRoom(joinFormData("bad"))),
-    ).toContain("/?error=");
+    ).toContain("/home?error=");
     expect(apiFetchMock).not.toHaveBeenCalled();
   });
 
@@ -114,12 +118,12 @@ describe("joinRoom", () => {
     ).toBe("/rooms/123e4567-e89b-42d3-a456-426614174000/start?joined=1");
   });
 
-  it("API が 2xx でも不正 JSON ならエラー付きでトップへ戻す", async () => {
+  it("API が 2xx でも不正 JSON ならエラー付きでホームへ戻す", async () => {
     apiFetchMock.mockResolvedValue(new Response("<html>gateway error</html>"));
 
     expect(
       await callAndGetRedirect(() => joinRoom(joinFormData("ABC123"))),
-    ).toContain("/?error=");
+    ).toContain("/home?error=");
   });
 });
 
@@ -139,31 +143,31 @@ describe("leaveRoom", () => {
     expect(apiFetchMock).not.toHaveBeenCalled();
   });
 
-  it("roomId が UUID 形式でなければ / へリダイレクトする", async () => {
+  it("roomId が UUID 形式でなければ /home へリダイレクトする", async () => {
     expect(
       await callAndGetRedirect(() => leaveRoom(leaveFormData("not-uuid"))),
-    ).toBe("/");
+    ).toBe("/home");
     expect(apiFetchMock).not.toHaveBeenCalled();
   });
 
-  it("退出に成功したら / へリダイレクトする", async () => {
+  it("退出に成功したら /home へリダイレクトする", async () => {
     apiFetchMock.mockResolvedValue(new Response(null, { status: 204 }));
 
     expect(
       await callAndGetRedirect(() => leaveRoom(leaveFormData(VALID_ROOM_ID))),
-    ).toBe("/");
+    ).toBe("/home");
     expect(apiFetchMock).toHaveBeenCalledWith(
       `/api/rooms/${VALID_ROOM_ID}/leave`,
       { method: "POST" },
     );
   });
 
-  it("404（既に退出済み・非メンバー）は / へリダイレクトする", async () => {
+  it("404（既に退出済み・非メンバー）は /home へリダイレクトする", async () => {
     apiFetchMock.mockResolvedValue(new Response("not found", { status: 404 }));
 
     expect(
       await callAndGetRedirect(() => leaveRoom(leaveFormData(VALID_ROOM_ID))),
-    ).toBe("/");
+    ).toBe("/home");
   });
 
   it("5xx は例外を投げて error boundary 行き", async () => {

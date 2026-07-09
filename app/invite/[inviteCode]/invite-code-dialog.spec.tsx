@@ -53,7 +53,7 @@ describe("InviteCodeDialog", () => {
     render(<InviteCodeDialog inviteCode="ABC234" />);
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "キャンセル" }));
-    expect(window.location.href).toBe("/");
+    expect(window.location.href).toBe("/home");
     Object.defineProperty(window, "location", { value: original });
   });
 });

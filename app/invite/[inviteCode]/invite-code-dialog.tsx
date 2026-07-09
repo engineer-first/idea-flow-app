@@ -36,7 +36,7 @@ export function InviteCodeDialog({
   useEffect(() => {
     if (!open) {
       // キャンセルや Esc で閉じた場合はホームへ
-      window.location.href = "/";
+      window.location.href = "/home";
     }
   }, [open]);
 

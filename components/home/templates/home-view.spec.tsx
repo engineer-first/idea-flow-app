@@ -1,7 +1,7 @@
-// ホーム画面（ルーム作成・参加）のプレゼンテーション層の単体テスト。
+// ホーム template の単体テスト。
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { HomeView } from "@/app/home-view";
+import { HomeView } from "@/components/home/templates/home-view";
 
 function renderView(
   overrides: Partial<React.ComponentProps<typeof HomeView>> = {},
