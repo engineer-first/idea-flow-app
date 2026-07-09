@@ -62,18 +62,38 @@ export function RoomStartBoard({
   const [members, setMembers] = useState<Member[]>(initialMembers);
   const [phase, setPhase] = useState<Phase>(initialPhase);
   // ended / disbanded は set せずホームへ redirect する。
-  const [connectionStatus, setConnectionStatus] = useState<
-    Exclude<RoomConnectionStatus, "ended" | "disbanded">
-  >("connecting");
+  const [connectionStatus, setConnectionStatus] =
+    useState<Exclude<RoomConnectionStatus, "ended" | "disbanded">>(
+      "connecting",
+    );
   const [isStarting, setIsStarting] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
   const [isLeavePending, startLeaveTransition] = useTransition();
   const clientRef = useRef<RoomClient | null>(null);
   const membersRef = useRef<Member[]>(members);
+  const isLeavingRef = useRef(false);
+  const startTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearStartTimeout = useCallback(() => {
+    if (startTimeoutRef.current !== null) {
+      clearTimeout(startTimeoutRef.current);
+      startTimeoutRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     membersRef.current = members;
   }, [members]);
+
+  useEffect(() => {
+    isLeavingRef.current = isLeaving;
+  }, [isLeaving]);
+
+  useEffect(() => {
+    return () => {
+      clearStartTimeout();
+    };
+  }, [clearStartTimeout]);
 
   // 既に writing ならボードへ直行（SSR でも redirect しているが、state 初期値が
   // 古い場合のリカバリとしても機能する）。
@@ -83,39 +103,40 @@ export function RoomStartBoard({
     }
   }, [phase, roomId, router]);
 
-  const handleServerMessage = useCallback((message: ServerMessage) => {
-    if (message.type === "error") {
-      console.error(`ルーム操作エラー (${message.code}): ${message.message}`);
-      if (message.code === "forbidden") {
-        // 権限なしで start_phase を送った場合は「開始中」を解除してあげる
-        // （押せたのに実は押せなかった、を伝える）。
-        setIsStarting(false);
+  const handleServerMessage = useCallback(
+    (message: ServerMessage) => {
+      if (message.type === "error") {
+        console.error(`ルーム操作エラー (${message.code}): ${message.message}`);
+        if (message.code === "forbidden") {
+          // 権限なしで start_phase を送った場合は「開始中」を解除してあげる
+          // （押せたのに実は押せなかった、を伝える）。
+          clearStartTimeout();
+          setIsStarting(false);
+        }
+        return;
       }
-      return;
-    }
-    // member_joined / member_left は自分以外の参加者から届く通知。
-    // 自分自身の参加・退出はサーバから届かない（broadcastToAllExcept）。
-    if (message.type === "member_joined") {
-      notify.memberJoined(message.member.name);
-    }
-    if (message.type === "member_left") {
-      // member_left は userId のみなので、除去前の members から名前を引く。
-      const left = membersRef.current.find((m) => m.userId === message.userId);
-      if (left) {
-        notify.memberLeft(left.name);
+      // member_joined / member_left は自分以外の参加者から届く通知。
+      // 自分自身の参加・退出はサーバから届かない（broadcastToAllExcept）。
+      if (message.type === "member_joined") {
+        notify.memberJoined(message.member.name);
       }
-    }
-    // ref を同期更新して、連続メッセージでも最新 members を引けるようにする。
-    const nextMembers = applyMemberServerMessage(membersRef.current, message);
-    membersRef.current = nextMembers;
-    setMembers(nextMembers);
-    setPhase((current) => applyPhaseServerMessage(current, message));
-  }, []);
-
-  const isLeavingRef = useRef(false);
-  useEffect(() => {
-    isLeavingRef.current = isLeaving;
-  }, [isLeaving]);
+      if (message.type === "member_left") {
+        // member_left は userId のみなので、除去前の members から名前を引く。
+        const left = membersRef.current.find(
+          (m) => m.userId === message.userId,
+        );
+        if (left) {
+          notify.memberLeft(left.name);
+        }
+      }
+      // ref を同期更新して、連続メッセージでも最新 members を引けるようにする。
+      const nextMembers = applyMemberServerMessage(membersRef.current, message);
+      membersRef.current = nextMembers;
+      setMembers(nextMembers);
+      setPhase((current) => applyPhaseServerMessage(current, message));
+    },
+    [clearStartTimeout],
+  );
 
   const handleStatusChange = useCallback(
     (status: RoomConnectionStatus) => {
@@ -159,13 +180,20 @@ export function RoomStartBoard({
     // 成功時は phase_changed → router.replace で /rooms/[id] へ遷移。
     // 失敗時（forbidden / 接続断）は上記の error ハンドラで isStarting を解除。
     // 万一何も起きない場合は 5 秒でタイムアウトさせて再操作可能にする。
-    setTimeout(() => setIsStarting(false), 5000);
-  }, [isHost, sendMessage]);
+    clearStartTimeout();
+    startTimeoutRef.current = setTimeout(() => {
+      startTimeoutRef.current = null;
+      setIsStarting(false);
+    }, 5000);
+  }, [isHost, sendMessage, clearStartTimeout]);
 
   // 退出 / 解散（#70）。StartRoomView 内の LeaveConfirmDialog から呼ばれる。
   // API 成功後に redirect。失敗時は WS を維持し isLeaving を戻す。
   const handleLeave = useCallback(() => {
     if (isLeaving || isLeavePending) return;
+    // WS close(4001) が leave 完了前に届いても roomDisbanded を出さないよう、
+    // setState のコミットを待たず ref を同期で立てる。
+    isLeavingRef.current = true;
     setIsLeaving(true);
     startLeaveTransition(async () => {
       const formData = new FormData();
@@ -188,6 +216,7 @@ export function RoomStartBoard({
           }
           return;
         }
+        isLeavingRef.current = false;
         setIsLeaving(false);
         const message =
           error instanceof Error

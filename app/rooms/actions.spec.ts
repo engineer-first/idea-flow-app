@@ -41,7 +41,7 @@ class RedirectSignal extends Error {
 }
 
 async function callAndGetRedirect(
-  action: () => Promise<void>,
+  action: () => Promise<unknown>,
 ): Promise<string> {
   try {
     await action();
@@ -128,18 +128,30 @@ describe("lookupInviteRoom", () => {
   });
 
   it("ルームが無ければ ok: false を返す", async () => {
-    lookupRoomByInviteCodeMock.mockResolvedValueOnce(null);
+    lookupRoomByInviteCodeMock.mockResolvedValueOnce({ kind: "not_found" });
     await expect(lookupInviteRoom("ABC123")).resolves.toEqual({
       ok: false,
       error: "ルームが見つかりませんでした。",
     });
   });
 
+  it("lookup が unavailable なら専用のエラー文言を返す", async () => {
+    lookupRoomByInviteCodeMock.mockResolvedValueOnce({ kind: "unavailable" });
+    await expect(lookupInviteRoom("ABC123")).resolves.toEqual({
+      ok: false,
+      error:
+        "ルーム情報を取得できませんでした。しばらくしてから再度お試しください。",
+    });
+  });
+
   it("見つかれば hostName を返す", async () => {
     lookupRoomByInviteCodeMock.mockResolvedValueOnce({
-      roomId: "123e4567-e89b-42d3-a456-426614174000",
-      inviteCode: "ABC123",
-      hostName: "田中太郎",
+      kind: "found",
+      room: {
+        roomId: "123e4567-e89b-42d3-a456-426614174000",
+        inviteCode: "ABC123",
+        hostName: "田中太郎",
+      },
     });
     await expect(lookupInviteRoom("ABC123")).resolves.toEqual({
       ok: true,
@@ -232,7 +244,6 @@ describe("leaveRoom", () => {
       callAndGetRedirect(() => leaveRoom(leaveFormData(VALID_ROOM_ID))),
     ).rejects.toThrow();
   });
-
 });
 
 const VALID_ROOM_ID = "123e4567-e89b-42d3-a456-426614174000";

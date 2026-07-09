@@ -43,16 +43,22 @@ export default async function StartPage({ params }: StartPageProps) {
     redirect(`/rooms/${parsed.data.roomId}`);
   }
 
-  // メンバー一覧を SSR で取得（初期表示用）。失敗しても snapshot で復元できる。
+  // メンバー一覧を SSR で取得（初期表示用）。
+  // 非 2xx でも不正ボディでも snapshot で復元できるので、フォールバックは空配列。
   const membersRes = await apiFetch(`/api/rooms/${id}/members`);
-  const initialMembers = membersRes.ok
-    ? RoomMembersResponseSchema.parse(await membersRes.json()).members
+  const membersParsed = membersRes.ok
+    ? RoomMembersResponseSchema.safeParse(
+        await membersRes.json().catch(() => null),
+      )
+    : null;
+  const initialMembers = membersParsed?.success
+    ? membersParsed.data.members
     : [];
 
   const inviteUrl = buildInviteUrl(getBaseUrl(), parsed.data.inviteCode);
 
-  // 作成/参加直後の toast は RoomStartBoard が Server Action でフラッシュを
-  // consume して出す（Cookie 削除は Server Component ではできない）。
+  // 作成/参加直後の toast はホーム / 招待 URL 側クライアントが成功時に出し、
+  // その後 router.push でこのスタート画面へ遷移する。
   return (
     <main className="flex h-screen flex-col gap-6 p-4">
       <div className="min-h-0 flex-1">

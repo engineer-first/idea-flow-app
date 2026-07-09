@@ -43,3 +43,10 @@ export const RoomMemberSchema = z.object({
 export const RoomMembersResponseSchema = z.object({
   members: z.array(RoomMemberSchema),
 });
+
+// GET /api/rooms/lookup?code= のレスポンス。招待確認 Dialog のホスト名表示用。
+export const RoomLookupResponseSchema = z.object({
+  roomId: z.string().uuid(),
+  inviteCode: z.string(),
+  hostName: z.string(),
+});

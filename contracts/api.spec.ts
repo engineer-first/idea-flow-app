@@ -4,6 +4,7 @@ import {
   CreateRoomResponseSchema,
   JoinRoomResponseSchema,
   RoomInfoResponseSchema,
+  RoomLookupResponseSchema,
   RoomMembersResponseSchema,
   SyncUserResponseSchema,
 } from "./api";
@@ -137,5 +138,40 @@ describe("RoomMembersResponseSchema", () => {
 
   it("members キー無しは拒否する", () => {
     expect(RoomMembersResponseSchema.safeParse({}).success).toBe(false);
+  });
+});
+
+describe("RoomLookupResponseSchema", () => {
+  it("roomId / inviteCode / hostName を受け入れる", () => {
+    expect(
+      RoomLookupResponseSchema.parse({
+        roomId: UUID,
+        inviteCode: "ABC234",
+        hostName: "田中太郎",
+      }),
+    ).toEqual({
+      roomId: UUID,
+      inviteCode: "ABC234",
+      hostName: "田中太郎",
+    });
+  });
+
+  it("hostName 無しは拒否する", () => {
+    expect(
+      RoomLookupResponseSchema.safeParse({
+        roomId: UUID,
+        inviteCode: "ABC234",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("roomId が UUID でないと拒否する", () => {
+    expect(
+      RoomLookupResponseSchema.safeParse({
+        roomId: "not-uuid",
+        inviteCode: "ABC234",
+        hostName: "Host",
+      }).success,
+    ).toBe(false);
   });
 });

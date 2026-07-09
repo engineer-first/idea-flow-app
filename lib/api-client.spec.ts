@@ -19,7 +19,7 @@ vi.mock("@opennextjs/cloudflare", () => ({
   },
 }));
 
-import { apiFetch } from "@/lib/api-client";
+import { apiFetch, lookupRoomByInviteCode } from "@/lib/api-client";
 
 const fetchMock = vi.fn<typeof fetch>();
 
@@ -60,5 +60,56 @@ describe("apiFetch", () => {
 
     const init = fetchMock.mock.calls[0]?.[1];
     expect(init?.signal).toBe(controller.signal);
+  });
+});
+
+describe("lookupRoomByInviteCode", () => {
+  const room = {
+    roomId: "123e4567-e89b-42d3-a456-426614174000",
+    inviteCode: "ABC234",
+    hostName: "田中太郎",
+  };
+
+  it("成功時は found を返す", async () => {
+    fetchMock.mockResolvedValueOnce(Response.json(room));
+    await expect(lookupRoomByInviteCode("ABC234")).resolves.toEqual({
+      kind: "found",
+      room,
+    });
+  });
+
+  it("404 は not_found（不存在と誤案内しないために 5xx と分ける）", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("not found", { status: 404 }));
+    await expect(lookupRoomByInviteCode("ABC234")).resolves.toEqual({
+      kind: "not_found",
+    });
+  });
+
+  it("400 は not_found", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("bad", { status: 400 }));
+    await expect(lookupRoomByInviteCode("bad")).resolves.toEqual({
+      kind: "not_found",
+    });
+  });
+
+  it("5xx は unavailable（ルームが見つからないとは言わない）", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("error", { status: 503 }));
+    await expect(lookupRoomByInviteCode("ABC234")).resolves.toEqual({
+      kind: "unavailable",
+    });
+  });
+
+  it("ネットワーク例外は unavailable", async () => {
+    fetchMock.mockRejectedValueOnce(new Error("network down"));
+    await expect(lookupRoomByInviteCode("ABC234")).resolves.toEqual({
+      kind: "unavailable",
+    });
+  });
+
+  it("2xx でも不正ボディは unavailable", async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ roomId: "x" }));
+    await expect(lookupRoomByInviteCode("ABC234")).resolves.toEqual({
+      kind: "unavailable",
+    });
   });
 });

@@ -6,10 +6,10 @@
 // サイズは prop で変更できるが、RoomMembers 側では 36px 固定で使う前提。
 // 「あなた」マーカーは isMe で枠線（ring）として表現する。
 // ホバー時の名前表示は Radix Tooltip（#70 UI 統一）で行う。
+// TooltipProvider は一覧側（RoomMembers）に 1 つ置き、ここでは Tooltip のみ。
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
@@ -66,30 +66,28 @@ export function Avatar({ name, size = 36, isMe = false }: AvatarProps) {
   const tooltipText = name || "不明なメンバー";
 
   return (
-    <TooltipProvider delayDuration={300}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div
-            role="img"
-            aria-label={tooltipText}
-            data-testid="avatar"
-            data-self={isMe ? "true" : undefined}
-            className={`inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-white ${colorClass} ${
-              isMe
-                ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-background"
-                : ""
-            }`}
-            style={{
-              width: size,
-              height: size,
-              fontSize: Math.round(size * 0.4),
-            }}
-          >
-            {initials}
-          </div>
-        </TooltipTrigger>
-        <TooltipContent>{tooltipText}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div
+          role="img"
+          aria-label={tooltipText}
+          data-testid="avatar"
+          data-self={isMe ? "true" : undefined}
+          className={`inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-white ${colorClass} ${
+            isMe
+              ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-background"
+              : ""
+          }`}
+          style={{
+            width: size,
+            height: size,
+            fontSize: Math.round(size * 0.4),
+          }}
+        >
+          {initials}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent>{tooltipText}</TooltipContent>
+    </Tooltip>
   );
 }

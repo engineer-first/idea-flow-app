@@ -62,14 +62,21 @@ export async function lookupInviteRoom(
   }
 
   const lookup = await lookupRoomByInviteCode(parsedInput.data.code);
-  if (!lookup) {
+  if (lookup.kind === "not_found") {
     return { ok: false, error: "ルームが見つかりませんでした。" };
+  }
+  if (lookup.kind === "unavailable") {
+    return {
+      ok: false,
+      error:
+        "ルーム情報を取得できませんでした。しばらくしてから再度お試しください。",
+    };
   }
 
   return {
     ok: true,
-    hostName: lookup.hostName,
-    inviteCode: lookup.inviteCode,
+    hostName: lookup.room.hostName,
+    inviteCode: lookup.room.inviteCode,
   };
 }
 

@@ -60,6 +60,10 @@ describe("applyMemberServerMessage", () => {
         y: 0,
         createdAt: "2026-07-07T00:00:00.000Z",
         updatedAt: "2026-07-07T00:00:00.000Z",
+        dotVotes: {
+          subjective: { count: 0, votedByMe: false, ownCount: 0 },
+          objective: { count: 0, votedByMe: false, ownCount: 0 },
+        },
       },
     };
     expect(applyMemberServerMessage([A], message)).toEqual([A]);
@@ -114,6 +118,10 @@ describe("applyPhaseServerMessage", () => {
         y: 0,
         createdAt: "2026-07-07T00:00:00.000Z",
         updatedAt: "2026-07-07T00:00:00.000Z",
+        dotVotes: {
+          subjective: { count: 0, votedByMe: false, ownCount: 0 },
+          objective: { count: 0, votedByMe: false, ownCount: 0 },
+        },
       },
     };
     expect(applyPhaseServerMessage("lobby", message)).toBe("lobby");

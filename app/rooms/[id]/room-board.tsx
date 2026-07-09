@@ -79,9 +79,10 @@ export function RoomBoard({
   const [phase, setPhase] = useState<Phase>(initialPhase);
   // createRoomClient が生成直後に "connecting" を通知するので初期値と一致する。
   // ended / disbanded は set せずホームへ redirect する。
-  const [connectionStatus, setConnectionStatus] = useState<
-    Exclude<RoomConnectionStatus, "ended" | "disbanded">
-  >("connecting");
+  const [connectionStatus, setConnectionStatus] =
+    useState<Exclude<RoomConnectionStatus, "ended" | "disbanded">>(
+      "connecting",
+    );
   const [draggingNoteId, setDraggingNoteId] = useState<string | null>(null);
   const [isLeaving, setIsLeaving] = useState(false);
   const [isLeavePending, startLeaveTransition] = useTransition();
@@ -107,7 +108,7 @@ export function RoomBoard({
 
   const handleServerMessage = useCallback((message: ServerMessage) => {
     if (message.type === "error") {
-      console.error(`ルーム操作エラー (${message.code}): ${message.message}`);
+      console.warn(`ルーム操作エラー (${message.code}): ${message.message}`);
       return;
     }
     setNotes((current) =>
@@ -255,6 +256,9 @@ export function RoomBoard({
   // redirect は NEXT_REDIRECT を throw するので useTransition 内で握りつぶす。
   const handleLeave = useCallback(() => {
     if (isLeaving || isLeavePending) return;
+    // WS close(4001) が leave 完了前に届いても roomDisbanded を出さないよう、
+    // setState のコミットを待たず ref を同期で立てる。
+    isLeavingRef.current = true;
     setIsLeaving(true);
     startLeaveTransition(async () => {
       const formData = new FormData();
@@ -280,6 +284,7 @@ export function RoomBoard({
           return;
         }
         // 5xx 等: WS は開いたまま、操作可能に戻す。
+        isLeavingRef.current = false;
         setIsLeaving(false);
         const message =
           error instanceof Error

@@ -4,6 +4,7 @@
 // データ層に一切依存せず、members / currentUserId / hostUserId を props で受け取るだけ。
 import { Avatar } from "@/app/rooms/[id]/avatar";
 import type { Member } from "@/app/rooms/room-reducer";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 export type RoomMembersProps = {
@@ -27,55 +28,59 @@ export function RoomMembers({
   const hidden = members.length - visible.length;
 
   return (
-    <fieldset
-      aria-label="参加者"
-      data-testid="room-members"
-      className="flex flex-wrap items-center gap-3 border-0 p-0 m-0"
-    >
-      {visible.map((member) => {
-        const isMe = member.userId === currentUserId;
-        const isHostMember =
-          hostUserId !== undefined && member.userId === hostUserId;
-        return (
-          <div
-            key={member.userId}
-            data-testid={`member-row-${member.userId}`}
-            data-self={isMe ? "true" : undefined}
-            data-host={isHostMember ? "true" : undefined}
-            className="flex items-center gap-1.5"
-          >
-            <Avatar name={member.name} isMe={isMe} />
-            <span className="flex min-w-0 flex-col">
-              <span
-                className={cn(
-                  "max-w-[8rem] truncate text-xs",
-                  isMe ? "font-semibold text-foreground" : "text-foreground/80",
-                )}
-              >
-                {member.name}
-              </span>
-              {isHostMember ? (
+    <TooltipProvider delayDuration={300}>
+      <fieldset
+        aria-label="参加者"
+        data-testid="room-members"
+        className="m-0 flex flex-wrap items-center gap-3 border-0 p-0"
+      >
+        {visible.map((member) => {
+          const isMe = member.userId === currentUserId;
+          const isHostMember =
+            hostUserId !== undefined && member.userId === hostUserId;
+          return (
+            <div
+              key={member.userId}
+              data-testid={`member-row-${member.userId}`}
+              data-self={isMe ? "true" : undefined}
+              data-host={isHostMember ? "true" : undefined}
+              className="flex items-center gap-1.5"
+            >
+              <Avatar name={member.name} isMe={isMe} />
+              <span className="flex min-w-0 flex-col">
                 <span
-                  data-testid={`member-host-label-${member.userId}`}
-                  className="text-[10px] font-medium leading-tight text-muted-foreground"
+                  className={cn(
+                    "max-w-[8rem] truncate text-xs",
+                    isMe
+                      ? "font-semibold text-foreground"
+                      : "text-foreground/80",
+                  )}
                 >
-                  ホスト
+                  {member.name}
                 </span>
-              ) : null}
-            </span>
+                {isHostMember ? (
+                  <span
+                    data-testid={`member-host-label-${member.userId}`}
+                    className="text-[10px] font-medium leading-tight text-muted-foreground"
+                  >
+                    ホスト
+                  </span>
+                ) : null}
+              </span>
+            </div>
+          );
+        })}
+        {hidden > 0 ? (
+          <div
+            role="img"
+            aria-label={`他 ${hidden} 名`}
+            data-testid="room-members-overflow"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-background bg-muted text-xs font-semibold text-muted-foreground"
+          >
+            +{hidden}
           </div>
-        );
-      })}
-      {hidden > 0 ? (
-        <div
-          role="img"
-          aria-label={`他 ${hidden} 名`}
-          data-testid="room-members-overflow"
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-background bg-muted text-xs font-semibold text-muted-foreground"
-        >
-          +{hidden}
-        </div>
-      ) : null}
-    </fieldset>
+        ) : null}
+      </fieldset>
+    </TooltipProvider>
   );
 }

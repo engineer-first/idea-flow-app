@@ -31,18 +31,22 @@ export default async function InvitePage({ params }: InvitePageProps) {
     );
   }
 
-  // 存在しない・無効な招待は参加 Dialog を出さずホームへ（エラー表示）。
   const lookup = await lookupRoomByInviteCode(code);
-  if (!lookup) {
+  if (lookup.kind === "not_found") {
     redirect(
       `/home?error=${encodeURIComponent("ルームが見つかりませんでした。")}`,
+    );
+  }
+  if (lookup.kind === "unavailable") {
+    redirect(
+      `/home?error=${encodeURIComponent("ルーム情報を取得できませんでした。しばらくしてから再度お試しください。")}`,
     );
   }
 
   return (
     <InviteCodeDialog
-      inviteCode={lookup.inviteCode}
-      hostName={lookup.hostName}
+      inviteCode={lookup.room.inviteCode}
+      hostName={lookup.room.hostName}
     />
   );
 }

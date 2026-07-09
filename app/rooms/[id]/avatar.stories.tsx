@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { Avatar } from "@/app/rooms/[id]/avatar";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const meta = {
   title: "Rooms/Avatar",
@@ -12,9 +13,11 @@ const meta = {
   },
   decorators: [
     (Story) => (
-      <div style={{ padding: 24 }}>
-        <Story />
-      </div>
+      <TooltipProvider delayDuration={0}>
+        <div style={{ padding: 24 }}>
+          <Story />
+        </div>
+      </TooltipProvider>
     ),
   ],
 } satisfies Meta<typeof Avatar>;

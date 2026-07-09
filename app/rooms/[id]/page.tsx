@@ -47,10 +47,15 @@ export default async function RoomPage({ params }: RoomPageProps) {
   }
 
   // メンバー一覧を SSR で取得して初回描画時の flicker を抑える。
-  // 失敗しても board の snapshot で復元できるので、フォールバックは空配列。
+  // 非 2xx でも不正ボディでも snapshot で復元できるので、フォールバックは空配列。
   const membersRes = await apiFetch(`/api/rooms/${id}/members`);
-  const initialMembers = membersRes.ok
-    ? RoomMembersResponseSchema.parse(await membersRes.json()).members
+  const membersParsed = membersRes.ok
+    ? RoomMembersResponseSchema.safeParse(
+        await membersRes.json().catch(() => null),
+      )
+    : null;
+  const initialMembers = membersParsed?.success
+    ? membersParsed.data.members
     : [];
 
   // 招待URL の origin は設定値（NEXT_PUBLIC_SITE_URL、本番では必須）から作る。

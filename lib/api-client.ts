@@ -5,6 +5,8 @@
 // 呼び出したユーザー本人として認可される。
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { cookies } from "next/headers";
+import type { z } from "zod";
+import { RoomLookupResponseSchema } from "@/contracts/api";
 import { SESSION_COOKIE_NAME } from "@/contracts/session";
 
 type FetcherLike = {
@@ -60,37 +62,38 @@ export async function apiFetch(
   );
 }
 
-export type RoomLookupResult = {
-  roomId: string;
-  inviteCode: string;
-  hostName: string;
-};
+export type RoomLookupResult = z.infer<typeof RoomLookupResponseSchema>;
 
-// 招待コードからルームを解決し、hostname 付きで返す。
-// 招待URL ページとホーム参加の確認 Dialog 文言に使う。
-// 失敗時（404 / 400 / ネットワーク）は null（呼び出し側でエラー表示）。
+// 招待コードからルームを解決する。
+// - found: 404/400 以外の成功レスポンスでボディがスキーマに合う
+// - not_found: 404 / 400（存在しない・形式不正）
+// - unavailable: 5xx・ネットワーク障害・不正ボディ（不存在と誤案内しない）
+export type RoomLookupOutcome =
+  | { kind: "found"; room: RoomLookupResult }
+  | { kind: "not_found" }
+  | { kind: "unavailable" };
+
 export async function lookupRoomByInviteCode(
   code: string,
-): Promise<RoomLookupResult | null> {
+): Promise<RoomLookupOutcome> {
   try {
     const res = await apiFetch(
       `/api/rooms/lookup?code=${encodeURIComponent(code)}`,
     );
-    if (!res.ok) return null;
-    const body = (await res.json()) as Partial<RoomLookupResult>;
-    if (
-      typeof body.roomId === "string" &&
-      typeof body.inviteCode === "string" &&
-      typeof body.hostName === "string"
-    ) {
-      return {
-        roomId: body.roomId,
-        inviteCode: body.inviteCode,
-        hostName: body.hostName,
-      };
+    if (res.status === 404 || res.status === 400) {
+      return { kind: "not_found" };
     }
-    return null;
+    if (!res.ok) {
+      return { kind: "unavailable" };
+    }
+    const parsed = RoomLookupResponseSchema.safeParse(
+      await res.json().catch(() => null),
+    );
+    if (!parsed.success) {
+      return { kind: "unavailable" };
+    }
+    return { kind: "found", room: parsed.data };
   } catch {
-    return null;
+    return { kind: "unavailable" };
   }
 }
