@@ -194,6 +194,35 @@ async function handleLeaveRoom(
   return new Response(null, { status: 204 });
 }
 
+// GET /api/rooms/lookup?code=XXX — 招待コードからルーム解決して hostname を返す。
+// 招待URL ページ (/invite/[code]) で、入室確認 Dialog の文言に
+// 「hostname さんが作成したルームに参加しますか？」を出すために使う。
+// 未ログインは 401（招待URL ページ側でリダイレクト済みなので到達しない）。
+async function handleLookupRoom(
+  request: Request,
+  env: Env,
+  _session: SessionPayload,
+): Promise<Response> {
+  const url = new URL(request.url);
+  const code = normalizeInviteCode(url.searchParams.get("code") ?? "");
+  if (!isValidInviteCode(code)) {
+    return error(400, "招待コードは英数字6桁で入力してください。");
+  }
+  const room = await findRoomByCode(env.DB, code);
+  if (!room) {
+    return error(404, "ルームが見つかりませんでした。");
+  }
+  // hostname を users.name から引く
+  const host = await env.DB.prepare("SELECT name FROM users WHERE id = ?1")
+    .bind(room.hostId)
+    .first<{ name: string | null }>();
+  return json({
+    roomId: room.roomId,
+    inviteCode: room.inviteCode,
+    hostName: host?.name ?? "ホスト",
+  });
+}
+
 // GET /api/rooms/:id/ws — メンバーのみ WebSocket 接続できる。
 // 認可はここで完結させ、DO へは検証済みユーザーIDと hostId をヘッダーで
 // 引き継ぐ。hostId は start_phase の認可で RoomDO が再判定に使う。
@@ -250,6 +279,12 @@ export default {
 
     if (method === "POST" && pathname === "/api/rooms") {
       return handleCreateRoom(env, session);
+    }
+
+    // /api/rooms/lookup — 招待コードからルーム解決（hostname を返す）
+    const lookupMatch = pathname.match(/^\/api\/rooms\/lookup$/);
+    if (method === "GET" && lookupMatch) {
+      return handleLookupRoom(request, env, session);
     }
 
     if (method === "POST" && pathname === "/api/rooms/join") {

@@ -59,3 +59,38 @@ export async function apiFetch(
     "API_WORKER_URL が未設定です。ローカル開発では `npm run dev:api` を起動し、.env.local に API_WORKER_URL=http://localhost:8787 を設定してください。",
   );
 }
+
+export type RoomLookupResult = {
+  roomId: string;
+  inviteCode: string;
+  hostName: string;
+};
+
+// 招待コードからルームを解決し、hostname 付きで返す。
+// 招待URL ページ (/invite/[code]) で入室確認 Dialog の文言に使う。
+// 失敗時（404 / 400 / ネットワーク）は例外を投げない（呼び出し側でフォールバック）。
+export async function lookupRoomByInviteCode(
+  code: string,
+): Promise<RoomLookupResult | null> {
+  try {
+    const res = await apiFetch(
+      `/api/rooms/lookup?code=${encodeURIComponent(code)}`,
+    );
+    if (!res.ok) return null;
+    const body = (await res.json()) as Partial<RoomLookupResult>;
+    if (
+      typeof body.roomId === "string" &&
+      typeof body.inviteCode === "string" &&
+      typeof body.hostName === "string"
+    ) {
+      return {
+        roomId: body.roomId,
+        inviteCode: body.inviteCode,
+        hostName: body.hostName,
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}

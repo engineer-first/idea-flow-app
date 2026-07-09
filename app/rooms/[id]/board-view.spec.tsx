@@ -250,3 +250,38 @@ describe("招待URL/コード（host 限定表示）", () => {
     expect(screen.queryByText("ZZ99XX")).not.toBeInTheDocument();
   });
 });
+
+describe("メンバー一覧（名前常時表示）", () => {
+  it("メンバー名が Avatar の隣に常時表示される（ホバー不要）", () => {
+    setup();
+    // 自分
+    expect(screen.getByText("Yuki Tanaka")).toBeInTheDocument();
+    // 自分以外（fixture の NAMES[0] と NAMES[1]）
+    expect(screen.getByText("Taro Yamada")).toBeInTheDocument();
+  });
+
+  it("自分メンバーの隣に「（あなた）」マーカーが付く", () => {
+    setup();
+    const meRow = screen.getByTestId(`member-row-${ME}`).textContent;
+    expect(meRow).toContain("Yuki Tanaka");
+    expect(meRow).toContain("（あなた）");
+  });
+
+  it("自分以外の row には「（あなた）」が付かない", () => {
+    setup();
+    // member-row- データ属性を全部取得して、自分以外を探す
+    const rows = screen.getAllByTestId(/^member-row-/);
+    const otherRow = rows.find(
+      (row) => row.getAttribute("data-self") !== "true",
+    );
+    expect(otherRow).toBeDefined();
+    expect(otherRow!.textContent).toContain("Taro Yamada");
+    expect(otherRow!.textContent).not.toContain("（あなた）");
+  });
+
+  it("ボード画面は maxVisible=3（5 人いても 3 個表示 + +2 バッジ）", () => {
+    setup({ members: buildMembers(5) });
+    expect(screen.getAllByTestId("avatar")).toHaveLength(3);
+    expect(screen.getByLabelText("他 2 名")).toBeInTheDocument();
+  });
+});

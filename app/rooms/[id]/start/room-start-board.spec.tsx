@@ -9,6 +9,26 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: REPLACE }),
 }));
 
+const notifyMocks = vi.hoisted(() => ({
+  memberJoined: vi.fn(),
+  memberLeft: vi.fn(),
+  roomCreated: vi.fn(),
+  joinedAsGuest: vi.fn(),
+  joinedAsHost: vi.fn(),
+  error: vi.fn(),
+}));
+
+vi.mock("@/app/_lib/notify", () => ({
+  notify: {
+    memberJoined: notifyMocks.memberJoined,
+    memberLeft: notifyMocks.memberLeft,
+    roomCreated: notifyMocks.roomCreated,
+    joinedAsGuest: notifyMocks.joinedAsGuest,
+    joinedAsHost: notifyMocks.joinedAsHost,
+    error: notifyMocks.error,
+  },
+}));
+
 import { RoomStartBoard } from "@/app/rooms/[id]/start/room-start-board";
 import type { ProtocolMember, ServerMessage } from "@/contracts/room-protocol";
 
@@ -94,6 +114,12 @@ function renderStart(
 afterEach(() => {
   vi.restoreAllMocks();
   REPLACE.mockReset();
+  notifyMocks.memberJoined.mockReset();
+  notifyMocks.memberLeft.mockReset();
+  notifyMocks.roomCreated.mockReset();
+  notifyMocks.joinedAsGuest.mockReset();
+  notifyMocks.joinedAsHost.mockReset();
+  notifyMocks.error.mockReset();
 });
 
 function findSocket() {
@@ -147,6 +173,37 @@ describe("サーバーメッセージ → 画面反映", () => {
         member: { userId: MEMBER_ID, name: "Member" },
       }),
     );
+    expect(screen.getAllByTestId("avatar")).toHaveLength(1);
+  });
+
+  it("member_joined を受信すると notify.memberJoined を呼ぶ", () => {
+    const { socket } = renderStart();
+    act(() =>
+      socket.simulateServerMessage({
+        type: "member_joined",
+        member: { userId: MEMBER_ID, name: "Taro" },
+      }),
+    );
+    expect(notifyMocks.memberJoined).toHaveBeenCalledTimes(1);
+    expect(notifyMocks.memberJoined).toHaveBeenCalledWith("Taro");
+  });
+
+  it("member_left を受信すると members から名前を引き、notify.memberLeft を呼ぶ", () => {
+    const { socket } = renderStart({
+      initialMembers: [
+        { userId: HOST_ID, name: "Host" },
+        { userId: MEMBER_ID, name: "Taro" },
+      ],
+    });
+    act(() =>
+      socket.simulateServerMessage({
+        type: "member_left",
+        userId: MEMBER_ID,
+      }),
+    );
+    expect(notifyMocks.memberLeft).toHaveBeenCalledTimes(1);
+    expect(notifyMocks.memberLeft).toHaveBeenCalledWith("Taro");
+    // 退出者は一覧から消える
     expect(screen.getAllByTestId("avatar")).toHaveLength(1);
   });
 

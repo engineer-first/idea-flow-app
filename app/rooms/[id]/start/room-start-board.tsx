@@ -7,9 +7,12 @@
 //   - phase_changed 受信後の /rooms/[id] への自動遷移
 //   - members / phase state の管理（app/rooms/room-reducer.ts）
 //   - 退出のトリガ（#70 退室機能）
+//   - 自分自身の遷移に応じた通知（toast）
+//   - 他メンバーの参加通知（toast）
 // を担当する。ノートは扱わない（#70 のスコープ）。
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { notify } from "@/app/_lib/notify";
 import { StartRoomView } from "@/app/rooms/[id]/start/start-room-view";
 import { leaveRoom } from "@/app/rooms/actions";
 import {
@@ -38,6 +41,10 @@ export type RoomStartBoardProps = {
   isHost: boolean;
   initialPhase: Phase;
   initialMembers: Member[];
+  // 直前遷移の種別（page.tsx から渡される）。
+  // それぞれ「ルームを作成しました」「ルームに参加しました」の通知を出す。
+  justCreated?: boolean;
+  justJoined?: boolean;
   // テストからフェイク WebSocket を注入するための口。本番では未指定。
   webSocketFactory?: RoomSocketFactory;
 };
@@ -50,6 +57,8 @@ export function RoomStartBoard({
   isHost,
   initialPhase,
   initialMembers,
+  justCreated,
+  justJoined,
   webSocketFactory,
 }: RoomStartBoardProps) {
   const router = useRouter();
@@ -61,6 +70,11 @@ export function RoomStartBoard({
   const [isLeaving, setIsLeaving] = useState(false);
   const [isLeavePending, startLeaveTransition] = useTransition();
   const clientRef = useRef<RoomClient | null>(null);
+  const membersRef = useRef<Member[]>(members);
+
+  useEffect(() => {
+    membersRef.current = members;
+  }, [members]);
 
   // 既に writing ならボードへ直行（SSR でも redirect しているが、state 初期値が
   // 古い場合のリカバリとしても機能する）。
@@ -80,7 +94,22 @@ export function RoomStartBoard({
       }
       return;
     }
-    setMembers((current) => applyMemberServerMessage(current, message));
+    // member_joined / member_left は自分以外の参加者から届く通知。
+    // 自分自身の参加・退出はサーバから届かない（broadcastToAllExcept）。
+    if (message.type === "member_joined") {
+      notify.memberJoined(message.member.name);
+    }
+    if (message.type === "member_left") {
+      // member_left は userId のみなので、除去前の members から名前を引く。
+      const left = membersRef.current.find((m) => m.userId === message.userId);
+      if (left) {
+        notify.memberLeft(left.name);
+      }
+    }
+    // ref を同期更新して、連続メッセージでも最新 members を引けるようにする。
+    const nextMembers = applyMemberServerMessage(membersRef.current, message);
+    membersRef.current = nextMembers;
+    setMembers(nextMembers);
     setPhase((current) => applyPhaseServerMessage(current, message));
   }, []);
 
@@ -101,6 +130,23 @@ export function RoomStartBoard({
   const sendMessage = useCallback((message: ClientMessage) => {
     clientRef.current?.send(message);
   }, []);
+
+  // 自分自身の遷移種別に応じた通知を一度だけ発火する。
+  // - justCreated: ルーム作成直後
+  // - justJoined: 招待URL またはホーム画面からの参加直後
+  // 連続遷移（remount 等）で重複しないよう useRef で発火済みフラグを管理。
+  const notifiedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (justCreated && notifiedRef.current !== "created") {
+      notifiedRef.current = "created";
+      notify.roomCreated();
+      return;
+    }
+    if (justJoined && notifiedRef.current !== "joined") {
+      notifiedRef.current = "joined";
+      notify.joinedAsGuest();
+    }
+  }, [justCreated, justJoined]);
 
   const handleStart = useCallback(() => {
     if (!isHost) return;

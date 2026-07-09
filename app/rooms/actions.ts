@@ -48,7 +48,8 @@ export async function createRoom(): Promise<void> {
   }
 
   // #70: 作成直後は lobby 状態なので、ボードではなくスタート画面へ遷移する。
-  redirect(`/rooms/${parsed.data.roomId}/start`);
+  // ?created=1 クエリで「ルームを作成しました」通知を start ページで出す。
+  redirect(`/rooms/${parsed.data.roomId}/start?created=1`);
 }
 
 export async function joinRoom(formData: FormData): Promise<void> {
@@ -82,7 +83,8 @@ export async function joinRoom(formData: FormData): Promise<void> {
   }
 
   // #70: 参加したらボードではなくスタート画面へ遷移する。
-  redirect(`/rooms/${parsed.data.roomId}/start`);
+  // ?joined=1 クエリで「ルームに参加しました」通知を出す。
+  redirect(`/rooms/${parsed.data.roomId}/start?joined=1`);
 }
 
 // #70 退室機能。

@@ -14,6 +14,7 @@
 // 削除は楽観更新しない: author 以外の削除はサーバーが forbidden で拒否するため、
 // 確定（note:deleted）を待ってから消すことで「消えたのに戻る」揺れを避ける。
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { notify } from "@/app/_lib/notify";
 import { BoardView } from "@/app/rooms/[id]/board-view";
 import { leaveRoom } from "@/app/rooms/actions";
 import {
@@ -76,6 +77,7 @@ export function RoomBoard({
   const [isLeaving, setIsLeaving] = useState(false);
   const [isLeavePending, startLeaveTransition] = useTransition();
   const draggingNoteIdRef = useRef<string | null>(null);
+  const membersRef = useRef<Member[]>(members);
   const clientRef = useRef<RoomClient | null>(null);
   const sendDragRef = useRef<ReturnType<
     typeof createThrottled<[NoteDragPayload]>
@@ -84,6 +86,10 @@ export function RoomBoard({
   useEffect(() => {
     draggingNoteIdRef.current = draggingNoteId;
   }, [draggingNoteId]);
+
+  useEffect(() => {
+    membersRef.current = members;
+  }, [members]);
 
   const handleServerMessage = useCallback((message: ServerMessage) => {
     if (message.type === "error") {
@@ -95,7 +101,22 @@ export function RoomBoard({
         draggingNoteId: draggingNoteIdRef.current,
       }),
     );
-    setMembers((current) => applyMemberServerMessage(current, message));
+    // member_joined / member_left は自分以外の参加者から届く通知。
+    // 自分自身の参加・退出はサーバから届かない（broadcastToAllExcept）。
+    if (message.type === "member_joined") {
+      notify.memberJoined(message.member.name);
+    }
+    if (message.type === "member_left") {
+      // member_left は userId のみなので、除去前の members から名前を引く。
+      const left = membersRef.current.find((m) => m.userId === message.userId);
+      if (left) {
+        notify.memberLeft(left.name);
+      }
+    }
+    // ref を同期更新して、連続メッセージでも最新 members を引けるようにする。
+    const nextMembers = applyMemberServerMessage(membersRef.current, message);
+    membersRef.current = nextMembers;
+    setMembers(nextMembers);
     setPhase((current) => applyPhaseServerMessage(current, message));
   }, []);
 

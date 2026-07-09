@@ -1,6 +1,6 @@
-// RoomMembers（アバター横並び）の単体テスト。
+// RoomMembers（Avatar + 名前 横並び）の単体テスト。
 // データ層に依存しないプレゼンテーション層として、自分判定・省略表示・
-// a11y 属性を検証する。
+// 名前常時表示・a11y 属性を検証する。
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { RoomMembers } from "@/app/rooms/[id]/room-members";
@@ -34,6 +34,36 @@ describe("RoomMembers", () => {
       .getAllByTestId("avatar")
       .filter((el) => el.getAttribute("data-self") !== "true");
     expect(others).toHaveLength(1);
+  });
+
+  it("メンバー名（イニシャル）が Avatar 内に表示される（変更なし）", () => {
+    render(<RoomMembers members={buildMembers(2)} currentUserId={ME} />);
+    // Avatar のフォールバック名（aria-label）にフルネームが入る
+    expect(screen.getByLabelText("Yuki Tanaka")).toBeInTheDocument();
+    expect(screen.getByLabelText("Taro Yamada")).toBeInTheDocument();
+  });
+
+  it("メンバー名が Avatar の隣に常時表示される（ホバー不要）", () => {
+    const members = buildMembers(2, ME);
+    render(<RoomMembers members={members} currentUserId={ME} />);
+    // name は Avatar の中ではなく、Avatar の隣（fieldset 内）にテキストとして出る
+    const group = screen.getByRole("group", { name: "参加者" });
+    expect(within(group).getByText("Yuki Tanaka")).toBeInTheDocument();
+    expect(within(group).getByText("Taro Yamada")).toBeInTheDocument();
+  });
+
+  it("自分メンバーの隣に「（あなた）」マーカーが付く", () => {
+    const members = buildMembers(2, ME);
+    render(<RoomMembers members={members} currentUserId={ME} />);
+    // 自分の row にだけ「（あなた）」ラベル
+    const meRow = screen.getByTestId(`member-row-${ME}`).textContent;
+    expect(meRow).toContain("Yuki Tanaka");
+    expect(meRow).toContain("（あなた）");
+    // 他人の row には「（あなた）」は付かない
+    const otherRow = screen.getByTestId(
+      `member-row-${members[1]!.userId}`,
+    ).textContent;
+    expect(otherRow).not.toContain("（あなた）");
   });
 
   it("maxVisible を超えると末尾が +N バッジに置き換わる", () => {

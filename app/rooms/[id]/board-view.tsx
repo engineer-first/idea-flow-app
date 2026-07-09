@@ -112,7 +112,14 @@ export function BoardView({
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <RoomMembers members={members} currentUserId={currentUserId} />
+          <RoomMembers
+            members={members}
+            currentUserId={currentUserId}
+            // ボード画面の上部バーは招待URL/状態/ボタン群で幅を取られるため、
+            // 名前は Avatar の隣に常時表示しつつ、maxVisible=3 で 4 人目以降は
+            // +N バッジに置き換える（start 画面は既定 5）。
+            maxVisible={3}
+          />
           {isHost ? (
             <span
               data-testid="host-badge"

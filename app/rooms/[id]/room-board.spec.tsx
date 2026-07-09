@@ -4,11 +4,29 @@
 // BoardView / NoteCard / notes-reducer 自体の仕様は各ファイルの spec が担う。
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+const notifyMocks = vi.hoisted(() => ({
+  memberJoined: vi.fn(),
+  memberLeft: vi.fn(),
+}));
+
+vi.mock("@/app/_lib/notify", () => ({
+  notify: {
+    memberJoined: notifyMocks.memberJoined,
+    memberLeft: notifyMocks.memberLeft,
+    roomCreated: vi.fn(),
+    joinedAsHost: vi.fn(),
+    joinedAsGuest: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
 import { RoomBoard } from "@/app/rooms/[id]/room-board";
 import type { ProtocolNote } from "@/contracts/room-protocol";
 
 const ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const USER_ID = "11111111-1111-4111-8111-111111111111";
+const OTHER_USER_ID = "22222222-2222-4222-8222-222222222222";
 const NOTE_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 
 type Listener = (event: { data?: unknown }) => void;
@@ -110,6 +128,44 @@ function connectWithSnapshot(notes: ProtocolNote[] = []) {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  notifyMocks.memberJoined.mockReset();
+  notifyMocks.memberLeft.mockReset();
+});
+
+describe("メンバー参加・退出の通知", () => {
+  it("member_joined を受信すると notify.memberJoined を呼ぶ", () => {
+    const { socket } = connectWithSnapshot([]);
+    act(() =>
+      socket.simulateServerMessage({
+        type: "member_joined",
+        member: { userId: OTHER_USER_ID, name: "Taro" },
+      }),
+    );
+    expect(notifyMocks.memberJoined).toHaveBeenCalledTimes(1);
+    expect(notifyMocks.memberJoined).toHaveBeenCalledWith("Taro");
+  });
+
+  it("member_left を受信すると members から名前を引き、notify.memberLeft を呼ぶ", () => {
+    const { socket } = renderBoard();
+    act(() =>
+      socket.simulateServerMessage({
+        type: "snapshot",
+        notes: [],
+        members: [
+          { userId: USER_ID, name: "Host" },
+          { userId: OTHER_USER_ID, name: "Taro" },
+        ],
+      }),
+    );
+    act(() =>
+      socket.simulateServerMessage({
+        type: "member_left",
+        userId: OTHER_USER_ID,
+      }),
+    );
+    expect(notifyMocks.memberLeft).toHaveBeenCalledTimes(1);
+    expect(notifyMocks.memberLeft).toHaveBeenCalledWith("Taro");
+  });
 });
 
 describe("サーバーメッセージ → 画面反映", () => {

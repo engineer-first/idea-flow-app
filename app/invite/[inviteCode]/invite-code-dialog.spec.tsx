@@ -21,6 +21,18 @@ describe("InviteCodeDialog", () => {
     expect(screen.getByText("ABC234")).toBeInTheDocument();
   });
 
+  it("hostName なしの場合は「招待コード XXX のルーム」のタイトル", () => {
+    render(<InviteCodeDialog inviteCode="ABC234" />);
+    expect(screen.getByText("このルームに参加しますか？")).toBeInTheDocument();
+  });
+
+  it("hostName ありの場合は「hostname さんが作成したルームに参加しますか？」", () => {
+    render(<InviteCodeDialog inviteCode="ABC234" hostName="田中太郎" />);
+    expect(
+      screen.getByText("田中太郎 さんが作成したルームに参加しますか？"),
+    ).toBeInTheDocument();
+  });
+
   it("「参加する」確定で joinRoom Server Action が招待コード付きで呼ばれる", async () => {
     const user = userEvent.setup();
     JOIN_ROOM.mockResolvedValueOnce(undefined);

@@ -14,10 +14,19 @@ export const dynamic = "force-dynamic";
 
 type StartPageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ created?: string; joined?: string }>;
 };
 
-export default async function StartPage({ params }: StartPageProps) {
+export default async function StartPage({
+  params,
+  searchParams,
+}: StartPageProps) {
   const { id } = await params;
+  const sp = await searchParams;
+  // 直前の遷移が「ルーム作成」か「招待URL から参加」かを URL クエリで伝える。
+  // RoomStartBoard がクライアント側で通知（toast）を発火する。
+  const justCreated = sp.created === "1";
+  const justJoined = sp.joined === "1";
 
   if (!isUuid(id)) {
     notFound();
@@ -64,6 +73,8 @@ export default async function StartPage({ params }: StartPageProps) {
           isHost={parsed.data.isHost}
           initialPhase={parsed.data.phase}
           initialMembers={initialMembers}
+          justCreated={justCreated}
+          justJoined={justJoined}
         />
       </div>
     </main>

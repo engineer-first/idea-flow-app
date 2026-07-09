@@ -71,13 +71,14 @@ describe("createRoom", () => {
   it("作成に成功したらスタート画面へリダイレクトする", async () => {
     apiFetchMock.mockResolvedValue(
       Response.json({
-        roomId: "123e4567-e89b-12d3-a456-426614174000",
+        roomId: "123e4567-e89b-42d3-a456-426614174000",
         inviteCode: "ABC123",
       }),
     );
 
+    // ?created=1 クエリで start ページ側に「ルームを作成しました」通知を出す
     expect(await callAndGetRedirect(() => createRoom())).toBe(
-      "/rooms/123e4567-e89b-12d3-a456-426614174000/start",
+      "/rooms/123e4567-e89b-42d3-a456-426614174000/start?created=1",
     );
   });
 
@@ -104,12 +105,13 @@ describe("joinRoom", () => {
 
   it("参加に成功したらスタート画面へリダイレクトする", async () => {
     apiFetchMock.mockResolvedValue(
-      Response.json({ roomId: "123e4567-e89b-12d3-a456-426614174000" }),
+      Response.json({ roomId: "123e4567-e89b-42d3-a456-426614174000" }),
     );
 
+    // ?joined=1 クエリで start ページ側に「ルームに参加しました」通知を出す
     expect(
       await callAndGetRedirect(() => joinRoom(joinFormData("ABC123"))),
-    ).toBe("/rooms/123e4567-e89b-12d3-a456-426614174000/start");
+    ).toBe("/rooms/123e4567-e89b-42d3-a456-426614174000/start?joined=1");
   });
 
   it("API が 2xx でも不正 JSON ならエラー付きでトップへ戻す", async () => {
