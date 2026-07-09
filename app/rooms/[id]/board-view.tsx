@@ -5,12 +5,24 @@ import { DotVoteSummary } from "@/app/components/dotvote/organisms/dot-vote-summ
 import { CopyInviteButton } from "@/app/rooms/[id]/copy-invite-button";
 import { NoteCard } from "@/app/rooms/[id]/note-card";
 import type { Note } from "@/app/rooms/notes-reducer";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 // ルームボードの表示用コンポーネント。データ層には一切依存せず、
 // 付箋の配列と各種コールバックをpropsで受け取る。
 // WebSocket接続・スロットル・プロトコル送信はroom-board.tsx（コンテナ）の責務。
 // 「どの付箋を選択中か」は同期不要な純粋にUIの関心事なので、ここでローカルに持つ。
 import { BOARD_HEIGHT, BOARD_WIDTH } from "@/contracts/board";
+import type { Phase } from "@/contracts/room-protocol";
 import { DOT_VOTE_LIMITS, type DotVoteKind } from "@/contracts/room-protocol";
 
 // WebSocket 接続の表示用状態。値の生成は room-board（コンテナ）の責務で、
@@ -27,8 +39,11 @@ export type BoardViewProps = {
   notes: Note[];
   inviteCode: string;
   inviteUrl: string;
+  phase: Phase;
+  isHost: boolean;
   connectionStatus: BoardConnectionStatus;
   draggingNoteId: string | null;
+  isNextPhasePending: boolean;
   onAddNote: () => void;
   onNoteDragStart: (noteId: string) => void;
   onNoteDragMove: (noteId: string, x: number, y: number) => void;
@@ -37,14 +52,18 @@ export type BoardViewProps = {
   onNoteDelete: (noteId: string) => void;
   onNoteVote: (noteId: string, kind: DotVoteKind) => void;
   onNoteVoteReset: (noteId: string, kind: DotVoteKind) => void;
+  onNextPhase: () => void;
 };
 
 export function BoardView({
   notes,
   inviteCode,
   inviteUrl,
+  phase,
+  isHost,
   connectionStatus,
   draggingNoteId,
+  isNextPhasePending,
   onAddNote,
   onNoteDragStart,
   onNoteDragMove,
@@ -53,6 +72,7 @@ export function BoardView({
   onNoteDelete,
   onNoteVote,
   onNoteVoteReset,
+  onNextPhase,
 }: BoardViewProps) {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   // 未接続中は room-client が送信を黙って破棄するため、操作自体を無効化する。
@@ -112,6 +132,49 @@ export function BoardView({
         </div>
         <div className="flex items-center gap-3">
           <DotVoteSummary voteRemaining={voteRemaining} />
+          <span className="text-sm text-muted-foreground">
+            Phase:
+            <span className="ml-1 font-semibold text-foreground">{phase}</span>
+          </span>
+
+          {isHost && (
+            <span className="text-xs text-muted-foreground">ホスト</span>
+          )}
+
+          {isHost && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  type="button"
+                  disabled={isDisconnected || isNextPhasePending}
+                >
+                  次のフェーズへ
+                </Button>
+              </AlertDialogTrigger>
+
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    次のフェーズへ移行しますか？
+                  </AlertDialogTitle>
+
+                  <AlertDialogDescription>
+                    {phase}から次のフェーズへ移行します。
+                    移行すると現在の付箋が整理され、一部の内容が引き継がれない場合があります。
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+
+                <AlertDialogFooter>
+                  <AlertDialogCancel>キャンセル</AlertDialogCancel>
+
+                  <AlertDialogAction onClick={onNextPhase}>
+                    移行する
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+
           {CONNECTION_STATUS_LABELS[connectionStatus] !== null && (
             // role="status"（aria-live: polite）で、再接続をスクリーンリーダーにも通知する。
             <span

@@ -84,7 +84,7 @@ async function handleCreateRoom(
     name: session.name,
   });
   const room = await insertRoom(env.DB, session.sub);
-  await roomStub(env, room.roomId).join(session.sub);
+  await roomStub(env, room.roomId).join(session.sub, true);
   return json({ roomId: room.roomId, inviteCode: room.inviteCode });
 }
 

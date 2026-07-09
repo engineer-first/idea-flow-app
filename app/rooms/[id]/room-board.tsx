@@ -21,7 +21,11 @@ import {
 } from "@/app/rooms/notes-reducer";
 import { createThrottled } from "@/app/rooms/throttle";
 import { DRAG_BROADCAST_THROTTLE_MS } from "@/contracts/board";
-import type { DotVoteKind, ServerMessage } from "@/contracts/room-protocol";
+import type {
+  DotVoteKind,
+  Phase,
+  ServerMessage,
+} from "@/contracts/room-protocol";
 import {
   createRoomClient,
   type RoomClient,
@@ -49,6 +53,8 @@ export function RoomBoard({
   // 付箋の初期状態は空。確定状態の真実はサーバー（RoomDO）側にあり、
   // 接続直後に送られてくる snapshot で復元される。
   const [notes, setNotes] = useState<Note[]>([]);
+  const [phase, setPhase] = useState<Phase>("phase1");
+  const [isHost, setIsHost] = useState(false);
   // createRoomClient が生成直後に "connecting" を通知するので初期値と一致する。
   const [connectionStatus, setConnectionStatus] =
     useState<RoomConnectionStatus>("connecting");
@@ -59,6 +65,7 @@ export function RoomBoard({
   const sendDragRef = useRef<ReturnType<
     typeof createThrottled<[NoteDragPayload]>
   > | null>(null);
+  const [isNextPhasePending, setIsNextPhasePending] = useState(false);
 
   useEffect(() => {
     draggingNoteIdRef.current = draggingNoteId;
@@ -77,6 +84,18 @@ export function RoomBoard({
         console.warn(`ルーム操作エラー (${message.code}): ${message.message}`);
         return;
       }
+
+      if (message.type === "snapshot") {
+        setPhase(message.phase);
+        setIsHost(message.isHost);
+      }
+
+      if (message.type === "phase:updated") {
+        setPhase(message.phase);
+        setIsNextPhasePending(false);
+        return;
+      }
+
       updateNotes((current) =>
         applyServerMessage(current, message, {
           draggingNoteId: draggingNoteIdRef.current,
@@ -118,6 +137,16 @@ export function RoomBoard({
     // 単一オブジェクトなので往復は短く、ID 生成をサーバーに一本化できる）。
     clientRef.current?.send({ type: "note:create" });
   }, []);
+
+  const handleNextPhase = useCallback(() => {
+    if (isNextPhasePending) return;
+
+    setIsNextPhasePending(true);
+
+    clientRef.current?.send({
+      type: "phase:next",
+    });
+  }, [isNextPhasePending]);
 
   const handleNoteDragStart = useCallback((noteId: string) => {
     setDraggingNoteId(noteId);
@@ -189,9 +218,13 @@ export function RoomBoard({
       notes={notes}
       inviteCode={inviteCode}
       inviteUrl={inviteUrl}
+      phase={phase}
+      isHost={isHost}
       connectionStatus={connectionStatus}
       draggingNoteId={draggingNoteId}
+      isNextPhasePending={isNextPhasePending}
       onAddNote={handleAddNote}
+      onNextPhase={handleNextPhase}
       onNoteDragStart={handleNoteDragStart}
       onNoteDragMove={handleNoteDragMove}
       onNoteDragEnd={handleNoteDragEnd}

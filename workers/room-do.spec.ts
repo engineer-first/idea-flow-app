@@ -68,3 +68,210 @@ describe("RoomDO WebSocket の深層防御", () => {
     res.webSocket?.close();
   });
 });
+
+describe("RoomDO snapshot", () => {
+  it("host は snapshot で isHost=true になる", async () => {
+    const stub = roomStub("room-snapshot-host");
+
+    await stub.join(USER_A, true);
+
+    const res = await stub.fetch("https://do/ws", {
+      headers: {
+        Upgrade: "websocket",
+        [USER_ID_HEADER]: USER_A,
+      },
+    });
+
+    expect(res.status).toBe(101);
+
+    const ws = res.webSocket!;
+    ws.accept();
+
+    const message = await new Promise<MessageEvent>((resolve) => {
+      ws.addEventListener("message", resolve);
+    });
+
+    const snapshot = JSON.parse(String(message.data));
+
+    expect(snapshot.type).toBe("snapshot");
+    expect(snapshot.isHost).toBe(true);
+
+    ws.close();
+  });
+
+  it("member は snapshot で isHost=false になる", async () => {
+    const stub = roomStub("room-snapshot-member");
+
+    await stub.join(USER_A, true);
+    await stub.join(USER_B);
+
+    const res = await stub.fetch("https://do/ws", {
+      headers: {
+        Upgrade: "websocket",
+        [USER_ID_HEADER]: USER_B,
+      },
+    });
+
+    expect(res.status).toBe(101);
+
+    const ws = res.webSocket!;
+    ws.accept();
+
+    const message = await new Promise<MessageEvent>((resolve) => {
+      ws.addEventListener("message", resolve);
+    });
+
+    const snapshot = JSON.parse(String(message.data));
+
+    expect(snapshot.type).toBe("snapshot");
+    expect(snapshot.isHost).toBe(false);
+
+    ws.close();
+  });
+});
+
+describe("RoomDO phase:next", () => {
+  it("host は phase を進められる", async () => {
+    const stub = roomStub("room-phase-host");
+
+    await stub.join(USER_A, true);
+
+    const res = await stub.fetch("https://do/ws", {
+      headers: {
+        Upgrade: "websocket",
+        [USER_ID_HEADER]: USER_A,
+      },
+    });
+
+    expect(res.status).toBe(101);
+
+    const ws = res.webSocket!;
+    ws.accept();
+
+    // snapshot を捨てる
+    await new Promise<MessageEvent>((resolve) => {
+      ws.addEventListener("message", resolve, { once: true });
+    });
+
+    ws.send(JSON.stringify({ type: "phase:next" }));
+
+    const message = await new Promise<MessageEvent>((resolve) => {
+      ws.addEventListener("message", resolve, { once: true });
+    });
+
+    const phase = JSON.parse(String(message.data));
+
+    expect(phase.type).toBe("phase:updated");
+    expect(phase.phase).toBe("phase2");
+
+    ws.close();
+  });
+
+  it("member は phase を進められない", async () => {
+    const stub = roomStub("room-phase-member");
+
+    await stub.join(USER_A, true);
+    await stub.join(USER_B);
+
+    const res = await stub.fetch("https://do/ws", {
+      headers: {
+        Upgrade: "websocket",
+        [USER_ID_HEADER]: USER_B,
+      },
+    });
+
+    expect(res.status).toBe(101);
+
+    const ws = res.webSocket!;
+    ws.accept();
+
+    // snapshot を捨てる
+    await new Promise<MessageEvent>((resolve) => {
+      ws.addEventListener("message", resolve, { once: true });
+    });
+
+    ws.send(JSON.stringify({ type: "phase:next" }));
+
+    const message = await new Promise<MessageEvent>((resolve) => {
+      ws.addEventListener("message", resolve, { once: true });
+    });
+
+    const error = JSON.parse(String(message.data));
+
+    expect(error.type).toBe("error");
+    expect(error.code).toBe("forbidden");
+
+    ws.close();
+  });
+
+  it("phase 更新は全クライアントへ配信される", async () => {
+    const stub = roomStub("room-phase-broadcast");
+
+    await stub.join(USER_A, true);
+    await stub.join(USER_B);
+
+    const hostRes = await stub.fetch("https://do/ws", {
+      headers: {
+        Upgrade: "websocket",
+        [USER_ID_HEADER]: USER_A,
+      },
+    });
+
+    const memberRes = await stub.fetch("https://do/ws", {
+      headers: {
+        Upgrade: "websocket",
+        [USER_ID_HEADER]: USER_B,
+      },
+    });
+
+    expect(hostRes.status).toBe(101);
+    expect(memberRes.status).toBe(101);
+
+    const host = hostRes.webSocket!;
+    const member = memberRes.webSocket!;
+
+    host.accept();
+    member.accept();
+
+    // snapshot を受け取る
+    await Promise.all([
+      new Promise<MessageEvent>((resolve) => {
+        host.addEventListener("message", resolve, { once: true });
+      }),
+      new Promise<MessageEvent>((resolve) => {
+        member.addEventListener("message", resolve, { once: true });
+      }),
+    ]);
+
+    // phase:updated の待機を先に開始する
+    const hostPromise = new Promise<MessageEvent>((resolve) => {
+      host.addEventListener("message", resolve, { once: true });
+    });
+
+    const memberPromise = new Promise<MessageEvent>((resolve) => {
+      member.addEventListener("message", resolve, { once: true });
+    });
+
+    // ホストがフェーズを進める
+    host.send(JSON.stringify({ type: "phase:next" }));
+
+    // 両方同時に待つ
+    const [hostMessage, memberMessage] = await Promise.all([
+      hostPromise,
+      memberPromise,
+    ]);
+
+    expect(JSON.parse(String(hostMessage.data))).toEqual({
+      type: "phase:updated",
+      phase: "phase2",
+    });
+
+    expect(JSON.parse(String(memberMessage.data))).toEqual({
+      type: "phase:updated",
+      phase: "phase2",
+    });
+
+    host.close();
+    member.close();
+  });
+});

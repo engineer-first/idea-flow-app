@@ -96,14 +96,24 @@ function renderBoard(options: { open?: boolean } = {}) {
   return { view, socket };
 }
 
-function connectWithSnapshot(notes: ProtocolNote[] = []) {
+function connectWithSnapshot(
+  notes: ProtocolNote[] = [],
+  options?: {
+    phase?: "phase1" | "phase2" | "phase3";
+    isHost?: boolean;
+  },
+) {
   const { view, socket } = renderBoard();
+
   act(() =>
     socket.simulateServerMessage({
       type: "snapshot",
       notes,
+      phase: options?.phase ?? "phase1",
+      isHost: options?.isHost ?? true,
     }),
   );
+
   return { view, socket };
 }
 
@@ -322,5 +332,24 @@ describe("ユーザー操作 → プロトコルメッセージ送信", () => {
     fireEvent.click(screen.getByRole("button", { name: "付箋を追加" }));
 
     expect(socket.sent).toHaveLength(0);
+  });
+
+  it("ホストが確認後に「次のフェーズへ」を実行すると phase:next が送信される", () => {
+    const { socket } = connectWithSnapshot([], {
+      isHost: true,
+      phase: "phase1",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "次のフェーズへ" }));
+
+    expect(
+      screen.getByText("次のフェーズへ移行しますか？"),
+    ).toBeInTheDocument();
+
+    expect(socket.sent).not.toContain(JSON.stringify({ type: "phase:next" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "移行する" }));
+
+    expect(socket.sent).toContain(JSON.stringify({ type: "phase:next" }));
   });
 });

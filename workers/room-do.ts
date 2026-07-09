@@ -15,6 +15,7 @@ import {
   type ClientMessage,
   DOT_VOTE_LIMITS,
   type DotVoteKind,
+  type Phase,
   type ProtocolNote,
   parseClientMessage,
   type ServerMessage,
@@ -56,11 +57,28 @@ export class RoomDO extends DurableObject {
   // ------------------------------------------------------------
 
   // 冪等: 既にメンバーでも何も起きない。
-  join(userId: string): void {
+  join(userId: string, isHost = false): void {
     this.ctx.storage.sql.exec(
       "INSERT OR IGNORE INTO members (user_id) VALUES (?1)",
       userId,
     );
+
+    if (isHost) {
+      const existing = this.ctx.storage.sql
+        .exec("SELECT host_id FROM room_owner WHERE id = 1")
+        .toArray()[0];
+
+      if (!existing?.host_id) {
+        this.ctx.storage.sql.exec(
+          `
+          UPDATE room_owner
+          SET host_id = ?1
+          WHERE id = 1
+          `,
+          userId,
+        );
+      }
+    }
   }
 
   isMember(userId: string): boolean {
@@ -69,6 +87,14 @@ export class RoomDO extends DurableObject {
       userId,
     );
     return cursor.toArray().length > 0;
+  }
+
+  private isHost(userId: string): boolean {
+    const row = this.ctx.storage.sql
+      .exec("SELECT host_id FROM room_owner WHERE id = 1")
+      .toArray()[0];
+
+    return row?.host_id === userId;
   }
 
   // ------------------------------------------------------------
@@ -340,6 +366,25 @@ export class RoomDO extends DurableObject {
         return;
       }
 
+      case "phase:next": {
+        if (!this.isHost(userId)) {
+          this.sendTo(ws, {
+            type: "error",
+            code: "forbidden",
+            message: "ホストのみ操作できます。",
+          });
+          return;
+        }
+
+        const nextPhase = this.nextPhase();
+
+        this.savePhase(nextPhase);
+
+        this.broadcastPhase(nextPhase);
+
+        return;
+      }
+
       default: {
         // メッセージ型の網羅性チェック（コンパイル時のみ意味を持つ）
         const _exhaustive: never = message;
@@ -358,6 +403,8 @@ export class RoomDO extends DurableObject {
     this.sendTo(ws, {
       type: "snapshot",
       notes: filterVisible({ viewerId: userId }, notes),
+      phase: this.getPhase(),
+      isHost: this.isHost(userId),
     });
   }
 
@@ -403,6 +450,17 @@ export class RoomDO extends DurableObject {
         socket.deserializeAttachment() as SocketAttachment | null;
       if (!attachment) continue;
       if (!visibleTo({ viewerId: attachment.userId }, subject)) continue;
+      socket.send(payload);
+    }
+  }
+
+  private broadcastPhase(phase: Phase): void {
+    const payload = JSON.stringify({
+      type: "phase:updated",
+      phase,
+    });
+
+    for (const socket of this.ctx.getWebSockets()) {
       socket.send(payload);
     }
   }
@@ -514,5 +572,35 @@ export class RoomDO extends DurableObject {
         },
       },
     };
+  }
+
+  private getPhase(): Phase {
+    const row = this.ctx.storage.sql
+      .exec("SELECT phase FROM room_state WHERE id = 1")
+      .toArray()[0];
+
+    return (row?.phase ?? "phase1") as Phase;
+  }
+
+  private nextPhase(): Phase {
+    const current = this.getPhase();
+
+    switch (current) {
+      case "phase1":
+        return "phase2";
+
+      case "phase2":
+        return "phase3";
+
+      case "phase3":
+        return "phase3";
+    }
+  }
+
+  private savePhase(phase: Phase): void {
+    this.ctx.storage.sql.exec(
+      "UPDATE room_state SET phase = ?1 WHERE id = 1",
+      phase,
+    );
   }
 }

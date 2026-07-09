@@ -47,6 +47,8 @@ describe("migrateRoomStorage", () => {
         "members",
         "note_votes",
         "notes",
+        "room_owner",
+        "room_state",
         "schema_version",
       ]);
       expect(schemaVersion(state.storage)).toBe(ROOM_DO_MIGRATIONS.length);
@@ -158,6 +160,8 @@ describe("RoomDO constructor の配線", () => {
         "members",
         "note_votes",
         "notes",
+        "room_owner",
+        "room_state",
         "schema_version",
       ]);
     });
