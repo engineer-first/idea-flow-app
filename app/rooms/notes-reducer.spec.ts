@@ -16,6 +16,10 @@ const note: Note = {
   y: 20,
   createdAt: "2026-07-03T00:00:00.000Z",
   updatedAt: "2026-07-03T00:00:00.000Z",
+  dotVotes: {
+    subjective: { count: 0, votedByMe: false, ownCount: 0 },
+    objective: { count: 0, votedByMe: false, ownCount: 0 },
+  },
 };
 
 function makeNote(overrides: Partial<Note> = {}): Note {

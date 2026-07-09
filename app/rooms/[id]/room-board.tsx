@@ -19,7 +19,7 @@ import {
 } from "@/app/rooms/notes-reducer";
 import { createThrottled } from "@/app/rooms/throttle";
 import { DRAG_BROADCAST_THROTTLE_MS } from "@/contracts/board";
-import type { ServerMessage } from "@/contracts/room-protocol";
+import type { DotVoteKind, ServerMessage } from "@/contracts/room-protocol";
 import {
   createRoomClient,
   type RoomClient,
@@ -146,6 +146,17 @@ export function RoomBoard({
     clientRef.current?.send({ type: "note:delete", noteId });
   }, []);
 
+  const handleNoteVote = useCallback((noteId: string, kind: DotVoteKind) => {
+    clientRef.current?.send({ type: "note:vote", noteId, kind });
+  }, []);
+
+  const handleNoteVoteReset = useCallback(
+    (noteId: string, kind: DotVoteKind) => {
+      clientRef.current?.send({ type: "note:vote-reset", noteId, kind });
+    },
+    [],
+  );
+
   return (
     <BoardView
       notes={notes}
@@ -159,6 +170,8 @@ export function RoomBoard({
       onNoteDragEnd={handleNoteDragEnd}
       onNoteContentChange={handleNoteContentChange}
       onNoteDelete={handleNoteDelete}
+      onNoteVote={handleNoteVote}
+      onNoteVoteReset={handleNoteVoteReset}
     />
   );
 }

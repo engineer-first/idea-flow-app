@@ -11,6 +11,10 @@
 // 選択状態(isSelected)は「同時に1枚だけ」という付箋間の関心事なので親が持ち、
 // 編集状態(isEditing)はこの付箋に閉じた関心事なのでローカルに持つ。
 import { useEffect, useRef, useState } from "react";
+import {
+  DotVoteControls,
+  type DotVoteRemaining,
+} from "@/app/components/dotvote/molecules/dot-vote-controls";
 import { getNoteShadow } from "@/app/rooms/[id]/note-shadow";
 import type { Note } from "@/app/rooms/notes-reducer";
 import {
@@ -20,6 +24,7 @@ import {
   NOTE_HEIGHT,
   NOTE_WIDTH,
 } from "@/contracts/board";
+import type { DotVoteKind } from "@/contracts/room-protocol";
 import { NOTE_CONTENT_MAX_LENGTH } from "@/contracts/room-protocol";
 
 export type NoteCardProps = {
@@ -38,6 +43,9 @@ export type NoteCardProps = {
   onDragEnd: (noteId: string, x: number, y: number) => void;
   onContentChange: (noteId: string, content: string) => void;
   onDelete: (noteId: string) => void;
+  voteRemaining: DotVoteRemaining;
+  onVote: (noteId: string, kind: DotVoteKind) => void;
+  onVoteReset: (noteId: string, kind: DotVoteKind) => void;
 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -67,6 +75,9 @@ export function NoteCard({
   onDragEnd,
   onContentChange,
   onDelete,
+  voteRemaining,
+  onVote,
+  onVoteReset,
 }: NoteCardProps) {
   const [localContent, setLocalContent] = useState(note.content);
   const [isEditing, setIsEditing] = useState(false);
@@ -247,11 +258,21 @@ export function NoteCard({
             setIsEditing(false);
           }
         }}
-        className={`flex-1 resize-none bg-transparent p-2 text-sm text-amber-950 outline-none dark:text-amber-50 ${
+        className={`min-h-0 flex-1 resize-none bg-transparent p-2 text-sm text-amber-950 outline-none dark:text-amber-50 ${
           isEditing ? "" : "pointer-events-none select-none"
         }`}
         placeholder="メモを入力..."
       />
+      <div className="relative z-20">
+        <DotVoteControls
+          noteId={note.id}
+          dotVotes={note.dotVotes}
+          voteRemaining={voteRemaining}
+          disabled={disabled}
+          onVote={onVote}
+          onVoteReset={onVoteReset}
+        />
+      </div>
       {!isEditing && (
         // 選択・ドラッグ・キー操作を受ける透明なサーフェス。
         // button要素は対話的な子要素(textarea)を持てないため、カード全体を
@@ -267,7 +288,7 @@ export function NoteCard({
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onKeyDown={handleKeyDown}
-          className={`absolute inset-0 touch-none select-none outline-none ${
+          className={`absolute inset-0 z-10 touch-none select-none outline-none ${
             disabled
               ? "cursor-not-allowed"
               : isOwnDrag

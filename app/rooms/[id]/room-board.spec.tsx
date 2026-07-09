@@ -68,6 +68,10 @@ function protocolNote(overrides?: Partial<ProtocolNote>): ProtocolNote {
     y: 100,
     createdAt: "2026-07-07T00:00:00.000Z",
     updatedAt: "2026-07-07T00:00:00.000Z",
+    dotVotes: {
+      subjective: { count: 0, votedByMe: false, ownCount: 0 },
+      objective: { count: 0, votedByMe: false, ownCount: 0 },
+    },
     ...overrides,
   };
 }
@@ -193,6 +197,57 @@ describe("ユーザー操作 → プロトコルメッセージ送信", () => {
     expect(socket.sent).toContain(JSON.stringify({ type: "note:create" }));
     // 確定（note:inserted）が届くまでは描画されない。
     expect(screen.queryAllByTestId("note-card")).toHaveLength(0);
+  });
+
+  it("付箋の主観ドットボタンで note:vote が送信される", () => {
+    const { socket } = connectWithSnapshot([protocolNote()]);
+
+    fireEvent.click(screen.getByRole("button", { name: "主観ドットを投票" }));
+
+    expect(socket.sent).toContain(
+      JSON.stringify({
+        type: "note:vote",
+        noteId: NOTE_ID,
+        kind: "subjective",
+      }),
+    );
+  });
+
+  it("付箋の客観ドットボタンで note:vote が送信される", () => {
+    const { socket } = connectWithSnapshot([protocolNote()]);
+
+    fireEvent.click(screen.getByRole("button", { name: "客観ドットを追加" }));
+
+    expect(socket.sent).toContain(
+      JSON.stringify({
+        type: "note:vote",
+        noteId: NOTE_ID,
+        kind: "objective",
+      }),
+    );
+  });
+
+  it("付箋の客観ドットリセットボタンで note:vote-reset が送信される", () => {
+    const { socket } = connectWithSnapshot([
+      protocolNote({
+        dotVotes: {
+          subjective: { count: 0, votedByMe: false, ownCount: 0 },
+          objective: { count: 2, votedByMe: true, ownCount: 2 },
+        },
+      }),
+    ]);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "客観ドットを0に戻す" }),
+    );
+
+    expect(socket.sent).toContain(
+      JSON.stringify({
+        type: "note:vote-reset",
+        noteId: NOTE_ID,
+        kind: "objective",
+      }),
+    );
   });
 
   it("アンマウントで WebSocket を閉じる", () => {
