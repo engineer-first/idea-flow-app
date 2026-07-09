@@ -246,7 +246,7 @@ describe("BoardView", () => {
   });
 });
 
-describe("退出・解散ボタン（#70 退室機能）", () => {
+describe("退出・解散ボタン", () => {
   it("ホストは「ルームを解散」ボタンが描画される", () => {
     setup({ isHost: true });
     expect(

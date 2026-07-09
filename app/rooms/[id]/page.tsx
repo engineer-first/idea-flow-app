@@ -40,7 +40,7 @@ export default async function RoomPage({ params }: RoomPageProps) {
     notFound();
   }
 
-  // lobby 状態なら付箋画面に直行させず、スタート画面へ誘導する（#70 仕様）。
+  // lobby 状態なら付箋画面に直行させず、スタート画面へ誘導する。
   // phase1-3 ならボードを直接開く。
   if (parsed.data.phase === "lobby") {
     redirect(`/rooms/${parsed.data.roomId}/start`);

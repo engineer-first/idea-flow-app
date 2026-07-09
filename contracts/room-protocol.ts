@@ -7,7 +7,7 @@
 // - roomId はプロトコルに現れない（1 RoomDO = 1 ルーム）。
 // - note:drag は永続化されない一時データ。確定は note:move だけが行う。
 //
-// フェーズモデル（#70 + #71 統合）:
+// フェーズモデル:
 // - lobby: 開始前ロビー（メンバー確認・招待）。start_phase で phase1 へ。
 // - phase1/2/3: ボード上のスプリント工程。phase:next で進む（ホストのみ）。
 import { z } from "zod";
@@ -45,11 +45,11 @@ export const NoteSchema = z.object({
 
 export type ProtocolNote = z.infer<typeof NoteSchema>;
 
-// lobby = 開始前 / phase1-3 = ボード上の工程（#71）
+// lobby = 開始前 / phase1-3 = ボード上の工程
 export const PhaseSchema = z.enum(["lobby", "phase1", "phase2", "phase3"]);
 export type Phase = z.infer<typeof PhaseSchema>;
 
-// メンバー一覧スナップショットの単位（#70）。
+// メンバー一覧スナップショットの単位。
 export const MemberSchema = z.object({
   userId: z.string().uuid(),
   name: z.string(),
@@ -98,9 +98,9 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
     noteId: z.string().uuid(),
     kind: DotVoteKindSchema,
   }),
-  // #70: ロビーからボードへ（lobby → phase1）。ホストのみ。
+  // ロビーからボードへ（lobby → phase1）。ホストのみ。
   z.object({ type: z.literal("start_phase") }),
-  // #71: ボード内の次工程（phase1 → phase2 → phase3）。ホストのみ。
+  // ボード内の次工程（phase1 → phase2 → phase3）。ホストのみ。
   z.object({ type: z.literal("phase:next") }),
 ]);
 
@@ -145,7 +145,7 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
     type: z.literal("phase_changed"),
     phase: PhaseSchema,
   }),
-  // #71 互換: phase:next 成功時に配信（board 側が購読）。
+  // phase:next 成功時に配信（board 側が購読）。
   z.object({
     type: z.literal("phase:updated"),
     phase: PhaseSchema,

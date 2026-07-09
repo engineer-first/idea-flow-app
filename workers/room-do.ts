@@ -74,12 +74,12 @@ export class RoomDO extends DurableObject {
   // RPC（api-worker からのみ呼ばれる）
   // ------------------------------------------------------------
 
-  // 参加処理。name は表示用（#70 のメンバー一覧で使う）。
+  // 参加処理。name は表示用（メンバー一覧で使う）。
   // 冪等: 既存メンバーなら name だけを最新に同期して終わる。
-  // 進行中のルームでも新規メンバーの参加は可能（#70 メモ: 途中参加OK）。
+  // 進行中のルームでも新規メンバーの参加は可能（途中参加OK）。
   //
   // 新規メンバーの場合のみ、既存メンバー全員の WS に member_joined を
-  // broadcast する（#70 の Realtime 反映）。新規メンバー本人には
+  // broadcast する（Realtime 反映）。新規メンバー本人には
   // snapshot.members が届くので送らない（本人除外）。
   async upsertMember(userId: string, name: string | undefined): Promise<void> {
     const safeName = name ?? "";
@@ -98,7 +98,7 @@ export class RoomDO extends DurableObject {
     }
   }
 
-  // 旧シグネチャ + #71 の isHost フラグ。ホスト初回 join で room_owner を記録。
+  // 旧シグネチャ + isHost フラグ。ホスト初回 join で room_owner を記録。
   async join(userId: string, isHost = false): Promise<void> {
     await this.upsertMember(userId, undefined);
     if (isHost) {
@@ -106,7 +106,7 @@ export class RoomDO extends DurableObject {
     }
   }
 
-  // 新規ルーム作成直後にロビー状態へ（#70）。
+  // 新規ルーム作成直後にロビー状態へ。
   async initializeNewRoom(
     hostId: string,
     hostName: string | undefined,
@@ -143,7 +143,7 @@ export class RoomDO extends DurableObject {
     return cursor.toArray().length > 0;
   }
 
-  // 退出処理（#70 退室機能）。
+  // 退出処理。
   async leave(userId: string): Promise<void> {
     if (!this.isMember(userId)) {
       return;

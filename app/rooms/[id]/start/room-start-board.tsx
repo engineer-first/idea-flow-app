@@ -6,10 +6,10 @@
 //   - ホスト判定付きの start_phase 送信
 //   - phase_changed 受信後の /rooms/[id] への自動遷移
 //   - members / phase state の管理（app/rooms/room-reducer.ts）
-//   - 退出のトリガ（#70 退室機能）
+//   - 退出のトリガ
 //   - 自分自身の遷移に応じた通知（toast）
 //   - 他メンバーの参加通知（toast）
-// を担当する。ノートは扱わない（#70 のスコープ）。
+// を担当する。ノートは扱わない。
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { notify } from "@/app/_lib/notify";
@@ -187,7 +187,7 @@ export function RoomStartBoard({
     }, 5000);
   }, [isHost, sendMessage, clearStartTimeout]);
 
-  // 退出 / 解散（#70）。StartRoomView 内の LeaveConfirmDialog から呼ばれる。
+  // 退出 / 解散。StartRoomView 内の LeaveConfirmDialog から呼ばれる。
   // API 成功後に redirect。失敗時は WS を維持し isLeaving を戻す。
   const handleLeave = useCallback(() => {
     if (isLeaving || isLeavePending) return;

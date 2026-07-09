@@ -152,7 +152,7 @@ describe("member_joined（Realtime 反映）", () => {
   it("既存メンバー接続中に第三者が REST join すると、既存メンバー全員に member_joined が届く", async () => {
     // ホスト (owner) と参加者 (member) の WS が開いた状態で、第三者が
     // /api/rooms/join すると、RoomDO 内の upsertMember が両 WS に
-    // member_joined を broadcast する（#70 の Realtime 反映）。
+    // member_joined を broadcast する（Realtime 反映）。
     const { roomId, owner, member } = await setupRoom();
 
     const newcomer: TestUser = {

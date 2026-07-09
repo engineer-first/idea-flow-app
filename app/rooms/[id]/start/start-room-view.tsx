@@ -43,7 +43,7 @@ export type StartRoomViewProps = {
   // 制御する想定。
   isStarting: boolean;
   onStart: () => void;
-  // 退出（#70 退室機能）。
+  // 退出。
   onLeave: () => void;
   isLeaving: boolean;
 };

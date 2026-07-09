@@ -34,7 +34,7 @@ export function applyMemberServerMessage(
       return [...members, message.member];
     }
     case "member_left": {
-      // 退出者を members から取り除く（#70 退室機能）。
+      // 退出者を members から取り除く。
       // サーバ側で broadcastToAllExcept により本人には届かないため、
       // ここで受け取る userId は常に「他人の退出」を意味する。
       return members.filter((m) => m.userId !== message.userId);

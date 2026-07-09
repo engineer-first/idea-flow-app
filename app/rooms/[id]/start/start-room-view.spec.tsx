@@ -83,7 +83,7 @@ describe("StartRoomView", () => {
   });
 });
 
-describe("退出ボタン（#70 退室機能）", () => {
+describe("退出ボタン", () => {
   it("ホストは「ルームを解散」ボタンが描画される", () => {
     renderView({ isHost: true });
     expect(

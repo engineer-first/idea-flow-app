@@ -69,11 +69,11 @@ export type BoardViewProps = {
   onNoteDelete: (noteId: string) => void;
   onNoteVote: (noteId: string, kind: DotVoteKind) => void;
   onNoteVoteReset: (noteId: string, kind: DotVoteKind) => void;
-  // 退出（#70 退室機能）。
+  // 退出。
   onLeave: () => void;
   // 退出処理中（多重押下防止）。true の間「退出する」ボタンは disabled。
   isLeaving: boolean;
-  // 次フェーズへ（#71）。ホストのみ UI 表示。
+  // 次フェーズへ。ホストのみ UI 表示。
   onNextPhase: () => void;
 };
 

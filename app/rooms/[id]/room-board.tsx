@@ -6,8 +6,8 @@
 //   - ドラッグ中イベントのスロットル送信
 //   - 操作のプロトコルメッセージ化（contracts/room-protocol.ts）
 //   - members / phase state の管理（app/rooms/room-reducer.ts）
-//   - 退出のトリガ（#70 退室機能）
-//   - 次フェーズ（#71 phase:next）
+//   - 退出のトリガ
+//   - 次フェーズ（phase:next）
 // を担当する。関心の分離のため、room-client や notes/room-reducer への依存は
 // このファイルに閉じ込める。
 //
@@ -271,7 +271,7 @@ export function RoomBoard({
     [],
   );
 
-  // 退出 / 解散（#70）。BoardView 内の LeaveConfirmDialog から呼ばれる。
+  // 退出 / 解散。BoardView 内の LeaveConfirmDialog から呼ばれる。
   // API 成功後に redirect でホームへ戻る。失敗時は WS を維持し isLeaving を戻す。
   // （先に close すると失敗時に再接続不能になるため、close は RoomDO に任せる）
   // redirect は NEXT_REDIRECT を throw するので useTransition 内で握りつぶす。

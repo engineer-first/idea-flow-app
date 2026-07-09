@@ -169,7 +169,7 @@ async function handleListMembers(
   return json({ members });
 }
 
-// POST /api/rooms/:id/leave — 退出 / 解散（#70 退室機能）。
+// POST /api/rooms/:id/leave — 退出 / 解散。
 // - 非ホスト: 自分の WS close + members から外れ、他メンバーに member_left。
 // - ホスト: ルームを解散する（全 WS close + RoomDO クリア + D1 rooms 削除）。
 // 認可:

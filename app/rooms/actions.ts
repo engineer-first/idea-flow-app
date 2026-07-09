@@ -97,7 +97,7 @@ export async function createRoom(): Promise<CreateRoomResult> {
     return { ok: false, error: "ルームを作成できませんでした。" };
   }
 
-  // #70: 作成直後は lobby 状態なので、ボードではなくスタート画面へ遷移する。
+  // 作成直後は lobby 状態なので、ボードではなくスタート画面へ遷移する。
   // 遷移と「ルームを作成しました」toast は呼び出し側クライアントが行う。
   return { ok: true, roomId: parsed.data.roomId };
 }
@@ -159,12 +159,12 @@ export async function joinRoom(formData: FormData): Promise<JoinRoomResult> {
     };
   }
 
-  // #70: 参加したらボードではなくスタート画面へ遷移する。
+  // 参加したらボードではなくスタート画面へ遷移する。
   // 遷移と「ルームに参加しました」toast は呼び出し側クライアントが行う。
   return { ok: true, roomId: parsed.data.roomId };
 }
 
-// #70 退室機能。
+// 退室機能。
 // roomId を hidden フィールド経由で受け取る（Server Action のフォーム送信）。
 // 未ログインは /login へ、ルーム未存在は / へリダイレクト。
 // 実処理は api-worker の POST /api/rooms/:id/leave へ委譲する。

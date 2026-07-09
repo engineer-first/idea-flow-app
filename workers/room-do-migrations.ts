@@ -18,7 +18,7 @@ export const ROOM_DO_MIGRATIONS: readonly string[] = [
    );
    DROP TABLE IF EXISTS meta;`,
 
-  // v2: ドット投票 + room_state（#71 が develop に入れた版を維持）
+  // v2: ドット投票 + room_state（develop 履歴を維持）
   // 既定 phase1 は旧挙動互換。新規ルームは create 時に lobby へ上書きする。
   `CREATE TABLE IF NOT EXISTS note_votes (
      note_id TEXT NOT NULL,
@@ -38,7 +38,7 @@ export const ROOM_DO_MIGRATIONS: readonly string[] = [
    INSERT OR IGNORE INTO room_state (id, phase)
    VALUES (1, 'phase1');`,
 
-  // v3: 客観ドット複数票 + host 管理（#71）
+  // v3: 客観ドット複数票 + host 管理
   `ALTER TABLE note_votes ADD COLUMN vote_count INTEGER NOT NULL DEFAULT 1;
    CREATE INDEX IF NOT EXISTS idx_note_votes_user_note_kind
      ON note_votes (user_id, note_id, kind);
@@ -49,7 +49,7 @@ export const ROOM_DO_MIGRATIONS: readonly string[] = [
    INSERT OR IGNORE INTO room_owner (id)
    VALUES (1);`,
 
-  // v4: メンバー表示名（#70 ロビー UI）
+  // v4: メンバー表示名（ロビー UI）
   `ALTER TABLE members ADD COLUMN name TEXT NOT NULL DEFAULT '';`,
 ];
 

@@ -1,11 +1,11 @@
 // 参加メンバーのアバター（イニシャル + ハッシュ由来カラー）。
-// 画像取得は行わない（#70 のスコープ）。背景色は name のハッシュで決定論的に
+// 画像取得は行わない（このスコープ外）。背景色は name のハッシュで決定論的に
 // 選ばれる Tailwind クラスで、Tailwind の JIT が確実に拾うよう文字列リテラル
 // として書く。
 //
 // サイズは prop で変更できるが、RoomMembers 側では 36px 固定で使う前提。
 // 「あなた」マーカーは isMe で枠線（ring）として表現する。
-// ホバー時の名前表示は Radix Tooltip（#70 UI 統一）で行う。
+// ホバー時の名前表示は Radix Tooltip で行う。
 // TooltipProvider は一覧側（RoomMembers）に 1 つ置き、ここでは Tooltip のみ。
 import {
   Tooltip,
