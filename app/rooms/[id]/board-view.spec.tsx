@@ -10,6 +10,7 @@ function setup(overrides: Partial<Parameters<typeof BoardView>[0]> = {}) {
     inviteUrl: "https://idea-flow.example/invite/AB12CD",
     phase: "phase1" as const,
     isHost: false,
+    isNextPhasePending: false,
     draggingNoteId: null,
     onNextPhase: vi.fn(),
     onAddNote: vi.fn(),
