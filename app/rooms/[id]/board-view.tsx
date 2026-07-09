@@ -5,6 +5,17 @@ import { CopyInviteButton } from "@/app/rooms/[id]/copy-invite-button";
 import { NoteCard } from "@/app/rooms/[id]/note-card";
 import type { Note } from "@/app/rooms/notes-reducer";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 // ルームボードの表示用コンポーネント。データ層には一切依存せず、
 // 付箋の配列と各種コールバックをpropsで受け取る。
 // WebSocket接続・スロットル・プロトコル送信はroom-board.tsx（コンテナ）の責務。
@@ -106,13 +117,37 @@ export function BoardView({
           )}
 
           {isHost && (
-            <Button
-              type="button"
-              onClick={onNextPhase}
-              disabled={isDisconnected || isNextPhasePending}
-            >
-              次のフェーズへ
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  type="button"
+                  disabled={isDisconnected || isNextPhasePending}
+                >
+                  次のフェーズへ
+                </Button>
+              </AlertDialogTrigger>
+
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    次のフェーズへ移行しますか？
+                  </AlertDialogTitle>
+
+                  <AlertDialogDescription>
+                    {phase}から次のフェーズへ移行します。
+                    移行すると現在の付箋が整理され、一部の内容が引き継がれない場合があります。
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+
+                <AlertDialogFooter>
+                  <AlertDialogCancel>キャンセル</AlertDialogCancel>
+
+                  <AlertDialogAction onClick={onNextPhase}>
+                    移行する
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
 
           {CONNECTION_STATUS_LABELS[connectionStatus] !== null && (

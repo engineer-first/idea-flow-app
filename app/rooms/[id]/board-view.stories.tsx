@@ -76,3 +76,11 @@ export const Reconnecting: Story = {
     connectionStatus: "closed",
   },
 };
+
+// ホストがフェーズ移行操作を行える状態。
+export const HostCanMovePhase: Story = {
+  args: {
+    isHost: true,
+    phase: "phase1",
+  },
+};

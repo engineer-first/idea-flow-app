@@ -176,4 +176,31 @@ describe("BoardView", () => {
       expect(onNoteDelete).toHaveBeenCalledWith("note-1");
     });
   });
+
+  describe("フェーズ移行", () => {
+    it("ホストの場合のみ「次のフェーズへ」ボタンを表示する", () => {
+      setup({ isHost: true });
+
+      expect(
+        screen.getByRole("button", { name: "次のフェーズへ" }),
+      ).toBeInTheDocument();
+    });
+
+    it("フェーズ移行前に確認ダイアログを表示し、確認後にonNextPhaseを呼ぶ", () => {
+      const onNextPhase = vi.fn();
+      setup({ isHost: true, onNextPhase });
+
+      fireEvent.click(screen.getByRole("button", { name: "次のフェーズへ" }));
+
+      expect(
+        screen.getByText("次のフェーズへ移行しますか？"),
+      ).toBeInTheDocument();
+
+      expect(onNextPhase).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole("button", { name: "移行する" }));
+
+      expect(onNextPhase).toHaveBeenCalledTimes(1);
+    });
+  });
 });
