@@ -14,7 +14,11 @@ import { Button } from "@/components/ui/button";
 // WebSocket接続・スロットル・プロトコル送信はroom-board.tsx（コンテナ）の責務。
 // 「どの付箋を選択中か」は同期不要な純粋にUIの関心事なので、ここでローカルに持つ。
 import { BOARD_HEIGHT, BOARD_WIDTH } from "@/contracts/board";
-import { DOT_VOTE_LIMITS, type DotVoteKind, type Phase } from "@/contracts/room-protocol";
+import {
+  DOT_VOTE_LIMITS,
+  type DotVoteKind,
+  type Phase,
+} from "@/contracts/room-protocol";
 
 // WebSocket 接続の表示用状態。値の生成は room-board（コンテナ）の責務で、
 // ここでは受け取った状態を表示するだけ（このコンポーネントはデータ層に依存しない）。
@@ -129,7 +133,9 @@ export function BoardView({
                 <CopyInviteButton value={inviteUrl} itemLabel="招待URL" />
               </div>
               <div className="flex max-w-full flex-col items-center gap-0.5">
-                <span className="text-xs text-muted-foreground">招待コード</span>
+                <span className="text-xs text-muted-foreground">
+                  招待コード
+                </span>
                 <CopyInviteButton value={inviteCode} itemLabel="招待コード" />
               </div>
             </div>

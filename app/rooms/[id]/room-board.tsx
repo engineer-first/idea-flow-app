@@ -32,7 +32,11 @@ import {
 } from "@/app/rooms/room-reducer";
 import { createThrottled } from "@/app/rooms/throttle";
 import { DRAG_BROADCAST_THROTTLE_MS } from "@/contracts/board";
-import type { DotVoteKind, Phase, ServerMessage } from "@/contracts/room-protocol";
+import type {
+  DotVoteKind,
+  Phase,
+  ServerMessage,
+} from "@/contracts/room-protocol";
 import {
   createRoomClient,
   type RoomClient,
@@ -229,7 +233,6 @@ export function RoomBoard({
   const handleNoteDelete = useCallback((noteId: string) => {
     clientRef.current?.send({ type: "note:delete", noteId });
   }, []);
-
 
   const handleNoteVote = useCallback((noteId: string, kind: DotVoteKind) => {
     const result = voteNoteLocally(notesRef.current, noteId, kind);

@@ -27,9 +27,7 @@ vi.mock("@/app/_lib/notify", () => ({
 import { InviteCodeDialog } from "@/app/invite/[inviteCode]/invite-code-dialog";
 
 function renderDialog() {
-  return render(
-    <InviteCodeDialog inviteCode="ABC234" hostName="田中太郎" />,
-  );
+  return render(<InviteCodeDialog inviteCode="ABC234" hostName="田中太郎" />);
 }
 
 describe("InviteCodeDialog", () => {

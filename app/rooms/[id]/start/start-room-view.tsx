@@ -115,7 +115,9 @@ export function StartRoomView({
                 <CopyInviteButton value={inviteUrl} itemLabel="招待URL" />
               </div>
               <div className="flex max-w-full flex-col items-center gap-0.5">
-                <span className="text-xs text-muted-foreground">招待コード</span>
+                <span className="text-xs text-muted-foreground">
+                  招待コード
+                </span>
                 <CopyInviteButton value={inviteCode} itemLabel="招待コード" />
               </div>
             </div>
