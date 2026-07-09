@@ -1,4 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { fn } from "storybook/test";
+import { HomeErrorAlert } from "@/components/home/molecules/home-error-alert";
+import { CreateRoomSectionView } from "@/components/home/organisms/create-room-section-view";
+import { JoinRoomSectionView } from "@/components/home/organisms/join-room-section-view";
 import { HomeView } from "@/components/home/templates/home-view";
 
 const meta = {
@@ -58,8 +62,36 @@ export const AllStates: Story = {
           <span className="font-mono text-xs text-muted-foreground">
             {label}
           </span>
-          <div className="min-h-[420px] rounded-lg border border-border">
-            <HomeView error={error} />
+          <div className="min-h-[520px] overflow-hidden rounded-xl border border-border">
+            {/* HomeView は Server Action 付き子を含むため、見た目カタログは View 合成 */}
+            <div className="relative flex min-h-[520px] items-center justify-center overflow-hidden bg-muted/40 p-6">
+              <div className="relative z-10 flex w-full max-w-2xl flex-col gap-6">
+                <header className="space-y-2 text-center">
+                  <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                    コラボレーション
+                  </p>
+                  <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+                    セッションを始めましょう
+                  </h1>
+                  <p className="mx-auto max-w-md text-sm text-muted-foreground">
+                    新しいルームをホストするか、招待コードで既存のセッションに参加できます。
+                  </p>
+                </header>
+                {error ? <HomeErrorAlert message={error} /> : null}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <CreateRoomSectionView pending={false} onSubmit={fn()} />
+                  <JoinRoomSectionView
+                    code=""
+                    onCodeChange={fn()}
+                    dialogOpen={false}
+                    onDialogOpenChange={fn()}
+                    hostName=""
+                    onSubmit={fn()}
+                    onConfirm={fn()}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       ))}

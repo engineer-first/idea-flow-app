@@ -23,7 +23,7 @@ export type JoinRoomFormViewProps = {
   joining?: boolean;
   dialogOpen: boolean;
   onDialogOpenChange: (open: boolean) => void;
-  // 確認 Dialog のホスト名（空ならフォールバック文言は使わずそのまま出す想定）。
+  // 確認 Dialog のホスト名（空ならフォールバック文言）。
   hostName: string;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   onConfirm: () => void;
@@ -46,7 +46,7 @@ export function JoinRoomFormView({
     <>
       <form
         onSubmit={onSubmit}
-        className="flex flex-col gap-3"
+        className="flex flex-col gap-4"
         data-testid="join-room-form"
       >
         <Field>
@@ -60,12 +60,15 @@ export function JoinRoomFormView({
             placeholder="AB12CD"
             autoComplete="off"
             required
-            className="font-mono"
+            spellCheck={false}
+            className="h-11 font-mono text-center text-base tracking-[0.35em] uppercase"
           />
-          <FieldDescription>6 桁の英数字</FieldDescription>
+          <FieldDescription>英数字 6 桁（大文字に自動変換）</FieldDescription>
         </Field>
         <Button
           type="submit"
+          variant="outline"
+          size="lg"
           disabled={!isValidCode || lookingUp}
           className="w-full"
         >
@@ -82,7 +85,10 @@ export function JoinRoomFormView({
                 : "このルームに参加しますか？"}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              招待コード <span className="font-mono font-semibold">{code}</span>{" "}
+              招待コード{" "}
+              <span className="font-mono font-semibold tracking-wider">
+                {code}
+              </span>{" "}
               のルームに参加します。
             </AlertDialogDescription>
           </AlertDialogHeader>

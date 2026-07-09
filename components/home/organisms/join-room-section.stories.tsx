@@ -26,7 +26,7 @@ const meta = {
   args: baseArgs,
   decorators: [
     (Story) => (
-      <div style={{ width: 360 }}>
+      <div style={{ width: 320 }}>
         <Story />
       </div>
     ),
@@ -36,36 +36,22 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// 未入力: 「参加する」は disabled。
 export const Empty: Story = {
-  args: {
-    code: "",
-  },
+  args: { code: "" },
 };
 
-// 途中入力（6 桁未満）: まだ disabled。
 export const IncompleteCode: Story = {
-  args: {
-    code: "AB12",
-  },
+  args: { code: "AB12" },
 };
 
-// 6 桁入力済み: 「参加する」が enabled。
 export const ValidCode: Story = {
-  args: {
-    code: "AB12CD",
-  },
+  args: { code: "AB12CD" },
 };
 
-// lookup 中（「確認中…」）。
 export const LookingUp: Story = {
-  args: {
-    code: "AB12CD",
-    lookingUp: true,
-  },
+  args: { code: "AB12CD", lookingUp: true },
 };
 
-// 確認 Dialog 表示中（ホスト名あり）。
 export const ConfirmDialog: Story = {
   args: {
     code: "AB12CD",
@@ -74,7 +60,6 @@ export const ConfirmDialog: Story = {
   },
 };
 
-// 確認 Dialog（ホスト名なしのフォールバック）。
 export const ConfirmDialogWithoutHost: Story = {
   args: {
     code: "AB12CD",
@@ -83,7 +68,6 @@ export const ConfirmDialogWithoutHost: Story = {
   },
 };
 
-// 参加 API 待ち（Dialog 内「参加中…」）。
 export const Joining: Story = {
   args: {
     code: "AB12CD",
@@ -93,7 +77,6 @@ export const Joining: Story = {
   },
 };
 
-// 全状態の一覧（フォーム側。Dialog は個別 story で確認）。
 export const AllStates: Story = {
   render: () => {
     const states: { label: string; props: JoinRoomSectionViewProps }[] = [
@@ -106,7 +89,7 @@ export const AllStates: Story = {
       },
     ];
     return (
-      <div className="flex w-[360px] flex-col gap-8">
+      <div className="flex w-[320px] flex-col gap-8">
         {states.map(({ label, props }) => (
           <div key={label} className="flex flex-col gap-2">
             <span className="font-mono text-xs text-muted-foreground">

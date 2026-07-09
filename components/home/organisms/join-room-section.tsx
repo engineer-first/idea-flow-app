@@ -1,12 +1,65 @@
+"use client";
+
 // ホーム「ルームに参加」セクション（organism / コンテナ）。
-// 招待コード入力 + 確認 Dialog は JoinRoomForm（rooms ドメイン）に委譲する。
-import { JoinRoomForm } from "@/app/rooms/join-room-form";
+// 見た目は JoinRoomSectionView、フォームの副作用は JoinRoomForm 相当のロジックを内包。
+// JoinRoomForm は単体でも使えるため、ここでは View + コンテナの配線に寄せる。
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { notify } from "@/app/_lib/notify";
+import { joinRoom, lookupInviteRoom } from "@/app/rooms/actions";
+import { JoinRoomSectionView } from "@/components/home/organisms/join-room-section-view";
 
 export function JoinRoomSection() {
+  const router = useRouter();
+  const [code, setCode] = useState("");
+  const [hostName, setHostName] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [lookingUp, startLookup] = useTransition();
+  const [joining, startJoin] = useTransition();
+
+  const isValidCode = /^[A-Z0-9]{6}$/.test(code);
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!isValidCode) return;
+    startLookup(async () => {
+      const result = await lookupInviteRoom(code);
+      if (!result.ok) {
+        notify.error(result.error);
+        return;
+      }
+      setHostName(result.hostName);
+      setDialogOpen(true);
+    });
+  }
+
+  function handleConfirm() {
+    if (!isValidCode) return;
+    startJoin(async () => {
+      const formData = new FormData();
+      formData.append("code", code);
+      const result = await joinRoom(formData);
+      if (!result.ok) {
+        notify.error(result.error);
+        return;
+      }
+      notify.joinedAsGuest();
+      setDialogOpen(false);
+      router.push(`/rooms/${result.roomId}/start`);
+    });
+  }
+
   return (
-    <section className="flex flex-col gap-3" data-testid="home-join-room">
-      <h2 className="text-sm font-medium">ルームに参加</h2>
-      <JoinRoomForm />
-    </section>
+    <JoinRoomSectionView
+      code={code}
+      onCodeChange={setCode}
+      lookingUp={lookingUp}
+      joining={joining}
+      dialogOpen={dialogOpen}
+      onDialogOpenChange={setDialogOpen}
+      hostName={hostName}
+      onSubmit={handleSubmit}
+      onConfirm={handleConfirm}
+    />
   );
 }
