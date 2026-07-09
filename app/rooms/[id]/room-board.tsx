@@ -22,6 +22,8 @@ import {
   applyServerMessage,
   moveNoteLocally,
   type Note,
+  resetNoteVoteLocally,
+  voteNoteLocally,
 } from "@/app/rooms/notes-reducer";
 import {
   applyMemberServerMessage,
@@ -30,7 +32,7 @@ import {
 } from "@/app/rooms/room-reducer";
 import { createThrottled } from "@/app/rooms/throttle";
 import { DRAG_BROADCAST_THROTTLE_MS } from "@/contracts/board";
-import type { Phase, ServerMessage } from "@/contracts/room-protocol";
+import type { DotVoteKind, Phase, ServerMessage } from "@/contracts/room-protocol";
 import {
   createRoomClient,
   type RoomClient,
@@ -85,6 +87,7 @@ export function RoomBoard({
   const [isLeavePending, startLeaveTransition] = useTransition();
   const draggingNoteIdRef = useRef<string | null>(null);
   const membersRef = useRef<Member[]>(members);
+  const notesRef = useRef<Note[]>(notes);
   const clientRef = useRef<RoomClient | null>(null);
   const sendDragRef = useRef<ReturnType<
     typeof createThrottled<[NoteDragPayload]>
@@ -97,6 +100,10 @@ export function RoomBoard({
   useEffect(() => {
     membersRef.current = members;
   }, [members]);
+
+  useEffect(() => {
+    notesRef.current = notes;
+  }, [notes]);
 
   const handleServerMessage = useCallback((message: ServerMessage) => {
     if (message.type === "error") {
@@ -222,6 +229,26 @@ export function RoomBoard({
     clientRef.current?.send({ type: "note:delete", noteId });
   }, []);
 
+
+  const handleNoteVote = useCallback((noteId: string, kind: DotVoteKind) => {
+    const result = voteNoteLocally(notesRef.current, noteId, kind);
+    if (!result.accepted) return;
+    notesRef.current = result.notes;
+    setNotes(result.notes);
+    clientRef.current?.send({ type: "note:vote", noteId, kind });
+  }, []);
+
+  const handleNoteVoteReset = useCallback(
+    (noteId: string, kind: DotVoteKind) => {
+      const result = resetNoteVoteLocally(notesRef.current, noteId, kind);
+      if (!result.accepted) return;
+      notesRef.current = result.notes;
+      setNotes(result.notes);
+      clientRef.current?.send({ type: "note:vote-reset", noteId, kind });
+    },
+    [],
+  );
+
   // 退出 / 解散（#70）。BoardView 内の LeaveConfirmDialog から呼ばれる。
   // API 成功後に redirect でホームへ戻る。失敗時は WS を維持し isLeaving を戻す。
   // （先に close すると失敗時に再接続不能になるため、close は RoomDO に任せる）
@@ -281,6 +308,8 @@ export function RoomBoard({
       onNoteDragEnd={handleNoteDragEnd}
       onNoteContentChange={handleNoteContentChange}
       onNoteDelete={handleNoteDelete}
+      onNoteVote={handleNoteVote}
+      onNoteVoteReset={handleNoteVoteReset}
       onLeave={handleLeave}
       isLeaving={isLeaving}
     />

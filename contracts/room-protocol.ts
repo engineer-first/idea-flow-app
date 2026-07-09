@@ -19,6 +19,20 @@ import { BOARD_HEIGHT, BOARD_WIDTH } from "./board";
 
 export const NOTE_CONTENT_MAX_LENGTH = 2000;
 
+export const DOT_VOTE_LIMITS = {
+  subjective: 1,
+  objective: 3,
+} as const;
+
+export const DotVoteKindSchema = z.enum(["subjective", "objective"]);
+export type DotVoteKind = z.infer<typeof DotVoteKindSchema>;
+
+const DotVoteSummarySchema = z.object({
+  count: z.number().int().min(0),
+  votedByMe: z.boolean(),
+  ownCount: z.number().int().min(0),
+});
+
 export const NoteSchema = z.object({
   id: z.string().uuid(),
   authorId: z.string().uuid(),
@@ -27,6 +41,10 @@ export const NoteSchema = z.object({
   y: z.number(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  dotVotes: z.object({
+    subjective: DotVoteSummarySchema,
+    objective: DotVoteSummarySchema,
+  }),
 });
 
 export type ProtocolNote = z.infer<typeof NoteSchema>;
@@ -80,6 +98,16 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
   }),
   // ホストがルームの進行状態を次に進める（サーバーが host 判定して通す/落とす）。
   z.object({ type: z.literal("start_phase") }),
+  z.object({
+    type: z.literal("note:vote"),
+    noteId: z.string().uuid(),
+    kind: DotVoteKindSchema,
+  }),
+  z.object({
+    type: z.literal("note:vote-reset"),
+    noteId: z.string().uuid(),
+    kind: DotVoteKindSchema,
+  }),
 ]);
 
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;

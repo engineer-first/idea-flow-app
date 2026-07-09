@@ -29,6 +29,8 @@ const meta = {
     onNoteDragEnd: fn(),
     onNoteContentChange: fn(),
     onNoteDelete: fn(),
+    onNoteVote: fn(),
+    onNoteVoteReset: fn(),
     onLeave: fn(),
     isLeaving: false,
   },
@@ -81,6 +83,26 @@ export const NonHost: Story = {
     isHost: false,
     // 自分以外をホストにする（fixture の 2 人目）。
     hostUserId: buildMembers(3, ME)[1]!.userId,
+  },
+};
+
+export const DotVoting: Story = {
+  args: {
+    notes: buildNotes(3).map((note, index) => ({
+      ...note,
+      dotVotes: {
+        subjective: {
+          count: index === 0 ? 1 : 0,
+          votedByMe: index === 0,
+          ownCount: index === 0 ? 1 : 0,
+        },
+        objective: {
+          count: index + 1,
+          votedByMe: index < 2,
+          ownCount: index < 2 ? 1 : 0,
+        },
+      },
+    })),
   },
 };
 

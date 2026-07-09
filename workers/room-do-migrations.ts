@@ -27,10 +27,26 @@ export const ROOM_DO_MIGRATIONS: readonly string[] = [
      updated_at TEXT NOT NULL
    );
    DROP TABLE IF EXISTS meta;`,
-  // v2: ルームの進行状態 (lobby / writing) とメンバー名表示を保持する。
-  // - members に name を追加: #70 でメンバー一覧 UI を出すため、RoomDO 内に
-  //   スナップショット用の名前を持たせる。D1 の users.name の更新に追従する
-  //   ため、upsertMember は name を受け取り UPDATE も行う。
+  // v2: 課題ドット投票。1ユーザーは同じ付箋・同じ種別に1票だけ持てる。
+  // 種別ごとの総投票数上限は RoomDO の操作処理で enforcing する。
+  // （develop に先に入ったため v2/v3 は投票系を維持。#70 の phase は v4）
+  `CREATE TABLE IF NOT EXISTS note_votes (
+     note_id TEXT NOT NULL,
+     user_id TEXT NOT NULL,
+     kind TEXT NOT NULL CHECK (kind IN ('subjective', 'objective')),
+     created_at TEXT NOT NULL,
+     PRIMARY KEY (note_id, user_id, kind)
+   );
+   CREATE INDEX IF NOT EXISTS idx_note_votes_note_kind
+     ON note_votes (note_id, kind);
+   CREATE INDEX IF NOT EXISTS idx_note_votes_user_kind
+     ON note_votes (user_id, kind);`,
+  // v3: 客観ドットは同じ付箋に複数票を積める。既存行は1票として保持する。
+  `ALTER TABLE note_votes ADD COLUMN vote_count INTEGER NOT NULL DEFAULT 1;
+   CREATE INDEX IF NOT EXISTS idx_note_votes_user_note_kind
+     ON note_votes (user_id, note_id, kind);`,
+  // v4: ルームの進行状態 (lobby / writing) とメンバー名表示を保持する（#70）。
+  // - members に name を追加: メンバー一覧 UI 用。upsertMember は name を受け取り UPDATE も行う。
   // - room_state: 進行状態を 1 行で持つ。lobby がデフォルト。
   `ALTER TABLE members ADD COLUMN name TEXT NOT NULL DEFAULT '';
    CREATE TABLE IF NOT EXISTS room_state (

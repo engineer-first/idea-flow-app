@@ -465,6 +465,174 @@ describe("note:update-content / note:move（pgTAP: メンバーの共同編集�
   });
 });
 
+describe("note:vote（課題ドット投票）", () => {
+  it("主観ドットは1票まで投票でき、全員へ集計が届く", async () => {
+    const { owner, member } = await setupRoom();
+    const noteId = await createNote({ owner, member });
+
+    send(member, { type: "note:vote", noteId, kind: "subjective" });
+    const toOwner = await expectType(owner, "note:updated");
+    const toMember = await expectType(member, "note:updated");
+
+    expect(toOwner.note.dotVotes.subjective).toEqual({
+      count: 1,
+      votedByMe: false,
+      ownCount: 0,
+    });
+    expect(toMember.note.dotVotes.subjective).toEqual({
+      count: 1,
+      votedByMe: true,
+      ownCount: 1,
+    });
+
+    owner.close();
+    member.close();
+  });
+
+  it("投票済みの主観ドットを再度押すと取り消せる", async () => {
+    const { owner, member } = await setupRoom();
+    const noteId = await createNote({ owner, member });
+
+    send(member, { type: "note:vote", noteId, kind: "subjective" });
+    await expectType(owner, "note:updated");
+    await expectType(member, "note:updated");
+
+    send(member, { type: "note:vote", noteId, kind: "subjective" });
+    const toOwner = await expectType(owner, "note:updated");
+    const toMember = await expectType(member, "note:updated");
+
+    expect(toOwner.note.dotVotes.subjective.count).toBe(0);
+    expect(toMember.note.dotVotes.subjective).toMatchObject({
+      count: 0,
+      votedByMe: false,
+      ownCount: 0,
+    });
+
+    owner.close();
+    member.close();
+  });
+
+  it("主観ドットの2票目は forbidden で拒否される", async () => {
+    const { roomId, owner, member } = await setupRoom();
+    const firstNoteId = await createNote({ owner, member });
+    send(owner, { type: "note:create" });
+    const secondNote = await expectType(owner, "note:inserted");
+    await expectType(member, "note:inserted");
+
+    send(member, {
+      type: "note:vote",
+      noteId: firstNoteId,
+      kind: "subjective",
+    });
+    await expectType(owner, "note:updated");
+    await expectType(member, "note:updated");
+
+    send(member, {
+      type: "note:vote",
+      noteId: secondNote.note.id,
+      kind: "subjective",
+    });
+    const error = await expectType(member, "error");
+    expect(error.code).toBe("forbidden");
+
+    member.close();
+    const reconnected = await connectRoomAs(MEMBER, roomId);
+    const snapshot = await expectType(reconnected, "snapshot");
+    expect(
+      snapshot.notes.filter((note) => note.dotVotes.subjective.votedByMe),
+    ).toHaveLength(1);
+
+    reconnected.close();
+    owner.close();
+  });
+
+  it("客観ドットは3票まで投票でき、4票目は forbidden で拒否される", async () => {
+    const { roomId, owner, member } = await setupRoom();
+    const noteIds: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      send(owner, { type: "note:create" });
+      const inserted = await expectType(owner, "note:inserted");
+      await expectType(member, "note:inserted");
+      noteIds.push(inserted.note.id);
+    }
+
+    for (const noteId of noteIds.slice(0, 3)) {
+      send(member, { type: "note:vote", noteId, kind: "objective" });
+      await expectType(owner, "note:updated");
+      await expectType(member, "note:updated");
+    }
+
+    send(member, { type: "note:vote", noteId: noteIds[3], kind: "objective" });
+    const error = await expectType(member, "error");
+    expect(error.code).toBe("forbidden");
+
+    member.close();
+    const reconnected = await connectRoomAs(MEMBER, roomId);
+    const snapshot = await expectType(reconnected, "snapshot");
+    expect(
+      snapshot.notes.filter((note) => note.dotVotes.objective.votedByMe),
+    ).toHaveLength(3);
+
+    reconnected.close();
+    owner.close();
+  });
+
+  it("客観ドットは同じ付箋に残り数まで積める", async () => {
+    const { owner, member } = await setupRoom();
+    const noteId = await createNote({ owner, member });
+
+    for (const expected of [1, 2, 3]) {
+      send(member, { type: "note:vote", noteId, kind: "objective" });
+      const toOwner = await expectType(owner, "note:updated");
+      const toMember = await expectType(member, "note:updated");
+
+      expect(toOwner.note.dotVotes.objective.count).toBe(expected);
+      expect(toOwner.note.dotVotes.objective.ownCount).toBe(0);
+      expect(toMember.note.dotVotes.objective).toEqual({
+        count: expected,
+        votedByMe: true,
+        ownCount: expected,
+      });
+    }
+
+    send(member, { type: "note:vote", noteId, kind: "objective" });
+    const error = await expectType(member, "error");
+    expect(error.code).toBe("forbidden");
+
+    owner.close();
+    member.close();
+  });
+
+  it("客観ドットはリセットで同じ付箋上の自分の票を0に戻せる", async () => {
+    const { owner, member } = await setupRoom();
+    const noteId = await createNote({ owner, member });
+
+    for (let i = 0; i < 2; i++) {
+      send(member, { type: "note:vote", noteId, kind: "objective" });
+      await expectType(owner, "note:updated");
+      await expectType(member, "note:updated");
+    }
+
+    send(member, { type: "note:vote-reset", noteId, kind: "objective" });
+    const toOwner = await expectType(owner, "note:updated");
+    const toMember = await expectType(member, "note:updated");
+
+    expect(toOwner.note.dotVotes.objective).toMatchObject({
+      count: 0,
+      votedByMe: false,
+      ownCount: 0,
+    });
+    expect(toMember.note.dotVotes.objective).toEqual({
+      count: 0,
+      votedByMe: false,
+      ownCount: 0,
+    });
+
+    owner.close();
+    member.close();
+  });
+});
+
 describe("note:delete（pgTAP: DELETE は author のみ）", () => {
   it("author は削除でき、全員に note:deleted が届く", async () => {
     const { owner, member } = await setupRoom();

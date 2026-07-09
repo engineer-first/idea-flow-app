@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { DotVoteSummary } from "@/app/components/dotvote/organisms/dot-vote-summary";
 import { CopyInviteButton } from "@/app/rooms/[id]/copy-invite-button";
 import { NoteCard } from "@/app/rooms/[id]/note-card";
 import { RoomMembers } from "@/app/rooms/[id]/room-members";
@@ -13,7 +14,7 @@ import { Button } from "@/components/ui/button";
 // WebSocket接続・スロットル・プロトコル送信はroom-board.tsx（コンテナ）の責務。
 // 「どの付箋を選択中か」は同期不要な純粋にUIの関心事なので、ここでローカルに持つ。
 import { BOARD_HEIGHT, BOARD_WIDTH } from "@/contracts/board";
-import type { Phase } from "@/contracts/room-protocol";
+import { DOT_VOTE_LIMITS, type DotVoteKind, type Phase } from "@/contracts/room-protocol";
 
 // WebSocket 接続の表示用状態。値の生成は room-board（コンテナ）の責務で、
 // ここでは受け取った状態を表示するだけ（このコンポーネントはデータ層に依存しない）。
@@ -43,6 +44,8 @@ export type BoardViewProps = {
   onNoteDragEnd: (noteId: string, x: number, y: number) => void;
   onNoteContentChange: (noteId: string, content: string) => void;
   onNoteDelete: (noteId: string) => void;
+  onNoteVote: (noteId: string, kind: DotVoteKind) => void;
+  onNoteVoteReset: (noteId: string, kind: DotVoteKind) => void;
   // 退出（#70 退室機能）。
   onLeave: () => void;
   // 退出処理中（多重押下防止）。true の間「退出する」ボタンは disabled。
@@ -66,6 +69,8 @@ export function BoardView({
   onNoteDragEnd,
   onNoteContentChange,
   onNoteDelete,
+  onNoteVote,
+  onNoteVoteReset,
   onLeave,
   isLeaving,
 }: BoardViewProps) {
@@ -73,6 +78,24 @@ export function BoardView({
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   // 未接続中は room-client が送信を黙って破棄するため、操作自体を無効化する。
   const isDisconnected = connectionStatus !== "open";
+  const voteRemaining = {
+    subjective: Math.max(
+      0,
+      DOT_VOTE_LIMITS.subjective -
+        notes.reduce(
+          (used, note) => used + note.dotVotes.subjective.ownCount,
+          0,
+        ),
+    ),
+    objective: Math.max(
+      0,
+      DOT_VOTE_LIMITS.objective -
+        notes.reduce(
+          (used, note) => used + note.dotVotes.objective.ownCount,
+          0,
+        ),
+    ),
+  };
 
   function handleBoardPointerDown(event: React.PointerEvent<HTMLDivElement>) {
     // 付箋の上のpointerdownはバブリングしてくるので、ボード背景を
@@ -122,6 +145,7 @@ export function BoardView({
             // +N バッジに置き換える（start 画面は既定 5）。
             maxVisible={3}
           />
+          <DotVoteSummary voteRemaining={voteRemaining} />
           {phase === "writing" ? null : (
             // ボード画面に「writing 以外」の状態で居る場合は start 画面への
             // 導線に過ぎない（通常は page.tsx の redirect でここに来ない）。
@@ -189,6 +213,9 @@ export function BoardView({
               onDragEnd={onNoteDragEnd}
               onContentChange={onNoteContentChange}
               onDelete={handleNoteDelete}
+              voteRemaining={voteRemaining}
+              onVote={onNoteVote}
+              onVoteReset={onNoteVoteReset}
             />
           ))}
         </div>

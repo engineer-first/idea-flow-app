@@ -45,6 +45,7 @@ describe("migrateRoomStorage", () => {
       migrateRoomStorage(state.storage);
       expect(tableNames(state.storage)).toEqual([
         "members",
+        "note_votes",
         "notes",
         "room_state",
         "schema_version",
@@ -97,6 +98,7 @@ describe("migrateRoomStorage", () => {
       expect(members).toEqual([{ user_id: USER_A }]);
       // 旧 meta テーブル（招待コードの複製）は掃除される。
       expect(tableNames(state.storage)).not.toContain("meta");
+      expect(tableNames(state.storage)).toContain("note_votes");
     });
   });
 
@@ -155,6 +157,7 @@ describe("RoomDO constructor の配線", () => {
       expect(schemaVersion(state.storage)).toBe(ROOM_DO_MIGRATIONS.length);
       expect(tableNames(state.storage)).toEqual([
         "members",
+        "note_votes",
         "notes",
         "room_state",
         "schema_version",
