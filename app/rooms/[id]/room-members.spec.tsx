@@ -24,9 +24,9 @@ describe("RoomMembers", () => {
     expect(screen.getAllByTestId("avatar")).toHaveLength(3);
   });
 
-  it("一覧は 2 列グリッドで並ぶ", () => {
+  it("一覧は 4 列グリッドで並ぶ", () => {
     render(<RoomMembers members={buildMembers(4)} currentUserId={ME} />);
-    expect(screen.getByTestId("room-members")).toHaveClass("grid-cols-2");
+    expect(screen.getByTestId("room-members")).toHaveClass("grid-cols-4");
   });
 
   it("自分には data-self='true' がつき、aria-label に名前だけが出る（（あなた）なし）", () => {
@@ -91,22 +91,23 @@ describe("RoomMembers", () => {
     expect(screen.queryByText("ホスト")).not.toBeInTheDocument();
   });
 
-  it("既定の maxVisible=8 を超えると +N バッジになる", () => {
+  it("既定の maxVisible=12（4×3）を超えると最終マスが +N になる", () => {
+    // 13 人 → 表示 11 + +2（4×3=12 マスを維持）
     render(
       <RoomMembers
-        members={buildMembers(ROOM_MEMBERS_MAX_VISIBLE + 3)}
+        members={buildMembers(ROOM_MEMBERS_MAX_VISIBLE + 1)}
         currentUserId={ME}
       />,
     );
     expect(screen.getAllByTestId("avatar")).toHaveLength(
-      ROOM_MEMBERS_MAX_VISIBLE,
+      ROOM_MEMBERS_MAX_VISIBLE - 1,
     );
-    expect(screen.getByRole("button", { name: "他 3 名" })).toHaveTextContent(
-      "+3",
+    expect(screen.getByRole("button", { name: "他 2 名" })).toHaveTextContent(
+      "+2",
     );
   });
 
-  it("8 人ちょうどなら +N バッジは出ない", () => {
+  it("12 人ちょうどなら +N バッジは出ない", () => {
     render(
       <RoomMembers
         members={buildMembers(ROOM_MEMBERS_MAX_VISIBLE)}
@@ -116,41 +117,42 @@ describe("RoomMembers", () => {
     expect(screen.getAllByTestId("avatar")).toHaveLength(
       ROOM_MEMBERS_MAX_VISIBLE,
     );
-    expect(screen.queryByLabelText(/他 \d+ 名/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /他 \d+ 名/ })).not.toBeInTheDocument();
   });
 
-  it("maxVisible を超えると末尾が +N バッジに置き換わる", () => {
+  it("maxVisible を超えると最終マスが +N になり 1 枠分を使う", () => {
+    // maxVisible=4 で 6 人 → 表示 3 + +3
     render(
       <RoomMembers
-        members={buildMembers(8)}
+        members={buildMembers(6)}
         currentUserId={ME}
-        maxVisible={3}
+        maxVisible={4}
       />,
     );
-    // 一覧のアバター 3 + ダイアログ未表示
     expect(screen.getAllByTestId("avatar")).toHaveLength(3);
-    expect(screen.getByRole("button", { name: "他 5 名" })).toHaveTextContent(
-      "+5",
+    expect(screen.getByRole("button", { name: "他 3 名" })).toHaveTextContent(
+      "+3",
     );
   });
 
   it("+N をクリックすると隠れメンバーのアイコンと名前だけの Dialog が開く", async () => {
     const user = userEvent.setup();
     const members = buildMembers(5, ME);
+    // maxVisible=3 → 表示 2 + +3、隠れ index 2-4
     render(
       <RoomMembers members={members} currentUserId={ME} maxVisible={3} />,
     );
-    // 表示: index 0-2、隠れ: index 3-4 → Jiro Suzuki, Saburo Kato
-    await user.click(screen.getByRole("button", { name: "他 2 名" }));
+    await user.click(screen.getByRole("button", { name: "他 3 名" }));
     const dialog = await screen.findByRole("dialog");
     expect(dialog).toBeInTheDocument();
     expect(
       within(dialog).getByRole("heading", { name: "他のメンバー" }),
     ).toBeInTheDocument();
+    // 隠れ: Hanako Sato, Jiro Suzuki, Saburo Kato
+    expect(within(dialog).getByLabelText("Hanako Sato")).toBeInTheDocument();
+    expect(within(dialog).getByText("Hanako Sato")).toBeInTheDocument();
     expect(within(dialog).getByLabelText("Jiro Suzuki")).toBeInTheDocument();
-    expect(within(dialog).getByText("Jiro Suzuki")).toBeInTheDocument();
     expect(within(dialog).getByLabelText("Saburo Kato")).toBeInTheDocument();
-    expect(within(dialog).getByText("Saburo Kato")).toBeInTheDocument();
     // 一覧側に出ているメンバーは Dialog に出さない
     expect(within(dialog).queryByText("Yuki Tanaka")).not.toBeInTheDocument();
     // ホストラベルなどは出さない（アイコン + 名前のみ）
@@ -170,11 +172,12 @@ describe("RoomMembers", () => {
 
   it("自分自身も maxVisible の対象として数える（省略対象になる）", () => {
     // 仕様: 「自分だから特別に残す」はしない。可視性の公平性を優先。
+    // maxVisible=3 で 5 人 → 表示 2 + +3
     const members = buildMembers(5, ME);
     render(<RoomMembers members={members} currentUserId={ME} maxVisible={3} />);
-    expect(screen.getAllByTestId("avatar")).toHaveLength(3);
-    expect(screen.getByRole("button", { name: "他 2 名" })).toHaveTextContent(
-      "+2",
+    expect(screen.getAllByTestId("avatar")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "他 3 名" })).toHaveTextContent(
+      "+3",
     );
   });
 

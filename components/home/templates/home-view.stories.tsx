@@ -67,14 +67,11 @@ export const AllStates: Story = {
             <div className="relative flex min-h-[520px] items-center justify-center overflow-hidden bg-muted/40 p-6">
               <div className="relative z-10 flex w-full max-w-2xl flex-col gap-6">
                 <header className="space-y-2 text-center">
-                  <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                    コラボレーション
-                  </p>
                   <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-                    セッションを始めましょう
+                    Design Sprintを始めましょう
                   </h1>
                   <p className="mx-auto max-w-md text-sm text-muted-foreground">
-                    新しいルームをホストするか、招待コードで既存のセッションに参加できます。
+                    新しいルームを作成するか、招待コードを入力して参加できます。
                   </p>
                 </header>
                 {error ? <HomeErrorAlert message={error} /> : null}

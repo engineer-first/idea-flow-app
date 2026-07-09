@@ -65,8 +65,8 @@ export default async function RoomPage({ params }: RoomPageProps) {
   // 強制的に再マウントする。これがないと notes state（や draggingNoteId）が
   // 旧ルームの値を保持し、新ルームの snapshot が届くまで旧データが表示される。
   return (
-    <main className="flex h-screen flex-col gap-4 p-4">
-      <div className="min-h-0 flex-1">
+    <main className="flex h-full min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4">
+      <div className="min-h-0 flex-1 overflow-hidden">
         <RoomBoard
           key={parsed.data.roomId}
           roomId={parsed.data.roomId}

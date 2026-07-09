@@ -1,5 +1,5 @@
 // スタート画面のプレゼンテーション層の単体テスト。
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { buildMembers } from "@/app/rooms/[id]/room-members.fixture";
@@ -66,12 +66,6 @@ describe("StartRoomView", () => {
   it("接続が切れているときは再接続中の表示が出る", () => {
     renderView({ connectionStatus: "closed" });
     expect(screen.getByRole("status")).toHaveTextContent("再接続");
-  });
-
-  it("phase=lobby のときバッジは「開始前」", () => {
-    renderView({ phase: "lobby" });
-    const view = screen.getByTestId("start-room-view");
-    expect(within(view).getByText("開始前")).toBeInTheDocument();
   });
 
   it("メンバー数を見出しに出す", () => {

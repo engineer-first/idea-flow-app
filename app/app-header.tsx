@@ -12,7 +12,7 @@ export type AppHeaderProps = {
 export function AppHeader({ userName }: AppHeaderProps) {
   return (
     <header
-      className="flex items-center justify-between gap-3 border-b border-border px-4 py-3"
+      className="sticky top-0 z-50 flex shrink-0 items-center justify-between gap-3 border-b border-border bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80"
       data-testid="app-header"
     >
       <p

@@ -14,7 +14,7 @@ export type HomeViewProps = {
 export function HomeView({ error }: HomeViewProps) {
   return (
     <div
-      className="relative flex h-full flex-1 items-center justify-center overflow-hidden p-4 sm:p-6"
+      className="relative flex h-full min-h-0 flex-1 items-center justify-center overflow-hidden p-4 sm:p-6"
       data-testid="home-view"
     >
       {/* 背景: 落ち着いたグラデーション + ぼかし（shadcn のトークン色のみ） */}
@@ -33,14 +33,11 @@ export function HomeView({ error }: HomeViewProps) {
 
       <div className="relative z-10 flex w-full max-w-2xl flex-col gap-6">
         <header className="space-y-2 text-center">
-          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-            コラボレーション
-          </p>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-            セッションを始めましょう
+            Design Sprintを始めましょう
           </h1>
           <p className="mx-auto max-w-md text-sm leading-relaxed text-muted-foreground">
-            新しいルームをホストするか、招待コードで既存のセッションに参加できます。
+            新しいルームを作成するか、招待コードを入力して参加できます。
           </p>
         </header>
 

@@ -21,8 +21,8 @@ type HomePageProps = {
 export default async function HomePage({ searchParams }: HomePageProps) {
   if (!isAuthConfigured()) {
     return (
-      <main className="flex flex-1 flex-col">
-        <div className="flex h-full flex-1 items-center justify-center p-4">
+      <main className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="flex h-full flex-1 items-center justify-center overflow-hidden p-4">
           <Card className="w-full max-w-md">
             <CardHeader>
               <CardTitle className="text-lg">認証の設定が必要です</CardTitle>
@@ -52,7 +52,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   }
 
   return (
-    <main className="flex flex-1 flex-col">
+    <main className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <HomeView error={params.error} />
     </main>
   );

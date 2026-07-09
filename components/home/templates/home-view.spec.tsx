@@ -30,15 +30,19 @@ describe("HomeView", () => {
     expect(screen.queryByText("IdeaFlow")).not.toBeInTheDocument();
   });
 
-  it("案内文言「ルームを作成するか…」は出さない（旧コピー禁止）", () => {
-    renderView();
-    expect(screen.queryByText(/ルームを作成するか/)).not.toBeInTheDocument();
-  });
-
-  it("セッション開始の見出しがある", () => {
+  it("案内で作成と参加の両方に触れる", () => {
     renderView();
     expect(
-      screen.getByRole("heading", { name: "セッションを始めましょう" }),
+      screen.getByText(
+        "新しいルームを作成するか、招待コードを入力して参加できます。",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("Design Sprint 開始の見出しがある", () => {
+    renderView();
+    expect(
+      screen.getByRole("heading", { name: "Design Sprintを始めましょう" }),
     ).toBeInTheDocument();
   });
 

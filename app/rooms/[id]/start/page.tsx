@@ -60,8 +60,8 @@ export default async function StartPage({ params }: StartPageProps) {
   // 作成/参加直後の toast はホーム / 招待 URL 側クライアントが成功時に出し、
   // その後 router.push でこのスタート画面へ遷移する。
   return (
-    <main className="flex h-screen flex-col gap-6 p-4">
-      <div className="min-h-0 flex-1">
+    <main className="flex h-full min-h-0 flex-1 flex-col gap-6 overflow-hidden p-4">
+      <div className="min-h-0 flex-1 overflow-hidden">
         <RoomStartBoard
           key={parsed.data.roomId}
           roomId={parsed.data.roomId}

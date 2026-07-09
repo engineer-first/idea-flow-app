@@ -1,11 +1,10 @@
 "use client";
 
+import { DoorOpen, Link2, Play, Users } from "lucide-react";
 import { useState } from "react";
 // スタート画面（メンバー一覧 + 開始ボタン）のプレゼンテーション層。
-// データ層に依存せず、表示と操作の橋渡しだけを担う。WebSocket 接続や
-// プロトコル送信は room-start-board.tsx（コンテナ）の責務。
-// shadcn 風の Card / Field / Label / Input コンポーネントを積極採用し、
-// デザインと挙動の責任分界を明確にする。
+// ホーム画面と同じ shadcn ベースのレイアウト言語（背景・ヘッダー・Card 分割）。
+// WebSocket 接続やプロトコル送信は room-start-board.tsx（コンテナ）の責務。
 import { CopyInviteButton } from "@/app/rooms/[id]/copy-invite-button";
 import { RoomMembers } from "@/app/rooms/[id]/room-members";
 import { LeaveConfirmDialog } from "@/app/rooms/leave-confirm-dialog";
@@ -49,11 +48,6 @@ export type StartRoomViewProps = {
   isLeaving: boolean;
 };
 
-const PHASE_LABELS: Record<Phase, string> = {
-  lobby: "開始前",
-  writing: "進行中",
-};
-
 export function StartRoomView({
   members,
   currentUserId,
@@ -70,110 +64,175 @@ export function StartRoomView({
 }: StartRoomViewProps) {
   const isDisconnected = connectionStatus !== "open";
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const connectionLabel = CONNECTION_STATUS_LABELS[connectionStatus];
 
   return (
     <div
-      className="flex h-full items-center justify-center p-4"
+      className="relative flex h-full flex-1 items-center justify-center overflow-hidden p-4 sm:p-6"
       data-testid="start-room-view"
       data-phase={phase}
       data-host={isHost ? "true" : undefined}
     >
-      <Card className="w-full max-w-2xl">
-        <CardHeader>
-          <CardDescription>現在のフェーズ</CardDescription>
-          <CardTitle data-testid="start-room-view-phase">
-            {PHASE_LABELS[phase]}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-6">
+      {/* ホームと同じ背景言語 */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-muted/40"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -left-24 top-1/4 size-72 rounded-full bg-primary/5 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-16 bottom-1/4 size-80 rounded-full bg-secondary blur-3xl"
+      />
+
+      <div className="relative z-10 flex w-full max-w-2xl flex-col gap-6">
+        <header className="space-y-3 text-center">
           <div className="flex flex-col items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              参加中のメンバー
-            </span>
-            <RoomMembers
-              members={members}
-              currentUserId={currentUserId}
-              hostUserId={hostUserId}
-            />
-            <span
-              className="text-xs text-muted-foreground"
-              data-testid="start-room-view-member-count"
-            >
-              {members.length} 名
-            </span>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+              {isHost ? "メンバーを集めて開始" : "ホストの開始を待機中"}
+            </h1>
+            <p className="mx-auto max-w-md text-sm leading-relaxed text-muted-foreground">
+              {isHost
+                ? "招待を共有してメンバーが揃ったらセッションを開始します。"
+                : "ホストがセッションを開始するまで、この画面でお待ちください。"}
+            </p>
           </div>
-
-          {isHost ? (
-            // 招待URL / 招待コードはホストだけが共有できる情報。
-            // 値自体を表示し、クリックでコピー。中央揃え。
-            <div
-              className="flex max-w-full flex-col items-center gap-3"
-              data-testid="start-room-view-invite"
-            >
-              <div className="flex max-w-full flex-col items-center gap-0.5">
-                <span className="text-xs text-muted-foreground">招待URL</span>
-                <CopyInviteButton value={inviteUrl} itemLabel="招待URL" />
-              </div>
-              <div className="flex max-w-full flex-col items-center gap-0.5">
-                <span className="text-xs text-muted-foreground">
-                  招待コード
-                </span>
-                <CopyInviteButton value={inviteCode} itemLabel="招待コード" />
-              </div>
-            </div>
-          ) : null}
-
-          {CONNECTION_STATUS_LABELS[connectionStatus] !== null ? (
+          {connectionLabel ? (
             <p
               role="status"
-              className={`text-center text-sm ${
+              className={`text-sm ${
                 connectionStatus === "closed"
                   ? "text-destructive"
                   : "text-muted-foreground"
               }`}
             >
-              {CONNECTION_STATUS_LABELS[connectionStatus]}
+              {connectionLabel}
             </p>
           ) : null}
-        </CardContent>
-        <CardFooter className="flex flex-col gap-2">
+        </header>
+
+        <div
+          className={`grid gap-4 sm:items-stretch ${
+            isHost ? "sm:grid-cols-2" : "sm:grid-cols-1"
+          }`}
+        >
+          {/* メンバー一覧カード */}
+          <Card className="flex h-full flex-col border-border/80 shadow-sm transition-shadow hover:shadow-md">
+            <CardHeader className="gap-3">
+              <div className="flex size-10 items-center justify-center rounded-xl bg-secondary text-secondary-foreground">
+                <Users className="size-5" aria-hidden />
+              </div>
+              <div className="space-y-1.5">
+                <CardTitle className="text-base">参加中のメンバー</CardTitle>
+                <CardDescription className="leading-relaxed">
+                  いまルームにいるメンバーです。
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="flex flex-1 flex-col items-center justify-start pt-0">
+              <RoomMembers
+                members={members}
+                currentUserId={currentUserId}
+                hostUserId={hostUserId}
+              />
+            </CardContent>
+            <CardFooter className="justify-center border-t border-border/60 pt-4">
+              <span
+                className="text-xs text-muted-foreground"
+                data-testid="start-room-view-member-count"
+              >
+                {members.length} 名
+              </span>
+            </CardFooter>
+          </Card>
+
+          {/* 招待カード（ホストのみ） */}
           {isHost ? (
+            <Card
+              className="flex h-full flex-col border-border/80 shadow-sm transition-shadow hover:shadow-md"
+              data-testid="start-room-view-invite"
+            >
+              <CardHeader className="gap-3">
+                <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+                  <Link2 className="size-5" aria-hidden />
+                </div>
+                <div className="space-y-1.5">
+                  <CardTitle className="text-base">メンバーを招待</CardTitle>
+                  <CardDescription className="leading-relaxed">
+                    URL またはコードを共有して参加を促します。クリックでコピー。
+                  </CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="flex flex-1 flex-col justify-center gap-5">
+                <div className="flex flex-col items-center gap-1.5 rounded-lg border border-border/80 bg-muted/30 px-3 py-3">
+                  <span className="text-xs text-muted-foreground">招待URL</span>
+                  <CopyInviteButton
+                    value={inviteUrl}
+                    itemLabel="招待URL"
+                    className="max-w-full"
+                  />
+                </div>
+                <div className="flex flex-col items-center gap-1.5 rounded-lg border border-border/80 bg-muted/30 px-3 py-3">
+                  <span className="text-xs text-muted-foreground">
+                    招待コード
+                  </span>
+                  <CopyInviteButton
+                    value={inviteCode}
+                    itemLabel="招待コード"
+                    className="font-mono tracking-wider"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
+        </div>
+
+        {/* メインアクション */}
+        <Card className="border-border/80 shadow-sm">
+          <CardFooter className="flex flex-col gap-2 p-4 sm:p-6">
+            {isHost ? (
+              <Button
+                type="button"
+                onClick={onStart}
+                disabled={isDisconnected || isStarting}
+                data-testid="start-phase-button"
+                size="lg"
+                className="w-full"
+              >
+                <Play className="size-4" aria-hidden />
+                {isStarting ? "開始中…" : "開始する"}
+              </Button>
+            ) : (
+              <p
+                data-testid="start-room-view-waiting"
+                className="w-full rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3 text-center text-sm text-muted-foreground"
+              >
+                ホストが開始するのをお待ちください
+              </p>
+            )}
             <Button
               type="button"
-              onClick={onStart}
-              disabled={isDisconnected || isStarting}
-              data-testid="start-phase-button"
+              variant="outline"
+              onClick={() => setLeaveDialogOpen(true)}
+              disabled={isLeaving}
+              data-testid="leave-button"
               size="lg"
               className="w-full"
             >
-              {isStarting ? "開始中…" : "開始する"}
+              <DoorOpen className="size-4" aria-hidden />
+              {isHost
+                ? isLeaving
+                  ? "解散中…"
+                  : "ルームを解散"
+                : isLeaving
+                  ? "退出中…"
+                  : "退出する"}
             </Button>
-          ) : (
-            <p
-              data-testid="start-room-view-waiting"
-              className="w-full text-center text-sm text-muted-foreground"
-            >
-              ホストが開始するのをお待ちください
-            </p>
-          )}
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setLeaveDialogOpen(true)}
-            disabled={isLeaving}
-            data-testid="leave-button"
-            className="w-full"
-          >
-            {isHost
-              ? isLeaving
-                ? "解散中…"
-                : "ルームを解散"
-              : isLeaving
-                ? "退出中…"
-                : "退出する"}
-          </Button>
-        </CardFooter>
-      </Card>
+          </CardFooter>
+        </Card>
+      </div>
 
       <LeaveConfirmDialog
         open={leaveDialogOpen}
