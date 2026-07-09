@@ -41,17 +41,19 @@ describe("JoinRoomResponseSchema", () => {
 });
 
 describe("RoomInfoResponseSchema", () => {
-  it("isHost と phase を含む拡張形を受け入れる", () => {
+  it("isHost / hostUserId / phase を含む拡張形を受け入れる", () => {
     const parsed = RoomInfoResponseSchema.parse({
       roomId: UUID,
       inviteCode: "ABC234",
       isHost: true,
+      hostUserId: UUID,
       phase: "lobby",
     });
     expect(parsed).toEqual({
       roomId: UUID,
       inviteCode: "ABC234",
       isHost: true,
+      hostUserId: UUID,
       phase: "lobby",
     });
   });
@@ -61,6 +63,30 @@ describe("RoomInfoResponseSchema", () => {
       RoomInfoResponseSchema.safeParse({
         roomId: UUID,
         inviteCode: "ABC234",
+        hostUserId: UUID,
+        phase: "lobby",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("hostUserId が無いと拒否する", () => {
+    expect(
+      RoomInfoResponseSchema.safeParse({
+        roomId: UUID,
+        inviteCode: "ABC234",
+        isHost: true,
+        phase: "lobby",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("hostUserId が UUID でないと拒否する", () => {
+    expect(
+      RoomInfoResponseSchema.safeParse({
+        roomId: UUID,
+        inviteCode: "ABC234",
+        isHost: true,
+        hostUserId: "not-a-uuid",
         phase: "lobby",
       }).success,
     ).toBe(false);
@@ -72,6 +98,7 @@ describe("RoomInfoResponseSchema", () => {
         roomId: UUID,
         inviteCode: "ABC234",
         isHost: false,
+        hostUserId: UUID,
         phase: "done",
       }).success,
     ).toBe(false);
@@ -83,6 +110,7 @@ describe("RoomInfoResponseSchema", () => {
         roomId: UUID,
         inviteCode: "ABC234",
         isHost: "true",
+        hostUserId: UUID,
         phase: "lobby",
       }).success,
     ).toBe(false);

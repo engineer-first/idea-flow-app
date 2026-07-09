@@ -45,6 +45,8 @@ export type RoomBoardProps = {
   currentUserId: string;
   // 自分がこのルームのホストかどうか（表示用。#70 では機能制御には使わない）。
   isHost: boolean;
+  // ホストの userId（メンバー一覧の「ホスト」ラベル表示用）。
+  hostUserId: string;
   // SSR 時にサーバーから取得した初期状態。再接続時の flicker を抑える。
   initialMembers: Member[];
   initialPhase: Phase;
@@ -60,6 +62,7 @@ export function RoomBoard({
   inviteUrl,
   currentUserId,
   isHost,
+  hostUserId,
   initialMembers,
   initialPhase,
   webSocketFactory,
@@ -238,6 +241,7 @@ export function RoomBoard({
       members={members}
       currentUserId={currentUserId}
       isHost={isHost}
+      hostUserId={hostUserId}
       phase={phase}
       onAddNote={handleAddNote}
       onNoteDragStart={handleNoteDragStart}

@@ -16,6 +16,7 @@ function setup(overrides: Partial<Parameters<typeof BoardView>[0]> = {}) {
     members: buildMembers(2, ME),
     currentUserId: ME,
     isHost: true,
+    hostUserId: ME,
     phase: "writing" as const,
     onAddNote: vi.fn(),
     onNoteDragStart: vi.fn(),
@@ -260,23 +261,19 @@ describe("メンバー一覧（名前常時表示）", () => {
     expect(screen.getByText("Taro Yamada")).toBeInTheDocument();
   });
 
-  it("自分メンバーの隣に「（あなた）」マーカーが付く", () => {
+  it("自分メンバーは data-self と ring で識別し、（あなた）文言は出さない", () => {
     setup();
-    const meRow = screen.getByTestId(`member-row-${ME}`).textContent;
-    expect(meRow).toContain("Yuki Tanaka");
-    expect(meRow).toContain("（あなた）");
+    const meRow = screen.getByTestId(`member-row-${ME}`);
+    expect(meRow).toHaveAttribute("data-self", "true");
+    expect(meRow.textContent).toContain("Yuki Tanaka");
+    expect(meRow.textContent).not.toContain("（あなた）");
   });
 
-  it("自分以外の row には「（あなた）」が付かない", () => {
-    setup();
-    // member-row- データ属性を全部取得して、自分以外を探す
-    const rows = screen.getAllByTestId(/^member-row-/);
-    const otherRow = rows.find(
-      (row) => row.getAttribute("data-self") !== "true",
+  it("ホストの名前下に「ホスト」ラベルが出る", () => {
+    setup({ hostUserId: ME });
+    expect(screen.getByTestId(`member-host-label-${ME}`)).toHaveTextContent(
+      "ホスト",
     );
-    expect(otherRow).toBeDefined();
-    expect(otherRow!.textContent).toContain("Taro Yamada");
-    expect(otherRow!.textContent).not.toContain("（あなた）");
   });
 
   it("ボード画面は maxVisible=3（5 人いても 3 個表示 + +2 バッジ）", () => {

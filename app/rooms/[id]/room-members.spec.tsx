@@ -1,6 +1,6 @@
 // RoomMembers（Avatar + 名前 横並び）の単体テスト。
-// データ層に依存しないプレゼンテーション層として、自分判定・省略表示・
-// 名前常時表示・a11y 属性を検証する。
+// データ層に依存しないプレゼンテーション層として、自分判定・ホスト表示・
+// 省略表示・名前常時表示・a11y 属性を検証する。
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { RoomMembers } from "@/app/rooms/[id]/room-members";
@@ -20,11 +20,12 @@ describe("RoomMembers", () => {
     expect(screen.getAllByTestId("avatar")).toHaveLength(3);
   });
 
-  it("自分には data-self='true' がつき、aria-label に「あなた」が付く", () => {
+  it("自分には data-self='true' がつき、aria-label に名前だけが出る（（あなた）なし）", () => {
     const members = buildMembers(2, ME);
     render(<RoomMembers members={members} currentUserId={ME} />);
-    const me = screen.getByLabelText(/あなた/);
+    const me = screen.getByLabelText("Yuki Tanaka");
     expect(me).toHaveAttribute("data-self", "true");
+    expect(me).toHaveAttribute("aria-label", "Yuki Tanaka");
   });
 
   it("自分以外は data-self が付かない", () => {
@@ -52,18 +53,39 @@ describe("RoomMembers", () => {
     expect(within(group).getByText("Taro Yamada")).toBeInTheDocument();
   });
 
-  it("自分メンバーの隣に「（あなた）」マーカーが付く", () => {
+  it("自分メンバーに（あなた）文言は付かない（ring で識別）", () => {
     const members = buildMembers(2, ME);
     render(<RoomMembers members={members} currentUserId={ME} />);
-    // 自分の row にだけ「（あなた）」ラベル
     const meRow = screen.getByTestId(`member-row-${ME}`).textContent;
     expect(meRow).toContain("Yuki Tanaka");
-    expect(meRow).toContain("（あなた）");
-    // 他人の row には「（あなた）」は付かない
-    const otherRow = screen.getByTestId(
-      `member-row-${members[1]!.userId}`,
-    ).textContent;
-    expect(otherRow).not.toContain("（あなた）");
+    expect(meRow).not.toContain("（あなた）");
+  });
+
+  it("hostUserId に一致するメンバーの名前下に「ホスト」が出る", () => {
+    const members = buildMembers(2, ME);
+    const hostId = members[1]!.userId;
+    render(
+      <RoomMembers
+        members={members}
+        currentUserId={ME}
+        hostUserId={hostId}
+      />,
+    );
+    expect(screen.getByTestId(`member-host-label-${hostId}`)).toHaveTextContent(
+      "ホスト",
+    );
+    expect(
+      screen.queryByTestId(`member-host-label-${ME}`),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId(`member-row-${hostId}`)).toHaveAttribute(
+      "data-host",
+      "true",
+    );
+  });
+
+  it("hostUserId 未指定ならホストラベルは出ない", () => {
+    render(<RoomMembers members={buildMembers(2, ME)} currentUserId={ME} />);
+    expect(screen.queryByText("ホスト")).not.toBeInTheDocument();
   });
 
   it("maxVisible を超えると末尾が +N バッジに置き換わる", () => {

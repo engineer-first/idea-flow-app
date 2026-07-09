@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { signOut } from "@/app/auth/actions";
 import { HomeView } from "@/app/home-view";
 import { createRoom } from "@/app/rooms/actions";
 import {
@@ -25,8 +24,10 @@ export default async function Home({ searchParams }: HomeProps) {
         <div className="flex h-full flex-1 items-center justify-center p-4">
           <Card className="w-full max-w-md">
             <CardHeader>
-              <CardTitle className="text-2xl">IdeaFlow</CardTitle>
-              <CardDescription>認証の環境変数を設定してください。</CardDescription>
+              <CardTitle className="text-lg">認証の設定が必要です</CardTitle>
+              <CardDescription>
+                認証の環境変数を設定してください。
+              </CardDescription>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
               <p>
@@ -51,12 +52,7 @@ export default async function Home({ searchParams }: HomeProps) {
 
   return (
     <main className="flex flex-1 flex-col">
-      <HomeView
-        userEmail={user.email}
-        error={params.error}
-        createRoomAction={createRoom}
-        signOutAction={signOut}
-      />
+      <HomeView error={params.error} createRoomAction={createRoom} />
     </main>
   );
 }

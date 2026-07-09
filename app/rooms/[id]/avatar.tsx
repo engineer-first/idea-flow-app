@@ -62,11 +62,8 @@ export type AvatarProps = {
 export function Avatar({ name, size = 36, isMe = false }: AvatarProps) {
   const initials = initialsOf(name);
   const colorClass = avatarColorClass(name);
-  const tooltipText = name
-    ? isMe
-      ? `${name}（あなた）`
-      : name
-    : "不明なメンバー";
+  // 自分は ring（枠）で識別する。文言の「（あなた）」は付けない。
+  const tooltipText = name || "不明なメンバー";
 
   return (
     <TooltipProvider delayDuration={300}>

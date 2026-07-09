@@ -62,7 +62,6 @@ export default async function StartPage({
 
   return (
     <main className="flex h-screen flex-col gap-6 p-4">
-      <h1 className="text-lg font-semibold">IdeaFlow ルーム</h1>
       <div className="min-h-0 flex-1">
         <RoomStartBoard
           key={parsed.data.roomId}
@@ -71,6 +70,7 @@ export default async function StartPage({
           inviteUrl={inviteUrl}
           currentUserId={user.sub}
           isHost={parsed.data.isHost}
+          hostUserId={parsed.data.hostUserId}
           initialPhase={parsed.data.phase}
           initialMembers={initialMembers}
           justCreated={justCreated}

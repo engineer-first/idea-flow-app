@@ -63,7 +63,6 @@ export default async function RoomPage({ params }: RoomPageProps) {
   // 旧ルームの値を保持し、新ルームの snapshot が届くまで旧データが表示される。
   return (
     <main className="flex h-screen flex-col gap-4 p-4">
-      <h1 className="text-lg font-semibold">IdeaFlow ルーム</h1>
       <div className="min-h-0 flex-1">
         <RoomBoard
           key={parsed.data.roomId}
@@ -72,6 +71,7 @@ export default async function RoomPage({ params }: RoomPageProps) {
           inviteUrl={inviteUrl}
           currentUserId={user.sub}
           isHost={parsed.data.isHost}
+          hostUserId={parsed.data.hostUserId}
           initialMembers={initialMembers}
           initialPhase={parsed.data.phase}
         />

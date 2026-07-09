@@ -15,6 +15,7 @@ function renderView(
       members={buildMembers(3, ME)}
       currentUserId={ME}
       isHost
+      hostUserId={ME}
       phase="lobby"
       inviteCode="AB12CD"
       inviteUrl="https://idea-flow.example/invite/AB12CD"
@@ -137,6 +138,16 @@ describe("招待URL/コード（host 限定表示）", () => {
       screen.getByText("https://example/invite/ZZ99XX"),
     ).toBeInTheDocument();
     expect(screen.getByText("ZZ99XX")).toBeInTheDocument();
+  });
+
+  it("host のとき招待URL・招待コードの両方にコピーボタンがある", () => {
+    renderView({ isHost: true });
+    expect(
+      screen.getByRole("button", { name: "招待URLをコピー" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "招待コードをコピー" }),
+    ).toBeInTheDocument();
   });
 
   it("非 host のとき招待URLと招待コードが表示されない", () => {

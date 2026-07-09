@@ -117,8 +117,8 @@ async function handleJoinRoom(
 
 // GET /api/rooms/:id — メンバーだけがルーム情報を取得できる。
 // 非メンバーには存在しないルームと同じ 404 を返し、存在を推測させない。
-// isHost / phase はこのエンドポイントでのみ返す（#70 で他人の host_id が
-// 漏れる経路を増やさないため、isHost フラグでだけ返す）。
+// isHost / hostUserId / phase はこのエンドポイントでのみ返す。
+// メンバー限定（非メンバーは 404）。hostUserId はメンバー一覧でホスト表示に使う。
 async function handleGetRoom(
   env: Env,
   session: SessionPayload,
@@ -140,6 +140,7 @@ async function handleGetRoom(
     roomId: room.roomId,
     inviteCode: room.inviteCode,
     isHost: room.hostId === session.sub,
+    hostUserId: room.hostId,
     phase,
   });
 }

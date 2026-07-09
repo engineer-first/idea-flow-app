@@ -11,6 +11,7 @@ const meta = {
   args: {
     members: buildMembers(3, ME),
     currentUserId: ME,
+    hostUserId: ME,
     maxVisible: 5,
   },
   decorators: [

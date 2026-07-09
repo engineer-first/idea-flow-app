@@ -21,6 +21,7 @@ const meta = {
     members: buildMembers(3, ME),
     currentUserId: ME,
     isHost: true,
+    hostUserId: ME,
     phase: "writing",
     onAddNote: fn(),
     onNoteDragStart: fn(),
@@ -74,10 +75,12 @@ export const ManyMembers: Story = {
   },
 };
 
-// 非ホストの状態（ホストバッジなし、メンバー一覧に「あなた」リングあり）。
+// 非ホストの状態（自分は ring のみ。ホストラベルは hostUserId のメンバーに付く）。
 export const NonHost: Story = {
   args: {
     isHost: false,
+    // 自分以外をホストにする（fixture の 2 人目）。
+    hostUserId: buildMembers(3, ME)[1]!.userId,
   },
 };
 

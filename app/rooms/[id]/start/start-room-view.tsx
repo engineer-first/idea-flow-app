@@ -34,6 +34,8 @@ export type StartRoomViewProps = {
   members: Member[];
   currentUserId: string;
   isHost: boolean;
+  // ホストの userId（メンバー一覧の「ホスト」ラベル表示用）。
+  hostUserId: string;
   phase: Phase;
   inviteCode: string;
   inviteUrl: string;
@@ -56,6 +58,7 @@ export function StartRoomView({
   members,
   currentUserId,
   isHost,
+  hostUserId,
   phase,
   inviteCode,
   inviteUrl,
@@ -87,7 +90,11 @@ export function StartRoomView({
             <span className="text-sm text-muted-foreground">
               参加中のメンバー
             </span>
-            <RoomMembers members={members} currentUserId={currentUserId} />
+            <RoomMembers
+              members={members}
+              currentUserId={currentUserId}
+              hostUserId={hostUserId}
+            />
             <span
               className="text-xs text-muted-foreground"
               data-testid="start-room-view-member-count"
@@ -100,22 +107,27 @@ export function StartRoomView({
             // 招待URL / 招待コードはホストだけが共有できる情報。
             // 非ホストには伏せて、誤って共有するリスクを避ける。
             <div
-              className="flex flex-col items-center gap-2"
+              className="flex flex-col items-center gap-3"
               data-testid="start-room-view-invite"
             >
-              <span className="text-sm text-muted-foreground">招待URL</span>
-              <span className="flex items-center gap-2 text-sm">
-                <span className="max-w-[18rem] truncate font-mono text-xs">
-                  {inviteUrl}
+              <div className="flex flex-col items-center gap-2">
+                <span className="text-sm text-muted-foreground">招待URL</span>
+                <span className="flex items-center gap-2 text-sm">
+                  <span className="max-w-[18rem] truncate font-mono text-xs">
+                    {inviteUrl}
+                  </span>
+                  <CopyInviteButton value={inviteUrl} itemLabel="招待URL" />
                 </span>
-                <CopyInviteButton url={inviteUrl} />
-              </span>
-              <span className="text-xs text-muted-foreground">
-                または招待コード:{" "}
-                <span className="font-mono text-sm font-semibold text-foreground">
-                  {inviteCode}
+              </div>
+              <div className="flex flex-col items-center gap-2">
+                <span className="text-sm text-muted-foreground">招待コード</span>
+                <span className="flex items-center gap-2 text-sm">
+                  <span className="font-mono text-sm font-semibold text-foreground">
+                    {inviteCode}
+                  </span>
+                  <CopyInviteButton value={inviteCode} itemLabel="招待コード" />
                 </span>
-              </span>
+              </div>
             </div>
           ) : null}
 

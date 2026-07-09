@@ -34,6 +34,8 @@ export type BoardViewProps = {
   members: Member[];
   currentUserId: string;
   isHost: boolean;
+  // ホストの userId（メンバー一覧の「ホスト」ラベル表示用）。
+  hostUserId: string;
   phase: Phase;
   onAddNote: () => void;
   onNoteDragStart: (noteId: string) => void;
@@ -56,6 +58,7 @@ export function BoardView({
   members,
   currentUserId,
   isHost,
+  hostUserId,
   phase,
   onAddNote,
   onNoteDragStart,
@@ -100,13 +103,14 @@ export function BoardView({
                 <span className="max-w-[18rem] truncate font-mono text-xs text-foreground">
                   {inviteUrl}
                 </span>
-                <CopyInviteButton url={inviteUrl} />
+                <CopyInviteButton value={inviteUrl} itemLabel="招待URL" />
               </span>
-              <span className="text-sm text-muted-foreground">
-                または招待コード:{" "}
+              <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>招待コード</span>
                 <span className="font-mono text-base font-semibold text-foreground">
                   {inviteCode}
                 </span>
+                <CopyInviteButton value={inviteCode} itemLabel="招待コード" />
               </span>
             </>
           ) : null}
@@ -115,19 +119,12 @@ export function BoardView({
           <RoomMembers
             members={members}
             currentUserId={currentUserId}
+            hostUserId={hostUserId}
             // ボード画面の上部バーは招待URL/状態/ボタン群で幅を取られるため、
             // 名前は Avatar の隣に常時表示しつつ、maxVisible=3 で 4 人目以降は
             // +N バッジに置き換える（start 画面は既定 5）。
             maxVisible={3}
           />
-          {isHost ? (
-            <span
-              data-testid="host-badge"
-              className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200"
-            >
-              ホスト
-            </span>
-          ) : null}
           {phase === "writing" ? null : (
             // ボード画面に「writing 以外」の状態で居る場合は start 画面への
             // 導線に過ぎない（通常は page.tsx の redirect でここに来ない）。

@@ -101,6 +101,7 @@ function renderBoard(options: { open?: boolean } = {}) {
       inviteUrl="https://idea-flow.example/invite/AB12CD"
       currentUserId={USER_ID}
       isHost
+      hostUserId={USER_ID}
       initialMembers={[]}
       initialPhase="writing"
       webSocketFactory={factory}

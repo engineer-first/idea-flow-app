@@ -98,6 +98,7 @@ function renderStart(
       inviteUrl="https://idea-flow.example/invite/AB12CD"
       currentUserId={options.currentUserId ?? HOST_ID}
       isHost={options.isHost ?? true}
+      hostUserId={HOST_ID}
       initialPhase={options.initialPhase ?? "lobby"}
       initialMembers={options.initialMembers ?? []}
       webSocketFactory={factory}

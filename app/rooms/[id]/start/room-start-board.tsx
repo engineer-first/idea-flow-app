@@ -39,6 +39,8 @@ export type RoomStartBoardProps = {
   inviteUrl: string;
   currentUserId: string;
   isHost: boolean;
+  // ホストの userId（メンバー一覧の「ホスト」ラベル表示用）。
+  hostUserId: string;
   initialPhase: Phase;
   initialMembers: Member[];
   // 直前遷移の種別（page.tsx から渡される）。
@@ -55,6 +57,7 @@ export function RoomStartBoard({
   inviteUrl,
   currentUserId,
   isHost,
+  hostUserId,
   initialPhase,
   initialMembers,
   justCreated,
@@ -188,6 +191,7 @@ export function RoomStartBoard({
       members={members}
       currentUserId={currentUserId}
       isHost={isHost}
+      hostUserId={hostUserId}
       phase={phase}
       inviteCode={inviteCode}
       inviteUrl={inviteUrl}

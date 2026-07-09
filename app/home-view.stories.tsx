@@ -7,9 +7,7 @@ const meta = {
   component: HomeView,
   parameters: { layout: "fullscreen" },
   args: {
-    userEmail: "user@example.com",
     createRoomAction: fn(),
-    signOutAction: fn(),
   },
   decorators: [
     (Story) => (

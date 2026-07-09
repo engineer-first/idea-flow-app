@@ -100,13 +100,14 @@ describe("ルーム作成", () => {
       roomId,
       inviteCode,
       isHost: true,
+      hostUserId: OWNER.sub,
       phase: "lobby",
     });
   });
 });
 
-describe("ルーム情報（isHost / phase）", () => {
-  it("参加者は isHost=false で取得できる", async () => {
+describe("ルーム情報（isHost / hostUserId / phase）", () => {
+  it("参加者は isHost=false と hostUserId（作成者）を取得できる", async () => {
     const { roomId, inviteCode } = await createRoomAs(OWNER);
     await joinRoomAs(MEMBER, inviteCode);
     const res = await SELF.fetch(`https://api.test/api/rooms/${roomId}`, {
@@ -117,6 +118,7 @@ describe("ルーム情報（isHost / phase）", () => {
       roomId,
       inviteCode,
       isHost: false,
+      hostUserId: OWNER.sub,
       phase: "lobby",
     });
   });

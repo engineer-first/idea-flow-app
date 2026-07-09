@@ -13,6 +13,7 @@ const meta = {
     members: buildMembers(3, ME),
     currentUserId: ME,
     isHost: true,
+    hostUserId: ME,
     phase: "lobby",
     inviteCode: "AB12CD",
     inviteUrl: "https://idea-flow.example/invite/AB12CD",

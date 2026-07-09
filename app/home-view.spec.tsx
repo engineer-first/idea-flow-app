@@ -6,14 +6,7 @@ import { HomeView } from "@/app/home-view";
 function renderView(
   overrides: Partial<React.ComponentProps<typeof HomeView>> = {},
 ) {
-  return render(
-    <HomeView
-      userEmail="user@example.com"
-      createRoomAction={vi.fn()}
-      signOutAction={vi.fn()}
-      {...overrides}
-    />,
-  );
+  return render(<HomeView createRoomAction={vi.fn()} {...overrides} />);
 }
 
 describe("HomeView", () => {
@@ -22,10 +15,16 @@ describe("HomeView", () => {
     expect(screen.getByTestId("home-view")).toBeInTheDocument();
   });
 
-  it("タイトル IdeaFlow と userEmail を表示する", () => {
-    renderView({ userEmail: "alice@example.com" });
-    expect(screen.getByText("IdeaFlow")).toBeInTheDocument();
-    expect(screen.getByText("alice@example.com")).toBeInTheDocument();
+  it("IdeaFlow タイトルは出さない（ヘッダー専用）", () => {
+    renderView();
+    expect(screen.queryByText("IdeaFlow")).not.toBeInTheDocument();
+  });
+
+  it("案内文言「ルームを作成するか…」は出さない", () => {
+    renderView();
+    expect(
+      screen.queryByText(/ルームを作成するか/),
+    ).not.toBeInTheDocument();
   });
 
   it("「ルームを作成」ボタンがある", () => {
@@ -51,14 +50,6 @@ describe("HomeView", () => {
   it("error が無いとき alert は出ない", () => {
     renderView();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  });
-
-  it("ヘッダーに「ログアウト」ボタンがある", () => {
-    renderView();
-    const header = screen.getByTestId("home-view-header");
-    expect(header).toContainElement(
-      screen.getByRole("button", { name: "ログアウト" }),
-    );
   });
 
   it("「ルームに参加」セクションがある", () => {
