@@ -50,19 +50,35 @@ describe("MemberSchema", () => {
 });
 
 describe("ServerMessageSchema", () => {
-  it("snapshot は notes と members を必須にする", () => {
+  it("snapshot は notes / members / phase を必須にする", () => {
     const parsed = ServerMessageSchema.parse({
       type: "snapshot",
       notes: [],
       members: [{ userId: USER_A, name: "Owner" }],
+      phase: "lobby",
     });
-    expect(parsed.type).toBe("snapshot");
+    expect(parsed).toEqual({
+      type: "snapshot",
+      notes: [],
+      members: [{ userId: USER_A, name: "Owner" }],
+      phase: "lobby",
+    });
   });
 
   it("snapshot に members フィールドが無いと拒否する", () => {
     const result = ServerMessageSchema.safeParse({
       type: "snapshot",
       notes: [],
+      phase: "lobby",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("snapshot に phase フィールドが無いと拒否する", () => {
+    const result = ServerMessageSchema.safeParse({
+      type: "snapshot",
+      notes: [],
+      members: [{ userId: USER_A, name: "Owner" }],
     });
     expect(result.success).toBe(false);
   });
@@ -159,9 +175,19 @@ describe("parseServerMessage", () => {
   it("正常な JSON 文字列をパースしてオブジェクトを返す", () => {
     expect(
       parseServerMessage(
-        JSON.stringify({ type: "snapshot", notes: [], members: [] }),
+        JSON.stringify({
+          type: "snapshot",
+          notes: [],
+          members: [],
+          phase: "lobby",
+        }),
       ),
-    ).toEqual({ type: "snapshot", notes: [], members: [] });
+    ).toEqual({
+      type: "snapshot",
+      notes: [],
+      members: [],
+      phase: "lobby",
+    });
   });
 
   it("JSON 以外の文字列は null", () => {

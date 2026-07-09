@@ -88,6 +88,7 @@ describe("snapshot（接続・再接続の復帰パス）", () => {
 
     expect(snapshot.notes).toEqual([]);
     expect(snapshot.members).toEqual([{ userId: OWNER.sub, name: OWNER.name }]);
+    expect(snapshot.phase).toBe("lobby");
     expect(snapshot).not.toHaveProperty("room");
     expect(snapshot).not.toHaveProperty("self");
     socket.close();
@@ -123,9 +124,27 @@ describe("snapshot（接続・再接続の復帰パス）", () => {
       { userId: OWNER.sub, name: OWNER.name },
       { userId: MEMBER.sub, name: MEMBER.name },
     ]);
+    expect(snapshot.phase).toBe("lobby");
 
     reconnected.close();
     member.close();
+  });
+
+  it("切断中に start_phase が進んだあと再接続すると snapshot.phase が writing になる", async () => {
+    const { roomId, owner, member } = await setupRoom();
+    // member が切断している間に host が writing へ進める
+    member.close();
+    send(owner, { type: "start_phase" });
+    await expectType(owner, "phase_changed");
+
+    const reconnected = await connectRoomAs(MEMBER, roomId, {
+      hostId: OWNER.sub,
+    });
+    const snapshot = await expectType(reconnected, "snapshot");
+    expect(snapshot.phase).toBe("writing");
+
+    reconnected.close();
+    owner.close();
   });
 });
 

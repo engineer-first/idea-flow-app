@@ -21,6 +21,8 @@ import {
   type ProtocolNote,
   parseClientMessage,
   type ServerMessage,
+  WS_CLOSE_LEFT_ROOM,
+  WS_CLOSE_LEFT_ROOM_REASON,
 } from "../contracts/room-protocol";
 import { migrateRoomStorage } from "./room-do-migrations";
 import { filterVisible, visibleTo } from "./visibility";
@@ -126,9 +128,9 @@ export class RoomDO extends DurableObject {
       const attachment =
         socket.deserializeAttachment() as SocketAttachment | null;
       if (attachment?.userId === userId) {
-        // 1000 = Normal Closure（WebSocket 標準の正常終了コード）
+        // 4000 = アプリ定義の「退出による close」。クライアントは再接続しない。
         try {
-          socket.close(1000, "left the room");
+          socket.close(WS_CLOSE_LEFT_ROOM, WS_CLOSE_LEFT_ROOM_REASON);
         } catch {
           // 既に閉じている等のエラーは握りつぶす
         }
@@ -422,6 +424,7 @@ export class RoomDO extends DurableObject {
       type: "snapshot",
       notes: filterVisible({ viewerId }, notes),
       members: this.listMembers().map((m) => this.toProtocolMember(m)),
+      phase: this.getPhase(),
     });
   }
 

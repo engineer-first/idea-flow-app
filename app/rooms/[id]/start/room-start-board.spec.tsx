@@ -161,6 +161,7 @@ describe("サーバーメッセージ → 画面反映", () => {
           { userId: HOST_ID, name: "Host" },
           { userId: MEMBER_ID, name: "Member" },
         ],
+        phase: "lobby",
       }),
     );
     expect(screen.getAllByTestId("avatar")).toHaveLength(2);
@@ -217,6 +218,7 @@ describe("サーバーメッセージ → 画面反映", () => {
         type: "snapshot",
         notes: [],
         members: [{ userId: HOST_ID, name: "Host" }],
+        phase: "lobby",
       }),
     );
     act(() =>

@@ -197,18 +197,12 @@ export function RoomBoard({
   }, []);
 
   // 退出（#70 退室機能）。BoardView 内の LeaveConfirmDialog から呼ばれる。
-  // 1. 自分の WS を能動的に閉じる（再接続を抑制し、UX として「もう受信しない」を即時反映）
-  // 2. Server Action leaveRoom(formData) を呼ぶ。内部で api-worker を fetch し
-  //    redirect("/") でホームへ戻る。
-  // redirect は NEXT_REDIRECT エラーを throw するので、useTransition の枠内で
-  // 呼んで throw を握りつぶす（Next.js がクライアントの遷移を処理する）。
-  // 確認 Dialog 自体は BoardView 側の state として持つ。
+  // API 成功後に redirect でホームへ戻る。失敗時は WS を維持し isLeaving を戻す。
+  // （先に close すると失敗時に再接続不能になるため、close は RoomDO.leave に任せる）
+  // redirect は NEXT_REDIRECT を throw するので useTransition 内で握りつぶす。
   const handleLeave = useCallback(() => {
     if (isLeaving || isLeavePending) return;
     setIsLeaving(true);
-    // 自分の WS を能動的に閉じる。RoomDO.leave でも閉じられるが、
-    // 早く「閉じた」体験にすることで再接続を試みない。
-    clientRef.current?.close();
     startLeaveTransition(async () => {
       const formData = new FormData();
       formData.append("roomId", roomId);
@@ -226,7 +220,13 @@ export function RoomBoard({
         ) {
           return;
         }
-        throw error;
+        // 409（ホスト退出拒否）や 5xx: WS は開いたまま、操作可能に戻す。
+        setIsLeaving(false);
+        const message =
+          error instanceof Error
+            ? error.message
+            : "ルームからの退出に失敗しました。";
+        notify.error(message);
       }
     });
   }, [isLeaving, isLeavePending, roomId]);

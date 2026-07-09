@@ -28,6 +28,7 @@ describe("applyServerMessage", () => {
       type: "snapshot",
       notes: [note],
       members: [],
+      phase: "lobby",
     };
 
     const result = applyServerMessage([], message, { draggingNoteId: null });
@@ -42,6 +43,7 @@ describe("applyServerMessage", () => {
       type: "snapshot",
       notes: [snapshotNote],
       members: [],
+      phase: "lobby",
     };
 
     const result = applyServerMessage([existing], message, {

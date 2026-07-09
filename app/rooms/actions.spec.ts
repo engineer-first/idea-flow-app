@@ -173,6 +173,21 @@ describe("leaveRoom", () => {
       callAndGetRedirect(() => leaveRoom(leaveFormData(VALID_ROOM_ID))),
     ).rejects.toThrow();
   });
+
+  it("409（lobby 中のホスト退出拒否）はメッセージ付きで例外を投げる", async () => {
+    apiFetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: "開始前のルームではホストは退出できません。",
+        }),
+        { status: 409 },
+      ),
+    );
+
+    await expect(
+      callAndGetRedirect(() => leaveRoom(leaveFormData(VALID_ROOM_ID))),
+    ).rejects.toThrow("開始前のルームではホストは退出できません。");
+  });
 });
 
 const VALID_ROOM_ID = "123e4567-e89b-42d3-a456-426614174000";

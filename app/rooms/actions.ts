@@ -104,7 +104,7 @@ export async function leaveRoom(formData: FormData): Promise<void> {
   }
 
   // 404（既に退出済み / 存在しない / 非メンバー）は「成功扱い」で / に戻す。
-  // 2xx 以外の他のエラーは 5xx 系で error boundary 行き。
+  // 409（lobby 中のホスト退出拒否）や 5xx は呼び出し側でリカバリする。
   const res = await apiFetch(`/api/rooms/${roomId}/leave`, {
     method: "POST",
   });
@@ -112,6 +112,9 @@ export async function leaveRoom(formData: FormData): Promise<void> {
   if (res.status === 404) {
     // 既に退出済み（または他人が退出させた）— ホームに戻す
     redirect("/");
+  }
+  if (res.status === 409) {
+    throw new Error("開始前のルームではホストは退出できません。");
   }
   if (!res.ok) {
     throw new Error(`ルーム退出 API が失敗しました: ${res.status}`);

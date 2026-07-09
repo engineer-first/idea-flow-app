@@ -162,10 +162,10 @@ export function RoomStartBoard({
   }, [isHost, sendMessage]);
 
   // 退出（#70 退室機能）。StartRoomView 内の LeaveConfirmDialog から呼ばれる。
+  // API 成功後に redirect。失敗時は WS を維持し isLeaving を戻す。
   const handleLeave = useCallback(() => {
     if (isLeaving || isLeavePending) return;
     setIsLeaving(true);
-    clientRef.current?.close();
     startLeaveTransition(async () => {
       const formData = new FormData();
       formData.append("roomId", roomId);
@@ -181,7 +181,12 @@ export function RoomStartBoard({
         ) {
           return;
         }
-        throw error;
+        setIsLeaving(false);
+        const message =
+          error instanceof Error
+            ? error.message
+            : "ルームからの退出に失敗しました。";
+        notify.error(message);
       }
     });
   }, [isLeaving, isLeavePending, roomId]);

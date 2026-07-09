@@ -122,6 +122,7 @@ function connectWithSnapshot(notes: ProtocolNote[] = []) {
       type: "snapshot",
       notes,
       members: [],
+      phase: "writing",
     }),
   );
   return { view, socket };
@@ -156,6 +157,7 @@ describe("メンバー参加・退出の通知", () => {
           { userId: USER_ID, name: "Host" },
           { userId: OTHER_USER_ID, name: "Taro" },
         ],
+        phase: "writing",
       }),
     );
     act(() =>

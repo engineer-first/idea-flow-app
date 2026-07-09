@@ -24,6 +24,7 @@ describe("applyMemberServerMessage", () => {
       type: "snapshot",
       notes: [],
       members: [A, B],
+      phase: "lobby",
     };
     expect(applyMemberServerMessage([], message)).toEqual([A, B]);
   });
@@ -123,12 +124,13 @@ describe("applyPhaseServerMessage", () => {
     expect(applyPhaseServerMessage("writing", message)).toBe("writing");
   });
 
-  it("snapshot メッセージは phase を変えない（snapshot には phase を含めない）", () => {
+  it("snapshot.phase で再接続後の進行状態を復元する", () => {
     const message: ServerMessage = {
       type: "snapshot",
       notes: [],
       members: [A],
+      phase: "writing",
     };
-    expect(applyPhaseServerMessage("lobby" as Phase, message)).toBe("lobby");
+    expect(applyPhaseServerMessage("lobby" as Phase, message)).toBe("writing");
   });
 });

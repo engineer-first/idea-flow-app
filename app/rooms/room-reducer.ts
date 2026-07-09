@@ -63,9 +63,8 @@ export function applyPhaseServerMessage(
       return message.phase;
     }
     case "snapshot": {
-      // snapshot には現時点で phase を含めない（プロトコルの最小形）。
-      // 将来 snapshot.phase を含める拡張をしたら、ここで採用する。
-      return phase;
+      // 再接続時の復帰パス。切断中に進んだ phase もここで取り込む。
+      return message.phase;
     }
     case "note:inserted":
     case "note:updated":

@@ -88,13 +88,20 @@ export type ClientMessage = z.infer<typeof ClientMessageSchema>;
 // サーバー → クライアント
 // ---------------------------------------------------------------
 
+// RoomDO.leave が当該ユーザーの全 WS を閉じるときに使う close code / reason。
+// クライアントはこれを見て再接続を打ち切る（マルチタブ退出の無限再接続防止）。
+export const WS_CLOSE_LEFT_ROOM = 4000;
+export const WS_CLOSE_LEFT_ROOM_REASON = "left the room";
+
 export const ServerMessageSchema = z.discriminatedUnion("type", [
   // 接続直後・再接続時に現在状態を一括送信する（復帰パスの本体）。
   // members は「現在のメンバー一覧（参加順）」をスナップショットに含める形。
+  // phase も必ず載せ、切断中に start_phase が進んでも再接続で復帰できるようにする。
   z.object({
     type: z.literal("snapshot"),
     notes: z.array(NoteSchema),
     members: z.array(MemberSchema),
+    phase: PhaseSchema,
   }),
   z.object({ type: z.literal("note:inserted"), note: NoteSchema }),
   z.object({ type: z.literal("note:updated"), note: NoteSchema }),

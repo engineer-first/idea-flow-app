@@ -174,7 +174,8 @@ async function handleListMembers(
 // 認可:
 //   - 未ログインは 401
 //   - ルームが存在しない、または自分がメンバーでない場合は 404
-//   - 退出処理は冪等（再呼び出しでも 200 を返す）
+//     （存在秘匿。クライアントは 204/404 を成功相当としてよい）
+//   - lobby 中のホスト退出は 409（開始不能なルームを作らない）
 async function handleLeaveRoom(
   env: Env,
   session: SessionPayload,
@@ -189,6 +190,15 @@ async function handleLeaveRoom(
   const member = await stub.isMember(session.sub);
   if (!member) {
     return error(404, "ルームが見つかりませんでした。");
+  }
+
+  // lobby 中にホストが抜けると start_phase できる人がいなくなり詰む。
+  // writing 以降は進行済みなのでホスト退出を許可する。
+  if (room.hostId === session.sub) {
+    const phase = await stub.getPhase();
+    if (phase === "lobby") {
+      return error(409, "開始前のルームではホストは退出できません。");
+    }
   }
 
   await stub.leave(session.sub);

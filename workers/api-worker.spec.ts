@@ -355,7 +355,7 @@ describe("退出（POST /api/rooms/:id/leave）", () => {
     expect(body.members.map((m) => m.userId)).toEqual([OWNER.sub]);
   });
 
-  it("退出は冪等（2 回呼んでもエラーにならない）", async () => {
+  it("2 回目の退出は非メンバーのため 404（存在秘匿。クライアントは成功相当でよい）", async () => {
     const { roomId, inviteCode } = await createRoomAs(OWNER);
     await joinRoomAs(MEMBER, inviteCode);
 
@@ -365,12 +365,34 @@ describe("退出（POST /api/rooms/:id/leave）", () => {
     );
     expect(first.status).toBe(204);
 
-    // 2 回目は既に非メンバー → 404 になる（再参加しない限り復帰しない）
+    // 2 回目は既に非メンバー → 404（存在秘匿）
     const second = await SELF.fetch(
       `https://api.test/api/rooms/${roomId}/leave`,
       { method: "POST", headers: { Cookie: await sessionCookie(MEMBER) } },
     );
     expect(second.status).toBe(404);
+  });
+
+  it("lobby 中のホスト退出は 409", async () => {
+    const { roomId } = await createRoomAs(OWNER);
+    const res = await SELF.fetch(`https://api.test/api/rooms/${roomId}/leave`, {
+      method: "POST",
+      headers: { Cookie: await sessionCookie(OWNER) },
+    });
+    expect(res.status).toBe(409);
+  });
+
+  it("writing 中ならホストも退出できる", async () => {
+    const { roomId } = await createRoomAs(OWNER);
+    // DO を writing に進めておく（lobby 中ホスト退出禁止の例外）
+    const stub = env.ROOM_DO.get(env.ROOM_DO.idFromName(roomId));
+    await stub.setPhase("writing", OWNER.sub, OWNER.sub);
+
+    const res = await SELF.fetch(`https://api.test/api/rooms/${roomId}/leave`, {
+      method: "POST",
+      headers: { Cookie: await sessionCookie(OWNER) },
+    });
+    expect(res.status).toBe(204);
   });
 
   it("非メンバーは 404（ルームの存在自体を見せない）", async () => {
