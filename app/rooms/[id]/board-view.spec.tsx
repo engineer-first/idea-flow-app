@@ -15,6 +15,8 @@ function setup(overrides: Partial<Parameters<typeof BoardView>[0]> = {}) {
     onNoteDragEnd: vi.fn(),
     onNoteContentChange: vi.fn(),
     onNoteDelete: vi.fn(),
+    onNoteVote: vi.fn(),
+    onNoteVoteReset: vi.fn(),
     connectionStatus: "open" as const,
     ...overrides,
   };
@@ -73,6 +75,36 @@ describe("BoardView", () => {
     fireEvent.click(screen.getByRole("button", { name: "付箋を追加" }));
 
     expect(onAddNote).toHaveBeenCalledTimes(1);
+  });
+
+  it("残り投票可能数を表示する", () => {
+    setup({
+      notes: buildNotes(2).map((note, index) => ({
+        ...note,
+        dotVotes: {
+          subjective: {
+            count: index === 0 ? 1 : 0,
+            votedByMe: index === 0,
+            ownCount: index === 0 ? 1 : 0,
+          },
+          objective: { count: index + 1, votedByMe: true, ownCount: 1 },
+        },
+      })),
+    });
+
+    expect(screen.getByText("主観 残り0")).toBeInTheDocument();
+    expect(screen.getByText("客観 残り1")).toBeInTheDocument();
+  });
+
+  it("付箋のドット投票ボタンでonNoteVoteを呼ぶ", () => {
+    const onNoteVote = vi.fn();
+    setup({ onNoteVote });
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "主観ドットを投票" })[0],
+    );
+
+    expect(onNoteVote).toHaveBeenCalledWith("note-1", "subjective");
   });
 
   describe("接続状態の表示", () => {

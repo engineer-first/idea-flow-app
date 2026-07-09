@@ -68,6 +68,10 @@ function protocolNote(overrides?: Partial<ProtocolNote>): ProtocolNote {
     y: 100,
     createdAt: "2026-07-07T00:00:00.000Z",
     updatedAt: "2026-07-07T00:00:00.000Z",
+    dotVotes: {
+      subjective: { count: 0, votedByMe: false, ownCount: 0 },
+      objective: { count: 0, votedByMe: false, ownCount: 0 },
+    },
     ...overrides,
   };
 }
@@ -144,10 +148,11 @@ describe("サーバーメッセージ → 画面反映", () => {
     expect(screen.queryByDisplayValue("最初の付箋")).not.toBeInTheDocument();
   });
 
-  it("error メッセージはクラッシュせずログに残る", () => {
+  it("error メッセージはクラッシュせず警告ログに残る", () => {
     const consoleError = vi
       .spyOn(console, "error")
       .mockImplementation(() => {});
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { socket } = connectWithSnapshot([]);
     act(() =>
       socket.simulateServerMessage({
@@ -156,7 +161,8 @@ describe("サーバーメッセージ → 画面反映", () => {
         message: "この操作を行う権限がありません。",
       }),
     );
-    expect(consoleError).toHaveBeenCalledWith(
+    expect(consoleError).not.toHaveBeenCalled();
+    expect(consoleWarn).toHaveBeenCalledWith(
       expect.stringContaining("forbidden"),
     );
   });
@@ -193,6 +199,104 @@ describe("ユーザー操作 → プロトコルメッセージ送信", () => {
     expect(socket.sent).toContain(JSON.stringify({ type: "note:create" }));
     // 確定（note:inserted）が届くまでは描画されない。
     expect(screen.queryAllByTestId("note-card")).toHaveLength(0);
+  });
+
+  it("付箋の主観ドットボタンで note:vote が送信される", () => {
+    const { socket } = connectWithSnapshot([protocolNote()]);
+
+    fireEvent.click(screen.getByRole("button", { name: "主観ドットを投票" }));
+
+    expect(socket.sent).toContain(
+      JSON.stringify({
+        type: "note:vote",
+        noteId: NOTE_ID,
+        kind: "subjective",
+      }),
+    );
+  });
+
+  it("付箋の客観ドットボタンで note:vote が送信される", () => {
+    const { socket } = connectWithSnapshot([protocolNote()]);
+
+    fireEvent.click(screen.getByRole("button", { name: "客観ドットを追加" }));
+
+    expect(socket.sent).toContain(
+      JSON.stringify({
+        type: "note:vote",
+        noteId: NOTE_ID,
+        kind: "objective",
+      }),
+    );
+  });
+
+  it("客観ドットはサーバー応答前でも残数までしか送信しない", () => {
+    const { socket } = connectWithSnapshot([protocolNote()]);
+    const button = screen.getByRole("button", { name: "客観ドットを追加" });
+
+    fireEvent.click(button);
+    fireEvent.click(button);
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    expect(
+      socket.sent.filter(
+        (message) =>
+          message ===
+          JSON.stringify({
+            type: "note:vote",
+            noteId: NOTE_ID,
+            kind: "objective",
+          }),
+      ),
+    ).toHaveLength(3);
+    expect(screen.getByText("客観 残り0")).toBeInTheDocument();
+    expect(button).toBeDisabled();
+  });
+
+  it("客観ドット更新のサーバー反映でローカル選択済みの主観ドットを外さない", () => {
+    const { socket } = connectWithSnapshot([protocolNote()]);
+
+    fireEvent.click(screen.getByRole("button", { name: "主観ドットを投票" }));
+    fireEvent.click(screen.getByRole("button", { name: "客観ドットを追加" }));
+
+    act(() =>
+      socket.simulateServerMessage({
+        type: "note:updated",
+        note: protocolNote({
+          dotVotes: {
+            subjective: { count: 0, votedByMe: false, ownCount: 0 },
+            objective: { count: 1, votedByMe: true, ownCount: 1 },
+          },
+        }),
+      }),
+    );
+
+    expect(
+      screen.getByRole("button", { name: "主観ドット投票を取り消す" }),
+    ).toHaveTextContent("主観1");
+  });
+
+  it("付箋の客観ドットリセットボタンで note:vote-reset が送信される", () => {
+    const { socket } = connectWithSnapshot([
+      protocolNote({
+        dotVotes: {
+          subjective: { count: 0, votedByMe: false, ownCount: 0 },
+          objective: { count: 2, votedByMe: true, ownCount: 2 },
+        },
+      }),
+    ]);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "客観ドットを0に戻す" }),
+    );
+
+    expect(socket.sent).toContain(
+      JSON.stringify({
+        type: "note:vote-reset",
+        noteId: NOTE_ID,
+        kind: "objective",
+      }),
+    );
   });
 
   it("アンマウントで WebSocket を閉じる", () => {

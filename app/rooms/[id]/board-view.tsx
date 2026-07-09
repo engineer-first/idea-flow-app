@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { DotVoteSummary } from "@/app/components/dotvote/organisms/dot-vote-summary";
 import { CopyInviteButton } from "@/app/rooms/[id]/copy-invite-button";
 import { NoteCard } from "@/app/rooms/[id]/note-card";
 import type { Note } from "@/app/rooms/notes-reducer";
@@ -10,6 +11,7 @@ import { Button } from "@/components/ui/button";
 // WebSocket接続・スロットル・プロトコル送信はroom-board.tsx（コンテナ）の責務。
 // 「どの付箋を選択中か」は同期不要な純粋にUIの関心事なので、ここでローカルに持つ。
 import { BOARD_HEIGHT, BOARD_WIDTH } from "@/contracts/board";
+import { DOT_VOTE_LIMITS, type DotVoteKind } from "@/contracts/room-protocol";
 
 // WebSocket 接続の表示用状態。値の生成は room-board（コンテナ）の責務で、
 // ここでは受け取った状態を表示するだけ（このコンポーネントはデータ層に依存しない）。
@@ -33,6 +35,8 @@ export type BoardViewProps = {
   onNoteDragEnd: (noteId: string, x: number, y: number) => void;
   onNoteContentChange: (noteId: string, content: string) => void;
   onNoteDelete: (noteId: string) => void;
+  onNoteVote: (noteId: string, kind: DotVoteKind) => void;
+  onNoteVoteReset: (noteId: string, kind: DotVoteKind) => void;
 };
 
 export function BoardView({
@@ -47,10 +51,30 @@ export function BoardView({
   onNoteDragEnd,
   onNoteContentChange,
   onNoteDelete,
+  onNoteVote,
+  onNoteVoteReset,
 }: BoardViewProps) {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   // 未接続中は room-client が送信を黙って破棄するため、操作自体を無効化する。
   const isDisconnected = connectionStatus !== "open";
+  const voteRemaining = {
+    subjective: Math.max(
+      0,
+      DOT_VOTE_LIMITS.subjective -
+        notes.reduce(
+          (used, note) => used + note.dotVotes.subjective.ownCount,
+          0,
+        ),
+    ),
+    objective: Math.max(
+      0,
+      DOT_VOTE_LIMITS.objective -
+        notes.reduce(
+          (used, note) => used + note.dotVotes.objective.ownCount,
+          0,
+        ),
+    ),
+  };
 
   function handleBoardPointerDown(event: React.PointerEvent<HTMLDivElement>) {
     // 付箋の上のpointerdownはバブリングしてくるので、ボード背景を
@@ -87,6 +111,7 @@ export function BoardView({
           </span>
         </div>
         <div className="flex items-center gap-3">
+          <DotVoteSummary voteRemaining={voteRemaining} />
           {CONNECTION_STATUS_LABELS[connectionStatus] !== null && (
             // role="status"（aria-live: polite）で、再接続をスクリーンリーダーにも通知する。
             <span
@@ -132,6 +157,9 @@ export function BoardView({
               onDragEnd={onNoteDragEnd}
               onContentChange={onNoteContentChange}
               onDelete={handleNoteDelete}
+              voteRemaining={voteRemaining}
+              onVote={onNoteVote}
+              onVoteReset={onNoteVoteReset}
             />
           ))}
         </div>

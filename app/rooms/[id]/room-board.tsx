@@ -16,10 +16,12 @@ import {
   applyServerMessage,
   moveNoteLocally,
   type Note,
+  resetNoteVoteLocally,
+  voteNoteLocally,
 } from "@/app/rooms/notes-reducer";
 import { createThrottled } from "@/app/rooms/throttle";
 import { DRAG_BROADCAST_THROTTLE_MS } from "@/contracts/board";
-import type { ServerMessage } from "@/contracts/room-protocol";
+import type { DotVoteKind, ServerMessage } from "@/contracts/room-protocol";
 import {
   createRoomClient,
   type RoomClient,
@@ -51,6 +53,7 @@ export function RoomBoard({
   const [connectionStatus, setConnectionStatus] =
     useState<RoomConnectionStatus>("connecting");
   const [draggingNoteId, setDraggingNoteId] = useState<string | null>(null);
+  const notesRef = useRef<Note[]>([]);
   const draggingNoteIdRef = useRef<string | null>(null);
   const clientRef = useRef<RoomClient | null>(null);
   const sendDragRef = useRef<ReturnType<
@@ -61,17 +64,27 @@ export function RoomBoard({
     draggingNoteIdRef.current = draggingNoteId;
   }, [draggingNoteId]);
 
-  const handleServerMessage = useCallback((message: ServerMessage) => {
-    if (message.type === "error") {
-      console.error(`ルーム操作エラー (${message.code}): ${message.message}`);
-      return;
-    }
-    setNotes((current) =>
-      applyServerMessage(current, message, {
-        draggingNoteId: draggingNoteIdRef.current,
-      }),
-    );
+  const updateNotes = useCallback((update: (current: Note[]) => Note[]) => {
+    const next = update(notesRef.current);
+    notesRef.current = next;
+    setNotes(next);
+    return next;
   }, []);
+
+  const handleServerMessage = useCallback(
+    (message: ServerMessage) => {
+      if (message.type === "error") {
+        console.warn(`ルーム操作エラー (${message.code}): ${message.message}`);
+        return;
+      }
+      updateNotes((current) =>
+        applyServerMessage(current, message, {
+          draggingNoteId: draggingNoteIdRef.current,
+        }),
+      );
+    },
+    [updateNotes],
+  );
 
   useEffect(() => {
     const client = createRoomClient({
@@ -95,6 +108,7 @@ export function RoomBoard({
       sendDragRef.current?.cancel();
       sendDragRef.current = null;
       clientRef.current = null;
+      notesRef.current = [];
       client.close();
     };
   }, [roomId, handleServerMessage, webSocketFactory]);
@@ -112,39 +126,63 @@ export function RoomBoard({
   const handleNoteDragMove = useCallback(
     (noteId: string, x: number, y: number) => {
       // 自分自身の操作なので即座にローカル反映する。
-      setNotes((current) => moveNoteLocally(current, noteId, x, y));
+      updateNotes((current) => moveNoteLocally(current, noteId, x, y));
       sendDragRef.current?.({ id: noteId, x, y });
     },
-    [],
+    [updateNotes],
   );
 
   const handleNoteDragEnd = useCallback(
     (noteId: string, x: number, y: number) => {
       sendDragRef.current?.cancel();
       setDraggingNoteId(null);
-      setNotes((current) => moveNoteLocally(current, noteId, x, y));
+      updateNotes((current) => moveNoteLocally(current, noteId, x, y));
       // ドロップ確定だけを永続化する（ドラッグ中の座標はサーバーに残らない）。
       clientRef.current?.send({ type: "note:move", noteId, x, y });
     },
-    [],
+    [updateNotes],
   );
 
   const handleNoteContentChange = useCallback(
     (noteId: string, content: string) => {
       // 入力中の見た目を止めないため本文だけは楽観更新する。
-      setNotes((current) =>
+      updateNotes((current) =>
         current.map((note) =>
           note.id === noteId ? { ...note, content } : note,
         ),
       );
       clientRef.current?.send({ type: "note:update-content", noteId, content });
     },
-    [],
+    [updateNotes],
   );
 
   const handleNoteDelete = useCallback((noteId: string) => {
     clientRef.current?.send({ type: "note:delete", noteId });
   }, []);
+
+  const handleNoteVote = useCallback(
+    (noteId: string, kind: DotVoteKind) => {
+      const result = voteNoteLocally(notesRef.current, noteId, kind);
+      if (!result.accepted) {
+        return;
+      }
+      updateNotes(() => result.notes);
+      clientRef.current?.send({ type: "note:vote", noteId, kind });
+    },
+    [updateNotes],
+  );
+
+  const handleNoteVoteReset = useCallback(
+    (noteId: string, kind: DotVoteKind) => {
+      const result = resetNoteVoteLocally(notesRef.current, noteId, kind);
+      if (!result.accepted) {
+        return;
+      }
+      updateNotes(() => result.notes);
+      clientRef.current?.send({ type: "note:vote-reset", noteId, kind });
+    },
+    [updateNotes],
+  );
 
   return (
     <BoardView
@@ -159,6 +197,8 @@ export function RoomBoard({
       onNoteDragEnd={handleNoteDragEnd}
       onNoteContentChange={handleNoteContentChange}
       onNoteDelete={handleNoteDelete}
+      onNoteVote={handleNoteVote}
+      onNoteVoteReset={handleNoteVoteReset}
     />
   );
 }
