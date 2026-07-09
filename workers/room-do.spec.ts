@@ -204,74 +204,74 @@ describe("RoomDO phase:next", () => {
     ws.close();
   });
 
- it("phase 更新は全クライアントへ配信される", async () => {
-  const stub = roomStub("room-phase-broadcast");
+  it("phase 更新は全クライアントへ配信される", async () => {
+    const stub = roomStub("room-phase-broadcast");
 
-  await stub.join(USER_A, true);
-  await stub.join(USER_B);
+    await stub.join(USER_A, true);
+    await stub.join(USER_B);
 
-  const hostRes = await stub.fetch("https://do/ws", {
-    headers: {
-      Upgrade: "websocket",
-      [USER_ID_HEADER]: USER_A,
-    },
-  });
+    const hostRes = await stub.fetch("https://do/ws", {
+      headers: {
+        Upgrade: "websocket",
+        [USER_ID_HEADER]: USER_A,
+      },
+    });
 
-  const memberRes = await stub.fetch("https://do/ws", {
-    headers: {
-      Upgrade: "websocket",
-      [USER_ID_HEADER]: USER_B,
-    },
-  });
+    const memberRes = await stub.fetch("https://do/ws", {
+      headers: {
+        Upgrade: "websocket",
+        [USER_ID_HEADER]: USER_B,
+      },
+    });
 
-  expect(hostRes.status).toBe(101);
-  expect(memberRes.status).toBe(101);
+    expect(hostRes.status).toBe(101);
+    expect(memberRes.status).toBe(101);
 
-  const host = hostRes.webSocket!;
-  const member = memberRes.webSocket!;
+    const host = hostRes.webSocket!;
+    const member = memberRes.webSocket!;
 
-  host.accept();
-  member.accept();
+    host.accept();
+    member.accept();
 
-  // snapshot を受け取る
-  await Promise.all([
-    new Promise<MessageEvent>((resolve) => {
+    // snapshot を受け取る
+    await Promise.all([
+      new Promise<MessageEvent>((resolve) => {
+        host.addEventListener("message", resolve, { once: true });
+      }),
+      new Promise<MessageEvent>((resolve) => {
+        member.addEventListener("message", resolve, { once: true });
+      }),
+    ]);
+
+    // phase:updated の待機を先に開始する
+    const hostPromise = new Promise<MessageEvent>((resolve) => {
       host.addEventListener("message", resolve, { once: true });
-    }),
-    new Promise<MessageEvent>((resolve) => {
+    });
+
+    const memberPromise = new Promise<MessageEvent>((resolve) => {
       member.addEventListener("message", resolve, { once: true });
-    }),
-  ]);
+    });
 
-  // phase:updated の待機を先に開始する
-  const hostPromise = new Promise<MessageEvent>((resolve) => {
-    host.addEventListener("message", resolve, { once: true });
+    // ホストがフェーズを進める
+    host.send(JSON.stringify({ type: "phase:next" }));
+
+    // 両方同時に待つ
+    const [hostMessage, memberMessage] = await Promise.all([
+      hostPromise,
+      memberPromise,
+    ]);
+
+    expect(JSON.parse(String(hostMessage.data))).toEqual({
+      type: "phase:updated",
+      phase: "phase2",
+    });
+
+    expect(JSON.parse(String(memberMessage.data))).toEqual({
+      type: "phase:updated",
+      phase: "phase2",
+    });
+
+    host.close();
+    member.close();
   });
-
-  const memberPromise = new Promise<MessageEvent>((resolve) => {
-    member.addEventListener("message", resolve, { once: true });
-  });
-
-  // ホストがフェーズを進める
-  host.send(JSON.stringify({ type: "phase:next" }));
-
-  // 両方同時に待つ
-  const [hostMessage, memberMessage] = await Promise.all([
-    hostPromise,
-    memberPromise,
-  ]);
-
-  expect(JSON.parse(String(hostMessage.data))).toEqual({
-    type: "phase:updated",
-    phase: "phase2",
-  });
-
-  expect(JSON.parse(String(memberMessage.data))).toEqual({
-    type: "phase:updated",
-    phase: "phase2",
-  });
-
-  host.close();
-  member.close();
-});
 });

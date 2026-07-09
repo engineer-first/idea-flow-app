@@ -17,6 +17,7 @@ const meta = {
     isHost: false,
     connectionStatus: "open",
     draggingNoteId: null,
+    isNextPhasePending: false,
     onAddNote: fn(),
     onNoteDragStart: fn(),
     onNoteDragMove: fn(),
