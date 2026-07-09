@@ -5,7 +5,7 @@ desc: >-
   D1 と RoomDO は物理的に別ストレージであり、DBレベルでの結合は存在しない。
 
 dsn: sqlite://tmp/d1-schema.sqlite
-docPath: docs/schema/d1
+docPath: schema-diagrams/d1
 
 er:
-  format: mermaid
+  format: svg

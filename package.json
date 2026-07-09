@@ -19,12 +19,11 @@
     "db:migrate": "wrangler d1 migrations apply DB --local --config workers/wrangler.jsonc",
     "db:schema:d1": "node --no-warnings scripts/build-d1-schema.mts",
     "db:schema:room-do": "node --no-warnings scripts/build-room-do-schema.mts",
-    "db:docs": "npm run db:schema:d1 && npm run db:schema:room-do && tbls doc --config .tbls/d1.yml --rm-dist && tbls doc --config .tbls/room-do.yml --rm-dist",
-    "db:docs:check": "npm run db:schema:d1 && npm run db:schema:room-do && tbls diff --config .tbls/d1.yml && tbls diff --config .tbls/room-do.yml",
+    "db:schema:diagrams": "npm run db:schema:d1 && npm run db:schema:room-do && tbls doc --config .tbls/d1.yml --rm-dist && tbls doc --config .tbls/room-do.yml --rm-dist",
     "build:cf": "opennextjs-cloudflare build",
     "preview:cf": "opennextjs-cloudflare build && wrangler dev -c wrangler.jsonc -c workers/wrangler.jsonc",
-    "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "storybook": "npm run db:schema:diagrams && storybook dev -p 6006",
+    "build-storybook": "npm run db:schema:diagrams && storybook build"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

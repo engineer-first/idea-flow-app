@@ -6,11 +6,11 @@ desc: >-
   コード上でのみ対応づけられる）。D1 側は .tbls/d1.yml を参照。
 
 dsn: sqlite://tmp/room-do-schema.sqlite
-docPath: docs/schema/room-do
+docPath: schema-diagrams/room-do
 
 # schema_version は版管理用の内部テーブルでドメインモデルではないため除外する。
 exclude:
   - schema_version
 
 er:
-  format: mermaid
+  format: svg

@@ -80,10 +80,11 @@
   プロトコルのメッセージに含めない。認可チェックではなく形で塞ぐ。
 - D1 migration は意図として戻せる形にし、スコープを最小限に保つ。
   適用は `npm run db:migrate`（ローカル）。
-- D1 migration または `room-do-migrations.ts` を変更したら `npm run db:docs`
-  を実行し、`docs/schema/{d1,room-do}/` の ER 図（Mermaid）を再生成して
-  コミットする。古いままだと CI の `npm run db:docs:check` が落ちる。
-  D1 と RoomDO は物理的に別ストレージで DB レベルの結合を持たないため、
+- D1 migration または `room-do-migrations.ts` を変更すると、Storybook の
+  `Schema/SchemaDiagram`（`components/schema-diagrams/`）の ER 図に自動反映
+  される（`npm run storybook` / `build-storybook` が `tbls` で再生成する）。
+  Chromatic が develop との見た目の差分を検出するため、手動生成やコミットは
+  不要。D1 と RoomDO は物理的に別ストレージで DB レベルの結合を持たないため、
   ER 図もあえて分離している（1枚に混ぜて結合があるように見せない）。
 
 ## 境界ルール

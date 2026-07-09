@@ -62,5 +62,7 @@ build-storybook.log
 workers/.dev.vars
 workers/.wrangler/
 
-# schema doc生成用の一時sqliteファイル（scripts/build-*-schema.ts が生成）
+# スキーマ抽出・ER図生成の成果物（scripts/build-*-schema.ts, tbls が生成）。
+# Chromatic 側で管理するため、リポジトリにはコミットしない。
 /tmp/*.sqlite
+/schema-diagrams/

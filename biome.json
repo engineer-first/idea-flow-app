@@ -9,6 +9,7 @@
       "!build",
       "!coverage",
       "!storybook-static",
+      "!schema-diagrams",
       "!**/*.tsbuildinfo",
       "!next-env.d.ts",
       "!package-lock.json",
