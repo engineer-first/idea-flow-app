@@ -5,7 +5,12 @@
 // からの位置更新を無視し、ローカルの操作を優先する。そうしないと、ドラッグ中に
 // 古い位置を運ぶ note:updated/note:drag イベントを受信した瞬間に付箋が
 // 巻き戻って見えてしまう。
-import type { ProtocolNote, ServerMessage } from "@/contracts/room-protocol";
+import {
+  DOT_VOTE_LIMITS,
+  type DotVoteKind,
+  type ProtocolNote,
+  type ServerMessage,
+} from "@/contracts/room-protocol";
 
 // アプリケーションで扱うドメインモデル。プロトコル上の付箋と同一の形なので
 // contracts の型をそのまま再エクスポートする（重複定義を避ける）。
@@ -84,4 +89,87 @@ export function moveNoteLocally(
   y: number,
 ): Note[] {
   return notes.map((n) => (n.id === noteId ? { ...n, x, y } : n));
+}
+
+export type LocalVoteResult = {
+  notes: Note[];
+  accepted: boolean;
+};
+
+function countOwnVotes(notes: Note[], kind: DotVoteKind): number {
+  return notes.reduce((count, note) => count + note.dotVotes[kind].ownCount, 0);
+}
+
+export function voteNoteLocally(
+  notes: Note[],
+  noteId: string,
+  kind: DotVoteKind,
+): LocalVoteResult {
+  const target = notes.find((note) => note.id === noteId);
+  if (!target) {
+    return { notes, accepted: false };
+  }
+
+  const summary = target.dotVotes[kind];
+  if (kind === "subjective" && summary.ownCount > 0) {
+    return resetNoteVoteLocally(notes, noteId, kind);
+  }
+
+  if (countOwnVotes(notes, kind) >= DOT_VOTE_LIMITS[kind]) {
+    return { notes, accepted: false };
+  }
+
+  return {
+    accepted: true,
+    notes: notes.map((note) =>
+      note.id === noteId
+        ? {
+            ...note,
+            dotVotes: {
+              ...note.dotVotes,
+              [kind]: {
+                count: summary.count + 1,
+                votedByMe: true,
+                ownCount: summary.ownCount + 1,
+              },
+            },
+          }
+        : note,
+    ),
+  };
+}
+
+export function resetNoteVoteLocally(
+  notes: Note[],
+  noteId: string,
+  kind: DotVoteKind,
+): LocalVoteResult {
+  const target = notes.find((note) => note.id === noteId);
+  if (!target) {
+    return { notes, accepted: false };
+  }
+
+  const summary = target.dotVotes[kind];
+  if (summary.ownCount <= 0) {
+    return { notes, accepted: false };
+  }
+
+  return {
+    accepted: true,
+    notes: notes.map((note) =>
+      note.id === noteId
+        ? {
+            ...note,
+            dotVotes: {
+              ...note.dotVotes,
+              [kind]: {
+                count: Math.max(0, summary.count - summary.ownCount),
+                votedByMe: false,
+                ownCount: 0,
+              },
+            },
+          }
+        : note,
+    ),
+  };
 }
