@@ -33,16 +33,17 @@ export const AllVariants: Story = {
       {/* 通常 */}
       <AlertDialog>
         <AlertDialogTrigger asChild>
-          <button className="rounded-md bg-primary px-3 py-2 text-primary-foreground">
+          <button
+            type="button"
+            className="rounded-md bg-primary px-3 py-2 text-primary-foreground"
+          >
             Default
           </button>
         </AlertDialogTrigger>
 
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              削除しますか？
-            </AlertDialogTitle>
+            <AlertDialogTitle>削除しますか？</AlertDialogTitle>
 
             <AlertDialogDescription>
               この操作は取り消すことができません。
@@ -50,22 +51,17 @@ export const AllVariants: Story = {
           </AlertDialogHeader>
 
           <AlertDialogFooter>
-            <AlertDialogCancel>
-              キャンセル
-            </AlertDialogCancel>
+            <AlertDialogCancel>キャンセル</AlertDialogCancel>
 
-            <AlertDialogAction>
-              削除する
-            </AlertDialogAction>
+            <AlertDialogAction>削除する</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-
       {/* Mediaあり */}
       <AlertDialog>
         <AlertDialogTrigger asChild>
-          <button className="rounded-md border px-3 py-2">
+          <button type="button" className="rounded-md border px-3 py-2">
             With Media
           </button>
         </AlertDialogTrigger>
@@ -76,42 +72,32 @@ export const AllVariants: Story = {
               <AlertTriangle />
             </AlertDialogMedia>
 
-            <AlertDialogTitle>
-              注意してください
-            </AlertDialogTitle>
+            <AlertDialogTitle>注意してください</AlertDialogTitle>
 
             <AlertDialogDescription>
-              重要な変更を実行します。
-              続行すると元に戻せません。
+              重要な変更を実行します。 続行すると元に戻せません。
             </AlertDialogDescription>
           </AlertDialogHeader>
 
           <AlertDialogFooter>
-            <AlertDialogCancel>
-              戻る
-            </AlertDialogCancel>
+            <AlertDialogCancel>戻る</AlertDialogCancel>
 
-            <AlertDialogAction>
-              続行
-            </AlertDialogAction>
+            <AlertDialogAction>続行</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-
       {/* Small */}
       <AlertDialog>
         <AlertDialogTrigger asChild>
-          <button className="rounded-md border px-3 py-2">
+          <button type="button" className="rounded-md border px-3 py-2">
             Small
           </button>
         </AlertDialogTrigger>
 
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              短い確認
-            </AlertDialogTitle>
+            <AlertDialogTitle>短い確認</AlertDialogTitle>
 
             <AlertDialogDescription>
               簡単な確認ダイアログです。
@@ -119,13 +105,9 @@ export const AllVariants: Story = {
           </AlertDialogHeader>
 
           <AlertDialogFooter>
-            <AlertDialogCancel size="sm">
-              Cancel
-            </AlertDialogCancel>
+            <AlertDialogCancel size="sm">Cancel</AlertDialogCancel>
 
-            <AlertDialogAction size="sm">
-              OK
-            </AlertDialogAction>
+            <AlertDialogAction size="sm">OK</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
