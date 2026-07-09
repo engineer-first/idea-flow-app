@@ -21,7 +21,11 @@ import {
 } from "@/app/rooms/notes-reducer";
 import { createThrottled } from "@/app/rooms/throttle";
 import { DRAG_BROADCAST_THROTTLE_MS } from "@/contracts/board";
-import type { DotVoteKind, Phase, ServerMessage } from "@/contracts/room-protocol";
+import type {
+  DotVoteKind,
+  Phase,
+  ServerMessage,
+} from "@/contracts/room-protocol";
 import {
   createRoomClient,
   type RoomClient,
@@ -81,16 +85,16 @@ export function RoomBoard({
         return;
       }
 
-    if (message.type === "snapshot") {
-      setPhase(message.phase);
-      setIsHost(message.isHost);
-    }
+      if (message.type === "snapshot") {
+        setPhase(message.phase);
+        setIsHost(message.isHost);
+      }
 
-    if (message.type === "phase:updated") {
-      setPhase(message.phase);
-      setIsNextPhasePending(false);
-      return;
-    }
+      if (message.type === "phase:updated") {
+        setPhase(message.phase);
+        setIsNextPhasePending(false);
+        return;
+      }
 
       updateNotes((current) =>
         applyServerMessage(current, message, {

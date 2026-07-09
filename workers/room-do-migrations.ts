@@ -28,7 +28,7 @@ export const ROOM_DO_MIGRATIONS: readonly string[] = [
    );
    DROP TABLE IF EXISTS meta;`,
 
-     // v2: 課題ドット投票 + フェーズ管理追加
+  // v2: 課題ドット投票 + フェーズ管理追加
   `
   CREATE TABLE IF NOT EXISTS note_votes (
      note_id TEXT NOT NULL,
@@ -53,7 +53,7 @@ export const ROOM_DO_MIGRATIONS: readonly string[] = [
    VALUES (1, 'phase1');
   `,
 
-    // v3: 客観ドット複数票対応 + host管理
+  // v3: 客観ドット複数票対応 + host管理
   `
   ALTER TABLE note_votes ADD COLUMN vote_count INTEGER NOT NULL DEFAULT 1;
 
