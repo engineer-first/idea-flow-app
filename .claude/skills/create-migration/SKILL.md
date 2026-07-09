@@ -34,14 +34,16 @@ disable-model-invocation: true
 
 ## 適用と検証
 
-1. `npm run db:migrate` でローカルに適用する
-2. `npx wrangler d1 execute DB --local --config workers/wrangler.jsonc --command "SELECT sql FROM sqlite_master WHERE type='table'"` でスキーマを確認する
-3. D1 に触れる spec（`workers/api-worker.spec.ts` など）に新スキーマの
+1. `npm run check:migrations` で番号重複がないことを確認する
+   （同じ番号のファイルが存在すると exit 1 になる。CI の lint job でも実行される）
+2. `npm run db:migrate` でローカルに適用する
+3. `npx wrangler d1 execute DB --local --config workers/wrangler.jsonc --command "SELECT sql FROM sqlite_master WHERE type='table'"` でスキーマを確認する
+4. D1 に触れる spec（`workers/api-worker.spec.ts` など）に新スキーマの
    振る舞いテストを追加し、`npm run test:workers` が green になることを確認する
 
 ## チェックリスト
 
-- 番号が既存と重複していない
+- `npm run check:migrations` が通る（番号が既存と重複していない）
 - 1 ファイル 1 意図になっている
 - 破壊的変更が分離され、ユーザー確認を経ている
 - `npm run test:workers` が通る
