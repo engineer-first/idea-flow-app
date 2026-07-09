@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { LeaveConfirmDialog } from "@/app/rooms/leave-confirm-dialog";
 
-describe("LeaveConfirmDialog", () => {
+describe("LeaveConfirmDialog（leave）", () => {
   it("open=true のとき「退出しますか？」が表示される", () => {
     render(
       <LeaveConfirmDialog
@@ -19,33 +19,6 @@ describe("LeaveConfirmDialog", () => {
     expect(
       screen.getByText(/退出すると、このルームに戻るには/),
     ).toBeInTheDocument();
-  });
-
-  it("open=false のとき Dialog が表示されない", () => {
-    render(
-      <LeaveConfirmDialog
-        open={false}
-        onOpenChange={vi.fn()}
-        onConfirm={vi.fn()}
-        isLeaving={false}
-      />,
-    );
-    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
-  });
-
-  it("「キャンセル」ボタンで onOpenChange(false) が呼ばれる", async () => {
-    const onOpenChange = vi.fn();
-    const user = userEvent.setup();
-    render(
-      <LeaveConfirmDialog
-        open
-        onOpenChange={onOpenChange}
-        onConfirm={vi.fn()}
-        isLeaving={false}
-      />,
-    );
-    await user.click(screen.getByRole("button", { name: "キャンセル" }));
-    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
   it("「退出する」ボタンで onConfirm が呼ばれる", async () => {
@@ -76,6 +49,40 @@ describe("LeaveConfirmDialog", () => {
     expect(screen.getByTestId("leave-confirm-action")).toBeDisabled();
     expect(screen.getByTestId("leave-confirm-action")).toHaveTextContent(
       "退出中…",
+    );
+  });
+});
+
+describe("LeaveConfirmDialog（disband）", () => {
+  it("ホスト向けに解散文言を表示する", () => {
+    render(
+      <LeaveConfirmDialog
+        open
+        onOpenChange={vi.fn()}
+        onConfirm={vi.fn()}
+        isLeaving={false}
+        mode="disband"
+      />,
+    );
+    expect(screen.getByText("ルームを解散しますか？")).toBeInTheDocument();
+    expect(screen.getByText(/解散するとルームは削除され/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "ルームを解散" }),
+    ).toBeInTheDocument();
+  });
+
+  it("isLeaving=true のとき「解散中…」になる", () => {
+    render(
+      <LeaveConfirmDialog
+        open
+        onOpenChange={vi.fn()}
+        onConfirm={vi.fn()}
+        isLeaving
+        mode="disband"
+      />,
+    );
+    expect(screen.getByTestId("leave-confirm-action")).toHaveTextContent(
+      "解散中…",
     );
   });
 });

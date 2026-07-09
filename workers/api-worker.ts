@@ -14,6 +14,7 @@ import {
 } from "../contracts/session";
 import { verifyToken } from "../lib/session/token";
 import {
+  deleteRoom,
   ensureUser,
   findRoomByCode,
   findRoomById,
@@ -168,14 +169,13 @@ async function handleListMembers(
   return json({ members });
 }
 
-// POST /api/rooms/:id/leave — 退出（#70 退室機能）。
-// 自分の WS を close し、RoomDO の members から外れ、他メンバー全員に
-// member_left を broadcast する。退出後は再参加可能（同じ招待URL から）。
+// POST /api/rooms/:id/leave — 退出 / 解散（#70 退室機能）。
+// - 非ホスト: 自分の WS close + members から外れ、他メンバーに member_left。
+// - ホスト: ルームを解散する（全 WS close + RoomDO クリア + D1 rooms 削除）。
 // 認可:
 //   - 未ログインは 401
 //   - ルームが存在しない、または自分がメンバーでない場合は 404
 //     （存在秘匿。クライアントは 204/404 を成功相当としてよい）
-//   - lobby 中のホスト退出は 409（開始不能なルームを作らない）
 async function handleLeaveRoom(
   env: Env,
   session: SessionPayload,
@@ -192,13 +192,11 @@ async function handleLeaveRoom(
     return error(404, "ルームが見つかりませんでした。");
   }
 
-  // lobby 中にホストが抜けると start_phase できる人がいなくなり詰む。
-  // writing 以降は進行済みなのでホスト退出を許可する。
+  // ホストの「退出」はルーム解散。残メンバーを開始不能にしない。
   if (room.hostId === session.sub) {
-    const phase = await stub.getPhase();
-    if (phase === "lobby") {
-      return error(409, "開始前のルームではホストは退出できません。");
-    }
+    await stub.disband();
+    await deleteRoom(env.DB, roomId);
+    return new Response(null, { status: 204 });
   }
 
   await stub.leave(session.sub);

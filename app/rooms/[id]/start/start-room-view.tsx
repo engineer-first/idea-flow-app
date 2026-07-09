@@ -156,7 +156,13 @@ export function StartRoomView({
             data-testid="leave-button"
             className="w-full"
           >
-            {isLeaving ? "退出中…" : "退出する"}
+            {isHost
+              ? isLeaving
+                ? "解散中…"
+                : "ルームを解散"
+              : isLeaving
+                ? "退出中…"
+                : "退出する"}
           </Button>
         </CardFooter>
       </Card>
@@ -166,6 +172,7 @@ export function StartRoomView({
         onOpenChange={setLeaveDialogOpen}
         onConfirm={onLeave}
         isLeaving={isLeaving}
+        mode={isHost ? "disband" : "leave"}
       />
     </div>
   );

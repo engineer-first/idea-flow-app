@@ -373,26 +373,32 @@ describe("退出（POST /api/rooms/:id/leave）", () => {
     expect(second.status).toBe(404);
   });
 
-  it("lobby 中のホスト退出は 409", async () => {
-    const { roomId } = await createRoomAs(OWNER);
-    const res = await SELF.fetch(`https://api.test/api/rooms/${roomId}/leave`, {
-      method: "POST",
-      headers: { Cookie: await sessionCookie(OWNER) },
-    });
-    expect(res.status).toBe(409);
-  });
-
-  it("writing 中ならホストも退出できる", async () => {
-    const { roomId } = await createRoomAs(OWNER);
-    // DO を writing に進めておく（lobby 中ホスト退出禁止の例外）
-    const stub = env.ROOM_DO.get(env.ROOM_DO.idFromName(roomId));
-    await stub.setPhase("writing", OWNER.sub, OWNER.sub);
+  it("ホストの leave はルームを解散し、D1 からも消える", async () => {
+    const { roomId, inviteCode } = await createRoomAs(OWNER);
+    await joinRoomAs(MEMBER, inviteCode);
 
     const res = await SELF.fetch(`https://api.test/api/rooms/${roomId}/leave`, {
       method: "POST",
       headers: { Cookie: await sessionCookie(OWNER) },
     });
     expect(res.status).toBe(204);
+
+    // ルーム行が消えている → GET は 404
+    const getRes = await SELF.fetch(`https://api.test/api/rooms/${roomId}`, {
+      headers: { Cookie: await sessionCookie(MEMBER) },
+    });
+    expect(getRes.status).toBe(404);
+
+    // 招待コードでも解決できない
+    const joinRes = await SELF.fetch("https://api.test/api/rooms/join", {
+      method: "POST",
+      headers: {
+        Cookie: await sessionCookie(MEMBER),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ code: inviteCode }),
+    });
+    expect(joinRes.status).toBe(404);
   });
 
   it("非メンバーは 404（ルームの存在自体を見せない）", async () => {

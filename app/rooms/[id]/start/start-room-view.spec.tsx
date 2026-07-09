@@ -90,20 +90,28 @@ describe("StartRoomView", () => {
 });
 
 describe("退出ボタン（#70 退室機能）", () => {
-  it("「退出する」ボタンが描画される（ホスト／非ホスト共通）", () => {
-    renderView();
+  it("ホストは「ルームを解散」ボタンが描画される", () => {
+    renderView({ isHost: true });
+    expect(
+      screen.getByRole("button", { name: "ルームを解散" }),
+    ).toBeInTheDocument();
+  });
+
+  it("非ホストは「退出する」ボタンが描画される", () => {
+    renderView({ isHost: false });
     expect(
       screen.getByRole("button", { name: "退出する" }),
     ).toBeInTheDocument();
   });
 
-  it("「退出する」クリックで確認 Dialog が開き、確定で onLeave が呼ばれる", async () => {
+  it("ホストの「ルームを解散」で確認 Dialog が開き、確定で onLeave が呼ばれる", async () => {
     const onLeave = vi.fn();
     const user = userEvent.setup();
-    renderView({ onLeave });
+    renderView({ onLeave, isHost: true });
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "退出する" }));
+    await user.click(screen.getByRole("button", { name: "ルームを解散" }));
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(screen.getByText("ルームを解散しますか？")).toBeInTheDocument();
     await user.click(screen.getByTestId("leave-confirm-action"));
     expect(onLeave).toHaveBeenCalledTimes(1);
   });
@@ -111,19 +119,19 @@ describe("退出ボタン（#70 退室機能）", () => {
   it("「キャンセル」で Dialog が閉じて onLeave は呼ばれない", async () => {
     const onLeave = vi.fn();
     const user = userEvent.setup();
-    renderView({ onLeave });
-    await user.click(screen.getByRole("button", { name: "退出する" }));
+    renderView({ onLeave, isHost: true });
+    await user.click(screen.getByRole("button", { name: "ルームを解散" }));
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "キャンセル" }));
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(onLeave).not.toHaveBeenCalled();
   });
 
-  it("isLeaving=true のときボタンは disabled で文言が「退出中…」", () => {
-    renderView({ isLeaving: true });
-    const button = screen.getByRole("button", { name: /退出/ });
+  it("isLeaving=true のときホストボタンは disabled で文言が「解散中…」", () => {
+    renderView({ isLeaving: true, isHost: true });
+    const button = screen.getByRole("button", { name: /解散/ });
     expect(button).toBeDisabled();
-    expect(button).toHaveTextContent("退出中…");
+    expect(button).toHaveTextContent("解散中…");
   });
 });
 

@@ -142,6 +142,24 @@ export class RoomDO extends DurableObject {
     this.broadcastToAllExcept({ type: "member_left", userId }, userId);
   }
 
+  // ルーム解散（ホスト操作）。全 WS を閉じ、members / notes を空にする。
+  // D1 rooms 行の削除は api-worker 側の責務。
+  async disband(): Promise<void> {
+    for (const socket of this.ctx.getWebSockets()) {
+      try {
+        socket.close(WS_CLOSE_LEFT_ROOM, WS_CLOSE_LEFT_ROOM_REASON);
+      } catch {
+        // 既に閉じている等のエラーは握りつぶす
+      }
+    }
+    this.ctx.storage.sql.exec("DELETE FROM notes");
+    this.ctx.storage.sql.exec("DELETE FROM members");
+    this.ctx.storage.sql.exec(
+      `UPDATE room_state SET phase = 'lobby', changed_at = ?1 WHERE id = 1`,
+      new Date().toISOString(),
+    );
+  }
+
   // メンバー一覧を参加順（joined_at 昇順）で返す。snapshot 構築に使う。
   listMembers(): { userId: string; name: string }[] {
     const rows = this.ctx.storage.sql
