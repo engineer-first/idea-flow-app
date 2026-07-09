@@ -7,6 +7,7 @@
 //   - 操作のプロトコルメッセージ化（contracts/room-protocol.ts）
 //   - members / phase state の管理（app/rooms/room-reducer.ts）
 //   - 退出のトリガ（#70 退室機能）
+//   - 次フェーズ（#71 phase:next）
 // を担当する。関心の分離のため、room-client や notes/room-reducer への依存は
 // このファイルに閉じ込める。
 //
@@ -50,7 +51,7 @@ export type RoomBoardProps = {
   inviteCode: string;
   inviteUrl: string;
   currentUserId: string;
-  // 自分がこのルームのホストかどうか（表示用。#70 では機能制御には使わない）。
+  // 自分がこのルームのホストかどうか（表示用・操作制御）。
   isHost: boolean;
   // ホストの userId（メンバー一覧の「ホスト」ラベル表示用）。
   hostUserId: string;
@@ -97,6 +98,7 @@ export function RoomBoard({
   const sendDragRef = useRef<ReturnType<
     typeof createThrottled<[NoteDragPayload]>
   > | null>(null);
+  const [isNextPhasePending, setIsNextPhasePending] = useState(false);
 
   useEffect(() => {
     draggingNoteIdRef.current = draggingNoteId;
@@ -113,6 +115,9 @@ export function RoomBoard({
   const handleServerMessage = useCallback((message: ServerMessage) => {
     if (message.type === "error") {
       console.warn(`ルーム操作エラー (${message.code}): ${message.message}`);
+      if (message.code === "forbidden") {
+        setIsNextPhasePending(false);
+      }
       return;
     }
     setNotes((current) =>
@@ -131,6 +136,9 @@ export function RoomBoard({
       if (left) {
         notify.memberLeft(left.name);
       }
+    }
+    if (message.type === "phase:updated" || message.type === "phase_changed") {
+      setIsNextPhasePending(false);
     }
     // ref を同期更新して、連続メッセージでも最新 members を引けるようにする。
     const nextMembers = applyMemberServerMessage(membersRef.current, message);
@@ -192,6 +200,16 @@ export function RoomBoard({
     // 単一オブジェクトなので往復は短く、ID 生成をサーバーに一本化できる）。
     clientRef.current?.send({ type: "note:create" });
   }, []);
+
+  const handleNextPhase = useCallback(() => {
+    if (isNextPhasePending) return;
+
+    setIsNextPhasePending(true);
+
+    clientRef.current?.send({
+      type: "phase:next",
+    });
+  }, [isNextPhasePending]);
 
   const handleNoteDragStart = useCallback((noteId: string) => {
     setDraggingNoteId(noteId);
@@ -303,14 +321,16 @@ export function RoomBoard({
       notes={notes}
       inviteCode={inviteCode}
       inviteUrl={inviteUrl}
+      phase={phase}
+      isHost={isHost}
       connectionStatus={connectionStatus}
       draggingNoteId={draggingNoteId}
       members={members}
       currentUserId={currentUserId}
-      isHost={isHost}
       hostUserId={hostUserId}
-      phase={phase}
+      isNextPhasePending={isNextPhasePending}
       onAddNote={handleAddNote}
+      onNextPhase={handleNextPhase}
       onNoteDragStart={handleNoteDragStart}
       onNoteDragMove={handleNoteDragMove}
       onNoteDragEnd={handleNoteDragEnd}

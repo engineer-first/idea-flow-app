@@ -12,12 +12,14 @@ function setup(overrides: Partial<Parameters<typeof BoardView>[0]> = {}) {
     notes: buildNotes(2),
     inviteCode: "AB12CD",
     inviteUrl: "https://idea-flow.example/invite/AB12CD",
+    phase: "phase1" as const,
+    isHost: false,
+    isNextPhasePending: false,
     draggingNoteId: null,
     members: buildMembers(2, ME),
     currentUserId: ME,
-    isHost: true,
     hostUserId: ME,
-    phase: "writing" as const,
+    onNextPhase: vi.fn(),
     onAddNote: vi.fn(),
     onNoteDragStart: vi.fn(),
     onNoteDragMove: vi.fn(),
@@ -213,6 +215,33 @@ describe("BoardView", () => {
       fireEvent.keyDown(getNoteSurface(first), { key: "Backspace" });
 
       expect(onNoteDelete).toHaveBeenCalledWith("note-1");
+    });
+  });
+
+  describe("フェーズ移行", () => {
+    it("ホストの場合のみ「次のフェーズへ」ボタンを表示する", () => {
+      setup({ isHost: true });
+
+      expect(
+        screen.getByRole("button", { name: "次のフェーズへ" }),
+      ).toBeInTheDocument();
+    });
+
+    it("フェーズ移行前に確認ダイアログを表示し、確認後にonNextPhaseを呼ぶ", () => {
+      const onNextPhase = vi.fn();
+      setup({ isHost: true, onNextPhase });
+
+      fireEvent.click(screen.getByRole("button", { name: "次のフェーズへ" }));
+
+      expect(
+        screen.getByText("次のフェーズへ移行しますか？"),
+      ).toBeInTheDocument();
+
+      expect(onNextPhase).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole("button", { name: "移行する" }));
+
+      expect(onNextPhase).toHaveBeenCalledTimes(1);
     });
   });
 });

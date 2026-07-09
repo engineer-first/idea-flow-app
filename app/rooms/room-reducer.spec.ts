@@ -25,6 +25,7 @@ describe("applyMemberServerMessage", () => {
       notes: [],
       members: [A, B],
       phase: "lobby",
+      isHost: true,
     };
     expect(applyMemberServerMessage([], message)).toEqual([A, B]);
   });
@@ -70,7 +71,7 @@ describe("applyMemberServerMessage", () => {
   });
 
   it("phase_changed は members を変えない", () => {
-    const message: ServerMessage = { type: "phase_changed", phase: "writing" };
+    const message: ServerMessage = { type: "phase_changed", phase: "phase1" };
     expect(applyMemberServerMessage([A], message)).toEqual([A]);
   });
 
@@ -102,9 +103,14 @@ describe("applyPhaseServerMessage", () => {
     ).toBe("lobby");
   });
 
-  it("phase_changed で writing に進める", () => {
-    const message: ServerMessage = { type: "phase_changed", phase: "writing" };
-    expect(applyPhaseServerMessage("lobby", message)).toBe("writing");
+  it("phase_changed で phase1 に進める", () => {
+    const message: ServerMessage = { type: "phase_changed", phase: "phase1" };
+    expect(applyPhaseServerMessage("lobby", message)).toBe("phase1");
+  });
+
+  it("phase:updated でも phase が進む", () => {
+    const message: ServerMessage = { type: "phase:updated", phase: "phase2" };
+    expect(applyPhaseServerMessage("phase1", message)).toBe("phase2");
   });
 
   it("ノート系メッセージは phase を変えない", () => {
@@ -129,7 +135,7 @@ describe("applyPhaseServerMessage", () => {
 
   it("member_joined は phase を変えない", () => {
     const message: ServerMessage = { type: "member_joined", member: B };
-    expect(applyPhaseServerMessage("writing", message)).toBe("writing");
+    expect(applyPhaseServerMessage("phase1", message)).toBe("phase1");
   });
 
   it("snapshot.phase で再接続後の進行状態を復元する", () => {
@@ -137,8 +143,9 @@ describe("applyPhaseServerMessage", () => {
       type: "snapshot",
       notes: [],
       members: [A],
-      phase: "writing",
+      phase: "phase1",
+      isHost: true,
     };
-    expect(applyPhaseServerMessage("lobby" as Phase, message)).toBe("writing");
+    expect(applyPhaseServerMessage("lobby" as Phase, message)).toBe("phase1");
   });
 });

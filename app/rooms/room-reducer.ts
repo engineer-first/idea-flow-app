@@ -44,6 +44,7 @@ export function applyMemberServerMessage(
     case "note:deleted":
     case "note:drag":
     case "phase_changed":
+    case "phase:updated":
     case "error":
       return members;
     default: {
@@ -59,7 +60,9 @@ export function applyPhaseServerMessage(
   message: ServerMessage,
 ): Phase {
   switch (message.type) {
-    case "phase_changed": {
+    case "phase_changed":
+    case "phase:updated": {
+      // start_phase / phase:next の両方で配信される（互換のため二重配信）。
       return message.phase;
     }
     case "snapshot": {

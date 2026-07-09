@@ -85,8 +85,8 @@ async function handleCreateRoom(
     name: session.name,
   });
   const room = await insertRoom(env.DB, session.sub);
-  const stub = roomStub(env, room.roomId);
-  await stub.upsertMember(session.sub, session.name);
+  // 作成者をホスト登録し、フェーズを lobby（開始前）に初期化する。
+  await roomStub(env, room.roomId).initializeNewRoom(session.sub, session.name);
   return json({ roomId: room.roomId, inviteCode: room.inviteCode });
 }
 

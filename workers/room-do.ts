@@ -1,7 +1,7 @@
 // 1ルーム = 1 Durable Object の権威サーバー。
 // - メンバーシップ（誰がこのルームに入れるか）の真実をここで持つ
 // - 付箋の確定状態（notes）の真実をここで持つ
-// - 進行状態 (lobby / writing) の真実をここで持つ
+// - 進行状態 (lobby / phase1-3) の真実をここで持つ
 // - 配信は必ず visibleTo（workers/visibility.ts）を通す（選択的送信）
 //   メンバー参加・進行状態のように参加者全員が受け取る情報は
 //   broadcastToAll という別経路で送る（visibleTo はノートにだけ適用する）
@@ -98,10 +98,41 @@ export class RoomDO extends DurableObject {
     }
   }
 
-  // 旧シグネチャ。api-worker の後方互換のために残し、内部で upsertMember に
-  // 委譲する。新規呼び出しは upsertMember を使う。
-  join(userId: string): Promise<void> {
-    return this.upsertMember(userId, undefined);
+  // 旧シグネチャ + #71 の isHost フラグ。ホスト初回 join で room_owner を記録。
+  async join(userId: string, isHost = false): Promise<void> {
+    await this.upsertMember(userId, undefined);
+    if (isHost) {
+      this.ensureHost(userId);
+    }
+  }
+
+  // 新規ルーム作成直後にロビー状態へ（#70）。
+  async initializeNewRoom(
+    hostId: string,
+    hostName: string | undefined,
+  ): Promise<void> {
+    await this.upsertMember(hostId, hostName);
+    this.ensureHost(hostId);
+    this.savePhase("lobby");
+  }
+
+  private ensureHost(userId: string): void {
+    const existing = this.ctx.storage.sql
+      .exec("SELECT host_id FROM room_owner WHERE id = 1")
+      .toArray()[0] as { host_id: string | null } | undefined;
+    if (!existing?.host_id) {
+      this.ctx.storage.sql.exec(
+        "UPDATE room_owner SET host_id = ?1 WHERE id = 1",
+        userId,
+      );
+    }
+  }
+
+  private isHostUser(userId: string): boolean {
+    const row = this.ctx.storage.sql
+      .exec("SELECT host_id FROM room_owner WHERE id = 1")
+      .toArray()[0] as { host_id: string | null } | undefined;
+    return row?.host_id === userId;
   }
 
   isMember(userId: string): boolean {
@@ -145,8 +176,7 @@ export class RoomDO extends DurableObject {
     this.ctx.storage.sql.exec("DELETE FROM note_votes");
     this.ctx.storage.sql.exec("DELETE FROM members");
     this.ctx.storage.sql.exec(
-      `UPDATE room_state SET phase = 'lobby', changed_at = ?1 WHERE id = 1`,
-      new Date().toISOString(),
+      "UPDATE room_state SET phase = 'lobby' WHERE id = 1",
     );
   }
 
@@ -167,7 +197,24 @@ export class RoomDO extends DurableObject {
       .toArray();
     const row = rows[0] as { phase: string } | undefined;
     const phase = row?.phase ?? "lobby";
-    return phase === "writing" ? "writing" : "lobby";
+    if (
+      phase === "lobby" ||
+      phase === "phase1" ||
+      phase === "phase2" ||
+      phase === "phase3"
+    ) {
+      return phase;
+    }
+    // 旧 "writing" は phase1 扱い
+    if (phase === "writing") return "phase1";
+    return "lobby";
+  }
+
+  private savePhase(phase: Phase): void {
+    this.ctx.storage.sql.exec(
+      "UPDATE room_state SET phase = ?1 WHERE id = 1",
+      phase,
+    );
   }
 
   async setPhase(
@@ -175,15 +222,24 @@ export class RoomDO extends DurableObject {
     byUserId: string,
     expectedHostId: string,
   ): Promise<void> {
-    if (byUserId !== expectedHostId) {
+    if (byUserId !== expectedHostId && !this.isHostUser(byUserId)) {
       throw new Error("進行状態を変更する権限がありません。");
     }
-    const now = new Date().toISOString();
-    this.ctx.storage.sql.exec(
-      `UPDATE room_state SET phase = ?1, changed_at = ?2 WHERE id = 1`,
-      phase,
-      now,
-    );
+    this.savePhase(phase);
+  }
+
+  private nextSprintPhase(): Phase {
+    const current = this.getPhase();
+    switch (current) {
+      case "lobby":
+        return "phase1";
+      case "phase1":
+        return "phase2";
+      case "phase2":
+        return "phase3";
+      case "phase3":
+        return "phase3";
+    }
   }
 
   // ------------------------------------------------------------
@@ -453,7 +509,8 @@ export class RoomDO extends DurableObject {
       }
 
       case "start_phase": {
-        if (userId !== hostId) {
+        // ロビー → phase1（ボード開始）。ホストのみ。
+        if (userId !== hostId && !this.isHostUser(userId)) {
           this.sendTo(ws, {
             type: "error",
             code: "forbidden",
@@ -461,9 +518,43 @@ export class RoomDO extends DurableObject {
           });
           return;
         }
-        // phase 永続化が終わる前に phase_changed を送らない（レース防止）。
-        await this.setPhase("writing", userId, hostId);
-        this.broadcastToAll({ type: "phase_changed", phase: "writing" });
+        if (this.getPhase() !== "lobby") {
+          this.sendTo(ws, {
+            type: "error",
+            code: "forbidden",
+            message: "すでに開始済みです。",
+          });
+          return;
+        }
+        await this.setPhase("phase1", userId, hostId);
+        this.broadcastToAll({ type: "phase_changed", phase: "phase1" });
+        this.broadcastToAll({ type: "phase:updated", phase: "phase1" });
+        return;
+      }
+
+      case "phase:next": {
+        // phase1 → phase2 → phase3。ホストのみ。lobby では不可。
+        if (userId !== hostId && !this.isHostUser(userId)) {
+          this.sendTo(ws, {
+            type: "error",
+            code: "forbidden",
+            message: "ホストのみ操作できます。",
+          });
+          return;
+        }
+        const current = this.getPhase();
+        if (current === "lobby") {
+          this.sendTo(ws, {
+            type: "error",
+            code: "forbidden",
+            message: "ロビー中は次フェーズに進めません。",
+          });
+          return;
+        }
+        const next = this.nextSprintPhase();
+        this.savePhase(next);
+        this.broadcastToAll({ type: "phase:updated", phase: next });
+        this.broadcastToAll({ type: "phase_changed", phase: next });
         return;
       }
 
@@ -486,6 +577,7 @@ export class RoomDO extends DurableObject {
       notes: filterVisible({ viewerId: userId }, notes),
       members: this.listMembers().map((m) => this.toProtocolMember(m)),
       phase: this.getPhase(),
+      isHost: this.isHostUser(userId),
     });
   }
 

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { fn } from "storybook/test";
+import { fn, userEvent, within } from "storybook/test";
 import { BoardView } from "@/app/rooms/[id]/board-view";
 import { buildNotes } from "@/app/rooms/[id]/board-view.fixture";
 import { buildMembers } from "@/app/rooms/[id]/room-members.fixture";
@@ -16,13 +16,14 @@ const meta = {
     notes: buildNotes(3),
     inviteCode: "AB12CD",
     inviteUrl: "https://idea-flow.example/invite/AB12CD",
+    phase: "phase1",
+    isHost: true,
     connectionStatus: "open",
     draggingNoteId: null,
     members: buildMembers(3, ME),
     currentUserId: ME,
-    isHost: true,
     hostUserId: ME,
-    phase: "writing",
+    isNextPhasePending: false,
     onAddNote: fn(),
     onNoteDragStart: fn(),
     onNoteDragMove: fn(),
@@ -33,6 +34,7 @@ const meta = {
     onNoteVoteReset: fn(),
     onLeave: fn(),
     isLeaving: false,
+    onNextPhase: fn(),
   },
   decorators: [
     (Story) => (
@@ -118,5 +120,30 @@ export const Connecting: Story = {
 export const Reconnecting: Story = {
   args: {
     connectionStatus: "closed",
+  },
+};
+
+// ホストがフェーズ移行操作を行える状態。
+export const HostCanMovePhase: Story = {
+  args: {
+    isHost: true,
+    phase: "phase1",
+  },
+};
+
+// 「次のフェーズへ」押下後、確認ダイアログが表示されている状態。
+export const NextPhaseConfirmDialog: Story = {
+  args: {
+    isHost: true,
+    phase: "phase1",
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(
+      await canvas.findByRole("button", {
+        name: "次のフェーズへ",
+      }),
+    );
   },
 };

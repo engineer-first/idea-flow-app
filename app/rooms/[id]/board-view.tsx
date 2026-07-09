@@ -8,6 +8,17 @@ import { RoomMembers } from "@/app/rooms/[id]/room-members";
 import { LeaveConfirmDialog } from "@/app/rooms/leave-confirm-dialog";
 import type { Note } from "@/app/rooms/notes-reducer";
 import type { Member } from "@/app/rooms/room-reducer";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 // ルームボードの表示用コンポーネント。データ層には一切依存せず、
 // 付箋の配列と各種コールバックをpropsで受け取る。
@@ -32,21 +43,24 @@ const CONNECTION_STATUS_LABELS: Record<BoardConnectionStatus, string | null> = {
 
 const PHASE_LABELS: Record<Phase, string> = {
   lobby: "開始待ち",
-  writing: "進行中",
+  phase1: "フェーズ1",
+  phase2: "フェーズ2",
+  phase3: "フェーズ3",
 };
 
 export type BoardViewProps = {
   notes: Note[];
   inviteCode: string;
   inviteUrl: string;
+  phase: Phase;
+  isHost: boolean;
   connectionStatus: BoardConnectionStatus;
   draggingNoteId: string | null;
   members: Member[];
   currentUserId: string;
-  isHost: boolean;
   // ホストの userId（メンバー一覧の「ホスト」ラベル表示用）。
   hostUserId: string;
-  phase: Phase;
+  isNextPhasePending: boolean;
   onAddNote: () => void;
   onNoteDragStart: (noteId: string) => void;
   onNoteDragMove: (noteId: string, x: number, y: number) => void;
@@ -59,19 +73,22 @@ export type BoardViewProps = {
   onLeave: () => void;
   // 退出処理中（多重押下防止）。true の間「退出する」ボタンは disabled。
   isLeaving: boolean;
+  // 次フェーズへ（#71）。ホストのみ UI 表示。
+  onNextPhase: () => void;
 };
 
 export function BoardView({
   notes,
   inviteCode,
   inviteUrl,
+  phase,
+  isHost,
   connectionStatus,
   draggingNoteId,
   members,
   currentUserId,
-  isHost,
   hostUserId,
-  phase,
+  isNextPhasePending,
   onAddNote,
   onNoteDragStart,
   onNoteDragMove,
@@ -82,6 +99,7 @@ export function BoardView({
   onNoteVoteReset,
   onLeave,
   isLeaving,
+  onNextPhase,
 }: BoardViewProps) {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
@@ -153,13 +171,50 @@ export function BoardView({
             hostUserId={hostUserId}
           />
           <DotVoteSummary voteRemaining={voteRemaining} />
-          {phase === "writing" ? null : (
-            // ボード画面に「writing 以外」の状態で居る場合は start 画面への
-            // 導線に過ぎない（通常は page.tsx の redirect でここに来ない）。
-            <span className="text-xs text-muted-foreground">
-              開始前: {PHASE_LABELS[phase]}
+          <span className="text-sm text-muted-foreground">
+            Phase:
+            <span className="ml-1 font-semibold text-foreground">
+              {PHASE_LABELS[phase]}
             </span>
+          </span>
+
+          {isHost && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  type="button"
+                  disabled={
+                    isDisconnected || isNextPhasePending || phase === "phase3"
+                  }
+                >
+                  次のフェーズへ
+                </Button>
+              </AlertDialogTrigger>
+
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    次のフェーズへ移行しますか？
+                  </AlertDialogTitle>
+
+                  <AlertDialogDescription>
+                    {PHASE_LABELS[phase]}
+                    から次のフェーズへ移行します。
+                    移行すると現在の付箋が整理され、一部の内容が引き継がれない場合があります。
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+
+                <AlertDialogFooter>
+                  <AlertDialogCancel>キャンセル</AlertDialogCancel>
+
+                  <AlertDialogAction onClick={onNextPhase}>
+                    移行する
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
+
           {CONNECTION_STATUS_LABELS[connectionStatus] !== null && (
             // role="status"（aria-live: polite）で、再接続をスクリーンリーダーにも通知する。
             <span

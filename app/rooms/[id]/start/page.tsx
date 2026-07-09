@@ -38,8 +38,8 @@ export default async function StartPage({ params }: StartPageProps) {
     notFound();
   }
 
-  // 既に writing ならボードへ直行（スタート画面に留まる意味がない）。
-  if (parsed.data.phase === "writing") {
+  // 既にボード工程（phase1-3）ならボードへ直行（スタート画面に留まる意味がない）。
+  if (parsed.data.phase !== "lobby") {
     redirect(`/rooms/${parsed.data.roomId}`);
   }
 

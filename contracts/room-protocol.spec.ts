@@ -17,9 +17,15 @@ const USER_A = "11111111-1111-4111-8111-111111111111";
 const USER_B = "22222222-2222-4222-8222-222222222222";
 
 describe("PhaseSchema", () => {
-  it("lobby と writing だけを受け入れる", () => {
+  it("lobby と phase1-3 を受け入れる", () => {
     expect(PhaseSchema.parse("lobby")).toBe("lobby");
-    expect(PhaseSchema.parse("writing")).toBe("writing");
+    expect(PhaseSchema.parse("phase1")).toBe("phase1");
+    expect(PhaseSchema.parse("phase2")).toBe("phase2");
+    expect(PhaseSchema.parse("phase3")).toBe("phase3");
+  });
+
+  it("旧 writing は拒否する（互換は RoomDO getPhase 側）", () => {
+    expect(PhaseSchema.safeParse("writing").success).toBe(false);
   });
 
   it("未知のフェーズは拒否する", () => {
@@ -50,18 +56,20 @@ describe("MemberSchema", () => {
 });
 
 describe("ServerMessageSchema", () => {
-  it("snapshot は notes / members / phase を必須にする", () => {
+  it("snapshot は notes / members / phase / isHost を必須にする", () => {
     const parsed = ServerMessageSchema.parse({
       type: "snapshot",
       notes: [],
       members: [{ userId: USER_A, name: "Owner" }],
       phase: "lobby",
+      isHost: true,
     });
     expect(parsed).toEqual({
       type: "snapshot",
       notes: [],
       members: [{ userId: USER_A, name: "Owner" }],
       phase: "lobby",
+      isHost: true,
     });
   });
 
@@ -79,6 +87,17 @@ describe("ServerMessageSchema", () => {
       type: "snapshot",
       notes: [],
       members: [{ userId: USER_A, name: "Owner" }],
+      isHost: true,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("snapshot に isHost フィールドが無いと拒否する", () => {
+    const result = ServerMessageSchema.safeParse({
+      type: "snapshot",
+      notes: [],
+      members: [{ userId: USER_A, name: "Owner" }],
+      phase: "lobby",
     });
     expect(result.success).toBe(false);
   });
@@ -94,13 +113,25 @@ describe("ServerMessageSchema", () => {
     });
   });
 
-  it("phase_changed は lobby / writing のみ受け入れる", () => {
+  it("phase_changed は lobby / phase1-3 を受け入れる", () => {
     expect(
       ServerMessageSchema.parse({ type: "phase_changed", phase: "lobby" }),
     ).toEqual({ type: "phase_changed", phase: "lobby" });
     expect(
-      ServerMessageSchema.parse({ type: "phase_changed", phase: "writing" }),
-    ).toEqual({ type: "phase_changed", phase: "writing" });
+      ServerMessageSchema.parse({ type: "phase_changed", phase: "phase1" }),
+    ).toEqual({ type: "phase_changed", phase: "phase1" });
+  });
+
+  it("phase:updated を受け入れる", () => {
+    expect(
+      ServerMessageSchema.parse({ type: "phase:updated", phase: "phase2" }),
+    ).toEqual({ type: "phase:updated", phase: "phase2" });
+  });
+
+  it("phase:next クライアントメッセージを受け入れる", () => {
+    expect(ClientMessageSchema.parse({ type: "phase:next" })).toEqual({
+      type: "phase:next",
+    });
   });
 
   it("phase_changed に未知のフェーズは拒否する", () => {
@@ -150,7 +181,7 @@ describe("ClientMessageSchema", () => {
 
   it("start_phase に余計なフィールドがあっても無視する（passthrough しない）", () => {
     expect(
-      ClientMessageSchema.safeParse({ type: "start_phase", phase: "writing" })
+      ClientMessageSchema.safeParse({ type: "start_phase", phase: "phase1" })
         .success,
     ).toBe(true);
   });
@@ -165,7 +196,7 @@ describe("ClientMessageSchema", () => {
 
   it("未知の type は拒否する", () => {
     expect(
-      ClientMessageSchema.safeParse({ type: "phase:force", phase: "writing" })
+      ClientMessageSchema.safeParse({ type: "phase:force", phase: "phase1" })
         .success,
     ).toBe(false);
   });
@@ -180,6 +211,7 @@ describe("parseServerMessage", () => {
           notes: [],
           members: [],
           phase: "lobby",
+          isHost: false,
         }),
       ),
     ).toEqual({
@@ -187,6 +219,7 @@ describe("parseServerMessage", () => {
       notes: [],
       members: [],
       phase: "lobby",
+      isHost: false,
     });
   });
 
@@ -228,7 +261,7 @@ describe("parseClientMessage", () => {
   it("phase_changed もクライアント送信メッセージには存在しない", () => {
     expect(
       parseClientMessage(
-        JSON.stringify({ type: "phase_changed", phase: "writing" }),
+        JSON.stringify({ type: "phase_changed", phase: "phase1" }),
       ),
     ).toBeNull();
   });

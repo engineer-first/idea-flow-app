@@ -95,10 +95,10 @@ export function RoomStartBoard({
     };
   }, [clearStartTimeout]);
 
-  // 既に writing ならボードへ直行（SSR でも redirect しているが、state 初期値が
+  // 既にボード工程ならボードへ直行（SSR でも redirect しているが、state 初期値が
   // 古い場合のリカバリとしても機能する）。
   useEffect(() => {
-    if (phase === "writing") {
+    if (phase !== "lobby") {
       router.replace(`/rooms/${roomId}`);
     }
   }, [phase, roomId, router]);

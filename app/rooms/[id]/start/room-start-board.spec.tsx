@@ -98,7 +98,7 @@ function renderStart(
     isHost?: boolean;
     currentUserId?: string;
     initialMembers?: ProtocolMember[];
-    initialPhase?: "lobby" | "writing";
+    initialPhase?: "lobby" | "phase1" | "phase2" | "phase3";
   } = {},
 ) {
   FakeWebSocket.instances = [];
@@ -173,6 +173,7 @@ describe("サーバーメッセージ → 画面反映", () => {
           { userId: MEMBER_ID, name: "Member" },
         ],
         phase: "lobby",
+        isHost: true,
       }),
     );
     expect(screen.getAllByTestId("avatar")).toHaveLength(2);
@@ -229,7 +230,7 @@ describe("サーバーメッセージ → 画面反映", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
-  it("phase_changed: writing を受信すると /rooms/[id] へ router.replace する", () => {
+  it("phase_changed: phase1 を受信すると /rooms/[id] へ router.replace する", () => {
     renderStart();
     // snapshot でメンバー確定
     const socket = findSocket();
@@ -239,12 +240,13 @@ describe("サーバーメッセージ → 画面反映", () => {
         notes: [],
         members: [{ userId: HOST_ID, name: "Host" }],
         phase: "lobby",
+        isHost: true,
       }),
     );
     act(() =>
       socket.simulateServerMessage({
         type: "phase_changed",
-        phase: "writing",
+        phase: "phase1",
       }),
     );
     expect(navigationMocks.replace).toHaveBeenCalledWith(`/rooms/${ROOM_ID}`);

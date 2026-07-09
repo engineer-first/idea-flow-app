@@ -4,16 +4,12 @@
 //
 // 設計上の不変条件:
 // - authorId を書き換えるメッセージは存在しない（構造的に不可能にする）。
-//   Supabase 時代に列レベル GRANT で塞いだ権限昇格攻撃を、プロトコルの形で塞ぐ。
-//   authorId はサーバーが接続時のヘッダー（検証済みユーザーID）から決める。
-// - roomId はそもそもプロトコルに現れない。1 RoomDO = 1 ルームなので、
-//   接続先（どの DO に繋いでいるか）自体が roomId を意味しており、
-//   メッセージの中に含めて信頼する必要がない。
+// - roomId はプロトコルに現れない（1 RoomDO = 1 ルーム）。
 // - note:drag は永続化されない一時データ。確定は note:move だけが行う。
-// - member_joined / phase_changed は閲覧者全員に届く共有情報。名前や
-//   ロールをクライアントが書き換えるプロトコルは存在しない（host 判定は
-//   api-worker が SessionPayload と D1 rooms.host_id で行い、RoomDO は
-//   その結果だけを受け取って setPhase する）。
+//
+// フェーズモデル（#70 + #71 統合）:
+// - lobby: 開始前ロビー（メンバー確認・招待）。start_phase で phase1 へ。
+// - phase1/2/3: ボード上のスプリント工程。phase:next で進む（ホストのみ）。
 import { z } from "zod";
 import { BOARD_HEIGHT, BOARD_WIDTH } from "./board";
 
@@ -49,13 +45,11 @@ export const NoteSchema = z.object({
 
 export type ProtocolNote = z.infer<typeof NoteSchema>;
 
-// ルームの進行状態。サーバーが真実をもち、phase_changed で全員に同期する。
-// クライアントから書き換える経路は存在しない（host でも start_phase を送るだけ）。
-export const PhaseSchema = z.enum(["lobby", "writing"]);
+// lobby = 開始前 / phase1-3 = ボード上の工程（#71）
+export const PhaseSchema = z.enum(["lobby", "phase1", "phase2", "phase3"]);
 export type Phase = z.infer<typeof PhaseSchema>;
 
-// メンバー一覧スナップショットの単位。userId と表示名だけを持ち、
-// 画像 URL や権限フラグはここに載せない（#70 のスコープで画像は出さない）。
+// メンバー一覧スナップショットの単位（#70）。
 export const MemberSchema = z.object({
   userId: z.string().uuid(),
   name: z.string(),
@@ -80,13 +74,11 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
       .string()
       .max(NOTE_CONTENT_MAX_LENGTH, "本文は2000文字以内で入力してください。"),
   }),
-  // ドロップ確定（永続化する）
   z.object({
     type: z.literal("note:move"),
     noteId: z.string().uuid(),
     ...NotePositionSchema,
   }),
-  // ドラッグ中の一時共有（永続化しない）
   z.object({
     type: z.literal("note:drag"),
     noteId: z.string().uuid(),
@@ -96,8 +88,6 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
     type: z.literal("note:delete"),
     noteId: z.string().uuid(),
   }),
-  // ホストがルームの進行状態を次に進める（サーバーが host 判定して通す/落とす）。
-  z.object({ type: z.literal("start_phase") }),
   z.object({
     type: z.literal("note:vote"),
     noteId: z.string().uuid(),
@@ -108,6 +98,10 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
     noteId: z.string().uuid(),
     kind: DotVoteKindSchema,
   }),
+  // #70: ロビーからボードへ（lobby → phase1）。ホストのみ。
+  z.object({ type: z.literal("start_phase") }),
+  // #71: ボード内の次工程（phase1 → phase2 → phase3）。ホストのみ。
+  z.object({ type: z.literal("phase:next") }),
 ]);
 
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;
@@ -116,23 +110,18 @@ export type ClientMessage = z.infer<typeof ClientMessageSchema>;
 // サーバー → クライアント
 // ---------------------------------------------------------------
 
-// RoomDO が WS を閉じるときに使う close code / reason。
-// クライアントはこれを見て再接続を打ち切り、必要ならホームへ誘導する。
-// 4000: 個人の退出 / 4001: ホストによるルーム解散
 export const WS_CLOSE_LEFT_ROOM = 4000;
 export const WS_CLOSE_LEFT_ROOM_REASON = "left the room";
 export const WS_CLOSE_ROOM_DISBANDED = 4001;
 export const WS_CLOSE_ROOM_DISBANDED_REASON = "room disbanded";
 
 export const ServerMessageSchema = z.discriminatedUnion("type", [
-  // 接続直後・再接続時に現在状態を一括送信する（復帰パスの本体）。
-  // members は「現在のメンバー一覧（参加順）」をスナップショットに含める形。
-  // phase も必ず載せ、切断中に start_phase が進んでも再接続で復帰できるようにする。
   z.object({
     type: z.literal("snapshot"),
     notes: z.array(NoteSchema),
     members: z.array(MemberSchema),
     phase: PhaseSchema,
+    isHost: z.boolean(),
   }),
   z.object({ type: z.literal("note:inserted"), note: NoteSchema }),
   z.object({ type: z.literal("note:updated"), note: NoteSchema }),
@@ -143,21 +132,22 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
     x: z.number(),
     y: z.number(),
   }),
-  // 新しいメンバーが参加したことを全員に通知する（Realtime 反映）。
   z.object({
     type: z.literal("member_joined"),
     member: MemberSchema,
   }),
-  // メンバーが退出したことを全員に通知する（Realtime 反映）。退室者は
-  // broadcast から除外される（自身の close は api-worker 側の RoomDO.leave
-  // で行うため、本人宛の member_left は届かない）。
   z.object({
     type: z.literal("member_left"),
     userId: z.string().uuid(),
   }),
-  // ホストが進行状態を進めたことを全員に通知する。
+  // start_phase 成功時（ロビー離脱）にも phase:next 成功時にも使う。
   z.object({
     type: z.literal("phase_changed"),
+    phase: PhaseSchema,
+  }),
+  // #71 互換: phase:next 成功時に配信（board 側が購読）。
+  z.object({
+    type: z.literal("phase:updated"),
     phase: PhaseSchema,
   }),
   z.object({

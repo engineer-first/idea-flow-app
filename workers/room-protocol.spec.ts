@@ -130,9 +130,9 @@ describe("snapshot（接続・再接続の復帰パス）", () => {
     member.close();
   });
 
-  it("切断中に start_phase が進んだあと再接続すると snapshot.phase が writing になる", async () => {
+  it("切断中に start_phase が進んだあと再接続すると snapshot.phase が phase1 になる", async () => {
     const { roomId, owner, member } = await setupRoom();
-    // member が切断している間に host が writing へ進める
+    // member が切断している間に host が phase1 へ進める
     member.close();
     send(owner, { type: "start_phase" });
     await expectType(owner, "phase_changed");
@@ -141,7 +141,7 @@ describe("snapshot（接続・再接続の復帰パス）", () => {
       hostId: OWNER.sub,
     });
     const snapshot = await expectType(reconnected, "snapshot");
-    expect(snapshot.phase).toBe("writing");
+    expect(snapshot.phase).toBe("phase1");
 
     reconnected.close();
     owner.close();
@@ -331,8 +331,8 @@ describe("start_phase / phase_changed（ホストだけ進行状態を進めら�
     send(owner, { type: "start_phase" });
     const toOwner = await expectType(owner, "phase_changed");
     const toMember = await expectType(member, "phase_changed");
-    expect(toOwner.phase).toBe("writing");
-    expect(toMember.phase).toBe("writing");
+    expect(toOwner.phase).toBe("phase1");
+    expect(toMember.phase).toBe("phase1");
 
     owner.close();
     member.close();
@@ -357,7 +357,7 @@ describe("start_phase / phase_changed（ホストだけ進行状態を進めら�
     member.close();
   });
 
-  it("start_phase 後の phase は永続化され、再接続後の /api/rooms/[id] でも writing のまま", async () => {
+  it("start_phase 後の phase は永続化され、再接続後の /api/rooms/[id] でも phase1 のまま", async () => {
     const { roomId, owner, member } = await setupRoom();
 
     send(owner, { type: "start_phase" });
@@ -371,7 +371,7 @@ describe("start_phase / phase_changed（ホストだけ進行状態を進めら�
       headers: { Cookie: await sessionCookieFor(MEMBER) },
     });
     const body = (await res.json()) as { phase: string };
-    expect(body.phase).toBe("writing");
+    expect(body.phase).toBe("phase1");
   });
 });
 
