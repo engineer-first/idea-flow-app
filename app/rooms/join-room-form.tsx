@@ -1,25 +1,14 @@
 "use client";
 
-// ホーム画面の「招待コードで参加」フォーム。
+// ホーム画面の「招待コードで参加」フォーム（コンテナ）。
 // 招待コードを入力 → lookup でホスト名を解決 → 確認 Dialog → joinRoom。
 // 成功時は toast → スタート画面へ遷移（作成と同じ経路）。
+// 表示は JoinRoomFormView に委譲する。
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { notify } from "@/app/_lib/notify";
 import { joinRoom, lookupInviteRoom } from "@/app/rooms/actions";
-import { Button } from "@/components/ui/button";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { JoinRoomFormView } from "@/app/rooms/join-room-form-view";
 
 export function JoinRoomForm() {
   const router = useRouter();
@@ -65,62 +54,16 @@ export function JoinRoomForm() {
   }
 
   return (
-    <>
-      <form
-        onSubmit={handleSubmit}
-        className="flex flex-col gap-3"
-        data-testid="join-room-form"
-      >
-        <Field>
-          <FieldLabel htmlFor="code">招待コード</FieldLabel>
-          <Input
-            id="code"
-            name="code"
-            value={code}
-            onChange={(event) => setCode(event.target.value.toUpperCase())}
-            maxLength={6}
-            placeholder="AB12CD"
-            autoComplete="off"
-            required
-            className="font-mono"
-          />
-          <FieldDescription>6 桁の英数字</FieldDescription>
-        </Field>
-        <Button
-          type="submit"
-          disabled={!isValidCode || lookingUp}
-          className="w-full"
-        >
-          {lookingUp ? "確認中…" : "参加する"}
-        </Button>
-      </form>
-
-      <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {hostName} さんが作成したルームに参加しますか？
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              招待コード <span className="font-mono font-semibold">{code}</span>{" "}
-              のルームに参加します。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={joining}>キャンセル</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(event) => {
-                event.preventDefault();
-                handleConfirm();
-              }}
-              disabled={joining}
-              data-testid="join-confirm-action"
-            >
-              {joining ? "参加中…" : "参加する"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+    <JoinRoomFormView
+      code={code}
+      onCodeChange={setCode}
+      lookingUp={lookingUp}
+      joining={joining}
+      dialogOpen={dialogOpen}
+      onDialogOpenChange={setDialogOpen}
+      hostName={hostName}
+      onSubmit={handleSubmit}
+      onConfirm={handleConfirm}
+    />
   );
 }
