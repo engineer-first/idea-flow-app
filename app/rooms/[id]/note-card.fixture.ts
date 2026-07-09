@@ -11,6 +11,10 @@ export function buildNote(overrides: Partial<Note> = {}): Note {
     y: 120,
     createdAt: "2026-07-03T00:00:00.000Z",
     updatedAt: "2026-07-03T00:00:00.000Z",
+    dotVotes: {
+      subjective: { count: 0, votedByMe: false, ownCount: 0 },
+      objective: { count: 0, votedByMe: false, ownCount: 0 },
+    },
     ...overrides,
   };
 }

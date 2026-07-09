@@ -28,19 +28,38 @@ export const ROOM_DO_MIGRATIONS: readonly string[] = [
    );
    DROP TABLE IF EXISTS meta;`,
 
-  // v2: フェーズ管理追加
+     // v2: 課題ドット投票 + フェーズ管理追加
   `
-  CREATE TABLE IF NOT EXISTS room_state (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
-    phase TEXT NOT NULL DEFAULT 'phase1'
-  );
+  CREATE TABLE IF NOT EXISTS note_votes (
+     note_id TEXT NOT NULL,
+     user_id TEXT NOT NULL,
+     kind TEXT NOT NULL CHECK (kind IN ('subjective', 'objective')),
+     created_at TEXT NOT NULL,
+     PRIMARY KEY (note_id, user_id, kind)
+   );
 
-  INSERT OR IGNORE INTO room_state (id, phase)
-  VALUES (1, 'phase1');
+   CREATE INDEX IF NOT EXISTS idx_note_votes_note_kind
+     ON note_votes (note_id, kind);
+
+   CREATE INDEX IF NOT EXISTS idx_note_votes_user_kind
+     ON note_votes (user_id, kind);
+
+   CREATE TABLE IF NOT EXISTS room_state (
+     id INTEGER PRIMARY KEY CHECK (id = 1),
+     phase TEXT NOT NULL DEFAULT 'phase1'
+   );
+
+   INSERT OR IGNORE INTO room_state (id, phase)
+   VALUES (1, 'phase1');
   `,
 
-  // v3: host管理追加
+    // v3: 客観ドット複数票対応 + host管理
   `
+  ALTER TABLE note_votes ADD COLUMN vote_count INTEGER NOT NULL DEFAULT 1;
+
+  CREATE INDEX IF NOT EXISTS idx_note_votes_user_note_kind
+    ON note_votes (user_id, note_id, kind);
+
   CREATE TABLE IF NOT EXISTS room_owner (
     id INTEGER PRIMARY KEY CHECK(id = 1),
     host_id TEXT

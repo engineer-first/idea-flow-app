@@ -5,7 +5,12 @@
 // からの位置更新を無視し、ローカルの操作を優先する。そうしないと、ドラッグ中に
 // 古い位置を運ぶ note:updated/note:drag イベントを受信した瞬間に付箋が
 // 巻き戻って見えてしまう。
-import type { ProtocolNote, ServerMessage } from "@/contracts/room-protocol";
+import {
+  DOT_VOTE_LIMITS,
+  type DotVoteKind,
+  type ProtocolNote,
+  type ServerMessage,
+} from "@/contracts/room-protocol";
 
 // アプリケーションで扱うドメインモデル。プロトコル上の付箋と同一の形なので
 // contracts の型をそのまま再エクスポートする（重複定義を避ける）。
@@ -41,11 +46,15 @@ export function applyServerMessage(
         if (n.id !== message.note.id) {
           return n;
         }
+        const note = {
+          ...message.note,
+          dotVotes: mergeLocalDotVotes(n.dotVotes, message.note.dotVotes),
+        };
         if (options.draggingNoteId === n.id) {
           // 自分がドラッグ中の位置はローカル優先で保持し、他フィールドのみ反映する。
-          return { ...message.note, x: n.x, y: n.y };
+          return { ...note, x: n.x, y: n.y };
         }
-        return message.note;
+        return note;
       });
     }
 
@@ -78,6 +87,31 @@ export function applyServerMessage(
   }
 }
 
+function mergeLocalDotVotes(
+  current: Note["dotVotes"],
+  incoming: Note["dotVotes"],
+): Note["dotVotes"] {
+  return {
+    subjective: mergeLocalDotVote(current.subjective, incoming.subjective),
+    objective: mergeLocalDotVote(current.objective, incoming.objective),
+  };
+}
+
+function mergeLocalDotVote(
+  current: Note["dotVotes"][DotVoteKind],
+  incoming: Note["dotVotes"][DotVoteKind],
+): Note["dotVotes"][DotVoteKind] {
+  if (current.ownCount <= incoming.ownCount) {
+    return incoming;
+  }
+
+  return {
+    count: incoming.count + current.ownCount - incoming.ownCount,
+    votedByMe: true,
+    ownCount: current.ownCount,
+  };
+}
+
 // 自分自身のドラッグ操作をローカルへ即時反映するための純粋関数。
 // サーバーへの確定（note:move）を待たず、操作の追従性を優先する。
 export function moveNoteLocally(
@@ -87,4 +121,87 @@ export function moveNoteLocally(
   y: number,
 ): Note[] {
   return notes.map((n) => (n.id === noteId ? { ...n, x, y } : n));
+}
+
+export type LocalVoteResult = {
+  notes: Note[];
+  accepted: boolean;
+};
+
+function countOwnVotes(notes: Note[], kind: DotVoteKind): number {
+  return notes.reduce((count, note) => count + note.dotVotes[kind].ownCount, 0);
+}
+
+export function voteNoteLocally(
+  notes: Note[],
+  noteId: string,
+  kind: DotVoteKind,
+): LocalVoteResult {
+  const target = notes.find((note) => note.id === noteId);
+  if (!target) {
+    return { notes, accepted: false };
+  }
+
+  const summary = target.dotVotes[kind];
+  if (kind === "subjective" && summary.ownCount > 0) {
+    return resetNoteVoteLocally(notes, noteId, kind);
+  }
+
+  if (countOwnVotes(notes, kind) >= DOT_VOTE_LIMITS[kind]) {
+    return { notes, accepted: false };
+  }
+
+  return {
+    accepted: true,
+    notes: notes.map((note) =>
+      note.id === noteId
+        ? {
+            ...note,
+            dotVotes: {
+              ...note.dotVotes,
+              [kind]: {
+                count: summary.count + 1,
+                votedByMe: true,
+                ownCount: summary.ownCount + 1,
+              },
+            },
+          }
+        : note,
+    ),
+  };
+}
+
+export function resetNoteVoteLocally(
+  notes: Note[],
+  noteId: string,
+  kind: DotVoteKind,
+): LocalVoteResult {
+  const target = notes.find((note) => note.id === noteId);
+  if (!target) {
+    return { notes, accepted: false };
+  }
+
+  const summary = target.dotVotes[kind];
+  if (summary.ownCount <= 0) {
+    return { notes, accepted: false };
+  }
+
+  return {
+    accepted: true,
+    notes: notes.map((note) =>
+      note.id === noteId
+        ? {
+            ...note,
+            dotVotes: {
+              ...note.dotVotes,
+              [kind]: {
+                count: Math.max(0, summary.count - summary.ownCount),
+                votedByMe: false,
+                ownCount: 0,
+              },
+            },
+          }
+        : note,
+    ),
+  };
 }
