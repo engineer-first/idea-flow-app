@@ -1,8 +1,14 @@
 import { redirect } from "next/navigation";
 import { signOut } from "@/app/auth/actions";
+import { HomeView } from "@/app/home-view";
 import { createRoom } from "@/app/rooms/actions";
-import { JoinRoomForm } from "@/app/rooms/join-room-form";
-import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/session/current-user";
 import { isAuthConfigured } from "@/lib/session/env";
 
@@ -15,12 +21,23 @@ type HomeProps = {
 export default async function Home({ searchParams }: HomeProps) {
   if (!isAuthConfigured()) {
     return (
-      <main>
-        <h1>IdeaFlow</h1>
-        <p>認証の環境変数を設定してください。</p>
-        <p>
-          <code>.env.example</code>を参考に<code>.env.local</code>を作成します。
-        </p>
+      <main className="flex flex-1 flex-col">
+        <div className="flex h-full flex-1 items-center justify-center p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="text-2xl">IdeaFlow</CardTitle>
+              <CardDescription>認証の環境変数を設定してください。</CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              <p>
+                <code className="font-mono text-xs">.env.example</code>
+                を参考に
+                <code className="font-mono text-xs">.env.local</code>
+                を作成します。
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       </main>
     );
   }
@@ -33,31 +50,13 @@ export default async function Home({ searchParams }: HomeProps) {
   }
 
   return (
-    <main>
-      <h1>IdeaFlow</h1>
-      <p>ログイン済みです。</p>
-      <p>{user.email}</p>
-      <form action={signOut}>
-        <Button type="submit" variant="destructive">
-          ログアウト
-        </Button>
-      </form>
-
-      {params.error ? <p role="alert">{params.error}</p> : null}
-
-      <hr />
-
-      <section>
-        <h2>ルームを作成</h2>
-        <form action={createRoom}>
-          <Button type="submit">ルームを作成</Button>
-        </form>
-      </section>
-
-      <section>
-        <h2>招待コードで参加</h2>
-        <JoinRoomForm />
-      </section>
+    <main className="flex flex-1 flex-col">
+      <HomeView
+        userEmail={user.email}
+        error={params.error}
+        createRoomAction={createRoom}
+        signOutAction={signOut}
+      />
     </main>
   );
 }
