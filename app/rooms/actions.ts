@@ -17,8 +17,7 @@ import {
   isValidInviteCode,
   normalizeInviteCode,
 } from "@/contracts/invite-code";
-import { setRoomFlash } from "@/app/rooms/flash";
-import { apiFetch } from "@/lib/api-client";
+import { apiFetch, lookupRoomByInviteCode } from "@/lib/api-client";
 import { getCurrentUser } from "@/lib/session/current-user";
 
 const JoinRoomInputSchema = z.object({
@@ -30,11 +29,49 @@ const JoinRoomInputSchema = z.object({
     }),
 });
 
-// 作成成功時はクライアントで toast → start へ遷移する。
-// （Server Action の redirect 後に flash を読む方式は Cookie 制約で不安定なため）
+// 作成/参加成功時はクライアントで toast → start へ遷移する。
+// （Server Action の redirect 後に toast する方式は、遷移でクライアント状態が
+// 消えるため使わない）
 export type CreateRoomResult =
   | { ok: true; roomId: string }
   | { ok: false; error: string };
+
+export type JoinRoomResult =
+  | { ok: true; roomId: string }
+  | { ok: false; error: string };
+
+// 参加確認 Dialog 用。ホスト名を先に解決し、存在しないコードは Dialog を開かない。
+export type LookupInviteResult =
+  | { ok: true; hostName: string; inviteCode: string }
+  | { ok: false; error: string };
+
+export async function lookupInviteRoom(
+  code: string,
+): Promise<LookupInviteResult> {
+  const user = await getCurrentUser();
+  if (!user) {
+    redirect("/login");
+  }
+
+  const parsedInput = JoinRoomInputSchema.safeParse({ code });
+  if (!parsedInput.success) {
+    return {
+      ok: false,
+      error: "招待コードは英数字6桁で入力してください。",
+    };
+  }
+
+  const lookup = await lookupRoomByInviteCode(parsedInput.data.code);
+  if (!lookup) {
+    return { ok: false, error: "ルームが見つかりませんでした。" };
+  }
+
+  return {
+    ok: true,
+    hostName: lookup.hostName,
+    inviteCode: lookup.inviteCode,
+  };
+}
 
 export async function createRoom(): Promise<CreateRoomResult> {
   const user = await getCurrentUser();
@@ -58,15 +95,16 @@ export async function createRoom(): Promise<CreateRoomResult> {
   return { ok: true, roomId: parsed.data.roomId };
 }
 
-export async function joinRoom(formData: FormData): Promise<void> {
+export async function joinRoom(formData: FormData): Promise<JoinRoomResult> {
   const parsedInput = JoinRoomInputSchema.safeParse({
     code: String(formData.get("code") ?? ""),
   });
 
   if (!parsedInput.success) {
-    redirect(
-      `/home?error=${encodeURIComponent("招待コードは英数字6桁で入力してください。")}`,
-    );
+    return {
+      ok: false,
+      error: "招待コードは英数字6桁で入力してください。",
+    };
   }
 
   const user = await getCurrentUser();
@@ -85,15 +123,12 @@ export async function joinRoom(formData: FormData): Promise<void> {
     : null;
 
   if (!parsed?.success) {
-    redirect(
-      `/home?error=${encodeURIComponent("ルームが見つかりませんでした。")}`,
-    );
+    return { ok: false, error: "ルームが見つかりませんでした。" };
   }
 
   // #70: 参加したらボードではなくスタート画面へ遷移する。
-  // フラッシュ Cookie で「参加直後」だけ toast を出す。
-  await setRoomFlash("room-joined");
-  redirect(`/rooms/${parsed.data.roomId}/start`);
+  // 遷移と「ルームに参加しました」toast は呼び出し側クライアントが行う。
+  return { ok: true, roomId: parsed.data.roomId };
 }
 
 // #70 退室機能。

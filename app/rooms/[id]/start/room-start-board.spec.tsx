@@ -17,9 +17,6 @@ const notifyMocks = vi.hoisted(() => ({
   memberJoined: vi.fn(),
   memberLeft: vi.fn(),
   roomDisbanded: vi.fn(),
-  roomCreated: vi.fn(),
-  joinedAsGuest: vi.fn(),
-  joinedAsHost: vi.fn(),
   error: vi.fn(),
 }));
 
@@ -28,16 +25,8 @@ vi.mock("@/app/_lib/notify", () => ({
     memberJoined: notifyMocks.memberJoined,
     memberLeft: notifyMocks.memberLeft,
     roomDisbanded: notifyMocks.roomDisbanded,
-    roomCreated: notifyMocks.roomCreated,
-    joinedAsGuest: notifyMocks.joinedAsGuest,
-    joinedAsHost: notifyMocks.joinedAsHost,
     error: notifyMocks.error,
   },
-}));
-
-vi.mock("@/app/rooms/flash", () => ({
-  consumeRoomFlash: vi.fn(async () => null),
-  setRoomFlash: vi.fn(async () => {}),
 }));
 
 import { RoomStartBoard } from "@/app/rooms/[id]/start/room-start-board";
@@ -142,9 +131,6 @@ afterEach(() => {
   notifyMocks.memberJoined.mockReset();
   notifyMocks.memberLeft.mockReset();
   notifyMocks.roomDisbanded.mockReset();
-  notifyMocks.roomCreated.mockReset();
-  notifyMocks.joinedAsGuest.mockReset();
-  notifyMocks.joinedAsHost.mockReset();
   notifyMocks.error.mockReset();
 });
 

@@ -67,8 +67,8 @@ export type RoomLookupResult = {
 };
 
 // 招待コードからルームを解決し、hostname 付きで返す。
-// 招待URL ページ (/invite/[code]) で入室確認 Dialog の文言に使う。
-// 失敗時（404 / 400 / ネットワーク）は例外を投げない（呼び出し側でフォールバック）。
+// 招待URL ページとホーム参加の確認 Dialog 文言に使う。
+// 失敗時（404 / 400 / ネットワーク）は null（呼び出し側でエラー表示）。
 export async function lookupRoomByInviteCode(
   code: string,
 ): Promise<RoomLookupResult | null> {

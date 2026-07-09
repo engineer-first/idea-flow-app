@@ -1,26 +1,37 @@
 // @vitest-environment node
 // createRoom / joinRoom の Server Actions 境界のテスト。
 // api-worker の応答が「非 2xx」「2xx だが不正 JSON」のどちらでも、未処理例外に
-// せずエラーリダイレクトへ倒れること（利用者に汎用 500 を見せない）を検証する。
+// せず ok: false で返すこと（create/join）。leave は従来どおり redirect。
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { apiFetchMock, getCurrentUserMock, redirectMock, setRoomFlashMock } =
-  vi.hoisted(() => ({
-    apiFetchMock:
-      vi.fn<(path: string, init?: RequestInit) => Promise<Response>>(),
-    getCurrentUserMock: vi.fn(),
-    redirectMock: vi.fn<(url: string) => never>(),
-    setRoomFlashMock: vi.fn(),
-  }));
+const {
+  apiFetchMock,
+  getCurrentUserMock,
+  redirectMock,
+  lookupRoomByInviteCodeMock,
+} = vi.hoisted(() => ({
+  apiFetchMock:
+    vi.fn<(path: string, init?: RequestInit) => Promise<Response>>(),
+  getCurrentUserMock: vi.fn(),
+  redirectMock: vi.fn<(url: string) => never>(),
+  lookupRoomByInviteCodeMock: vi.fn(),
+}));
 
-vi.mock("@/lib/api-client", () => ({ apiFetch: apiFetchMock }));
+vi.mock("@/lib/api-client", () => ({
+  apiFetch: apiFetchMock,
+  lookupRoomByInviteCode: lookupRoomByInviteCodeMock,
+}));
 vi.mock("@/lib/session/current-user", () => ({
   getCurrentUser: getCurrentUserMock,
 }));
 vi.mock("next/navigation", () => ({ redirect: redirectMock }));
-vi.mock("@/app/rooms/flash", () => ({ setRoomFlash: setRoomFlashMock }));
 
-import { createRoom, joinRoom, leaveRoom } from "@/app/rooms/actions";
+import {
+  createRoom,
+  joinRoom,
+  leaveRoom,
+  lookupInviteRoom,
+} from "@/app/rooms/actions";
 
 // 実物の redirect() は例外を投げて以降の処理を打ち切る。同じ制御フローを再現する。
 class RedirectSignal extends Error {
@@ -83,7 +94,6 @@ describe("createRoom", () => {
       ok: true,
       roomId: "123e4567-e89b-42d3-a456-426614174000",
     });
-    expect(setRoomFlashMock).not.toHaveBeenCalled();
     expect(redirectMock).not.toHaveBeenCalled();
   });
 
@@ -108,32 +118,67 @@ describe("createRoom", () => {
   });
 });
 
-describe("joinRoom", () => {
-  it("形式不正の招待コードはエラー付きでホームへ戻す", async () => {
-    expect(
-      await callAndGetRedirect(() => joinRoom(joinFormData("bad"))),
-    ).toContain("/home?error=");
-    expect(apiFetchMock).not.toHaveBeenCalled();
+describe("lookupInviteRoom", () => {
+  it("形式不正の招待コードは ok: false を返す", async () => {
+    await expect(lookupInviteRoom("bad")).resolves.toEqual({
+      ok: false,
+      error: "招待コードは英数字6桁で入力してください。",
+    });
+    expect(lookupRoomByInviteCodeMock).not.toHaveBeenCalled();
   });
 
-  it("参加に成功したらスタート画面へリダイレクトする", async () => {
+  it("ルームが無ければ ok: false を返す", async () => {
+    lookupRoomByInviteCodeMock.mockResolvedValueOnce(null);
+    await expect(lookupInviteRoom("ABC123")).resolves.toEqual({
+      ok: false,
+      error: "ルームが見つかりませんでした。",
+    });
+  });
+
+  it("見つかれば hostName を返す", async () => {
+    lookupRoomByInviteCodeMock.mockResolvedValueOnce({
+      roomId: "123e4567-e89b-42d3-a456-426614174000",
+      inviteCode: "ABC123",
+      hostName: "田中太郎",
+    });
+    await expect(lookupInviteRoom("ABC123")).resolves.toEqual({
+      ok: true,
+      hostName: "田中太郎",
+      inviteCode: "ABC123",
+    });
+  });
+});
+
+describe("joinRoom", () => {
+  it("形式不正の招待コードは ok: false を返す", async () => {
+    await expect(joinRoom(joinFormData("bad"))).resolves.toEqual({
+      ok: false,
+      error: "招待コードは英数字6桁で入力してください。",
+    });
+    expect(apiFetchMock).not.toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it("参加に成功したら roomId を返す（遷移と toast はクライアント側）", async () => {
     apiFetchMock.mockResolvedValue(
       Response.json({ roomId: "123e4567-e89b-42d3-a456-426614174000" }),
     );
 
-    // フラッシュ Cookie で start 側が「ルームに参加しました」を出す
-    expect(
-      await callAndGetRedirect(() => joinRoom(joinFormData("ABC123"))),
-    ).toBe("/rooms/123e4567-e89b-42d3-a456-426614174000/start");
-    expect(setRoomFlashMock).toHaveBeenCalledWith("room-joined");
+    await expect(joinRoom(joinFormData("ABC123"))).resolves.toEqual({
+      ok: true,
+      roomId: "123e4567-e89b-42d3-a456-426614174000",
+    });
+    expect(redirectMock).not.toHaveBeenCalled();
   });
 
-  it("API が 2xx でも不正 JSON ならエラー付きでホームへ戻す", async () => {
+  it("API が 2xx でも不正 JSON なら ok: false を返す", async () => {
     apiFetchMock.mockResolvedValue(new Response("<html>gateway error</html>"));
 
-    expect(
-      await callAndGetRedirect(() => joinRoom(joinFormData("ABC123"))),
-    ).toContain("/home?error=");
+    await expect(joinRoom(joinFormData("ABC123"))).resolves.toEqual({
+      ok: false,
+      error: "ルームが見つかりませんでした。",
+    });
+    expect(redirectMock).not.toHaveBeenCalled();
   });
 });
 

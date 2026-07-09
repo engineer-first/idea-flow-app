@@ -1,6 +1,10 @@
 import { redirect } from "next/navigation";
 import { getLoginPath, sanitizeNextPath } from "@/app/auth/redirects";
 import { InviteCodeDialog } from "@/app/invite/[inviteCode]/invite-code-dialog";
+import {
+  isValidInviteCode,
+  normalizeInviteCode,
+} from "@/contracts/invite-code";
 import { lookupRoomByInviteCode } from "@/lib/api-client";
 import { getCurrentUser } from "@/lib/session/current-user";
 
@@ -15,15 +19,30 @@ export default async function InvitePage({ params }: InvitePageProps) {
   const invitePath = `/invite/${raw}`;
   const user = await getCurrentUser();
 
-  // 未ログインは /login へ（戻り先 = 招待URL）。既存の route.ts と同じ挙動。
+  // 未ログインは /login へ（戻り先 = 招待URL）。
   if (!user) {
     redirect(getLoginPath(sanitizeNextPath(invitePath)));
   }
 
-  // 招待コードから hostname を取得（Dialog の文言に使う）。
-  // 失敗時は null のまま、Dialog 側で汎用文言にフォールバック。
-  const lookup = await lookupRoomByInviteCode(raw).catch(() => null);
-  const hostName = lookup?.hostName ?? null;
+  const code = normalizeInviteCode(raw);
+  if (!isValidInviteCode(code)) {
+    redirect(
+      `/home?error=${encodeURIComponent("招待コードは英数字6桁で入力してください。")}`,
+    );
+  }
 
-  return <InviteCodeDialog inviteCode={raw} hostName={hostName} />;
+  // 存在しない・無効な招待は参加 Dialog を出さずホームへ（エラー表示）。
+  const lookup = await lookupRoomByInviteCode(code);
+  if (!lookup) {
+    redirect(
+      `/home?error=${encodeURIComponent("ルームが見つかりませんでした。")}`,
+    );
+  }
+
+  return (
+    <InviteCodeDialog
+      inviteCode={lookup.inviteCode}
+      hostName={lookup.hostName}
+    />
+  );
 }

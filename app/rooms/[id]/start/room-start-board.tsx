@@ -15,7 +15,6 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { notify } from "@/app/_lib/notify";
 import { StartRoomView } from "@/app/rooms/[id]/start/start-room-view";
 import { leaveRoom } from "@/app/rooms/actions";
-import { consumeRoomFlash } from "@/app/rooms/flash";
 import {
   applyMemberServerMessage,
   applyPhaseServerMessage,
@@ -151,25 +150,6 @@ export function RoomStartBoard({
 
   const sendMessage = useCallback((message: ClientMessage) => {
     clientRef.current?.send(message);
-  }, []);
-
-  // 作成/参加直後のフラッシュ Cookie を Server Action で消費し、一度だけ toast。
-  // Cookie の delete は Server Component ではできないため、ここで行う。
-  useEffect(() => {
-    let cancelled = false;
-    void consumeRoomFlash().then((flash) => {
-      if (cancelled || !flash) return;
-      if (flash === "room-created") {
-        notify.roomCreated();
-        return;
-      }
-      if (flash === "room-joined") {
-        notify.joinedAsGuest();
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   const handleStart = useCallback(() => {
