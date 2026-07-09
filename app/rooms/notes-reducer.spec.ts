@@ -85,6 +85,38 @@ describe("applyServerMessage", () => {
     expect(result).toEqual([updated]);
   });
 
+  it("note:updatedが古い自分の投票状態を持つ場合はローカルの選択状態を保持する", () => {
+    const existing = makeNote({
+      dotVotes: {
+        subjective: { count: 1, votedByMe: true, ownCount: 1 },
+        objective: { count: 1, votedByMe: true, ownCount: 1 },
+      },
+    });
+    const incoming = makeNote({
+      dotVotes: {
+        subjective: { count: 0, votedByMe: false, ownCount: 0 },
+        objective: { count: 1, votedByMe: true, ownCount: 1 },
+      },
+    });
+
+    const result = applyServerMessage(
+      [existing],
+      { type: "note:updated", note: incoming },
+      { draggingNoteId: null },
+    );
+
+    expect(result[0].dotVotes.subjective).toEqual({
+      count: 1,
+      votedByMe: true,
+      ownCount: 1,
+    });
+    expect(result[0].dotVotes.objective).toEqual({
+      count: 1,
+      votedByMe: true,
+      ownCount: 1,
+    });
+  });
+
   it("自分がドラッグ中の付箋に対するnote:updatedは位置(x, y)を無視し、他フィールドのみ反映する", () => {
     const existing = makeNote({ content: "old", x: 100, y: 100 });
     // サーバーからの反射（エコー）が古い位置を運んでくる想定

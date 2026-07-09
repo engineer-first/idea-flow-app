@@ -46,11 +46,15 @@ export function applyServerMessage(
         if (n.id !== message.note.id) {
           return n;
         }
+        const note = {
+          ...message.note,
+          dotVotes: mergeLocalDotVotes(n.dotVotes, message.note.dotVotes),
+        };
         if (options.draggingNoteId === n.id) {
           // 自分がドラッグ中の位置はローカル優先で保持し、他フィールドのみ反映する。
-          return { ...message.note, x: n.x, y: n.y };
+          return { ...note, x: n.x, y: n.y };
         }
-        return message.note;
+        return note;
       });
     }
 
@@ -78,6 +82,31 @@ export function applyServerMessage(
       return _exhaustive;
     }
   }
+}
+
+function mergeLocalDotVotes(
+  current: Note["dotVotes"],
+  incoming: Note["dotVotes"],
+): Note["dotVotes"] {
+  return {
+    subjective: mergeLocalDotVote(current.subjective, incoming.subjective),
+    objective: mergeLocalDotVote(current.objective, incoming.objective),
+  };
+}
+
+function mergeLocalDotVote(
+  current: Note["dotVotes"][DotVoteKind],
+  incoming: Note["dotVotes"][DotVoteKind],
+): Note["dotVotes"][DotVoteKind] {
+  if (current.ownCount <= incoming.ownCount) {
+    return incoming;
+  }
+
+  return {
+    count: incoming.count + current.ownCount - incoming.ownCount,
+    votedByMe: true,
+    ownCount: current.ownCount,
+  };
 }
 
 // 自分自身のドラッグ操作をローカルへ即時反映するための純粋関数。

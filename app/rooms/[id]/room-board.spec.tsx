@@ -253,6 +253,29 @@ describe("ユーザー操作 → プロトコルメッセージ送信", () => {
     expect(button).toBeDisabled();
   });
 
+  it("客観ドット更新のサーバー反映でローカル選択済みの主観ドットを外さない", () => {
+    const { socket } = connectWithSnapshot([protocolNote()]);
+
+    fireEvent.click(screen.getByRole("button", { name: "主観ドットを投票" }));
+    fireEvent.click(screen.getByRole("button", { name: "客観ドットを追加" }));
+
+    act(() =>
+      socket.simulateServerMessage({
+        type: "note:updated",
+        note: protocolNote({
+          dotVotes: {
+            subjective: { count: 0, votedByMe: false, ownCount: 0 },
+            objective: { count: 1, votedByMe: true, ownCount: 1 },
+          },
+        }),
+      }),
+    );
+
+    expect(
+      screen.getByRole("button", { name: "主観ドット投票を取り消す" }),
+    ).toHaveTextContent("主観1");
+  });
+
   it("付箋の客観ドットリセットボタンで note:vote-reset が送信される", () => {
     const { socket } = connectWithSnapshot([
       protocolNote({
