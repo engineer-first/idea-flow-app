@@ -58,7 +58,7 @@ export function CopyInviteButton({
       ) : (
         <>
           <Copy className="h-4 w-4" aria-hidden="true" />
-          コピー
+          {itemLabel}
         </>
       )}
     </Button>

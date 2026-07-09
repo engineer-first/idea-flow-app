@@ -48,21 +48,24 @@ function clickNote(card: HTMLElement) {
 }
 
 describe("BoardView", () => {
-  it("招待コードを表示する", () => {
-    setup({ inviteCode: "ZZ99XX" });
+  it("host のとき招待URL・招待コードのコピーボタンだけを表示する", () => {
+    setup({
+      isHost: true,
+      inviteCode: "ZZ99XX",
+      inviteUrl: "https://idea-flow.example/invite/ZZ99XX",
+    });
 
-    expect(screen.getByText("ZZ99XX")).toBeInTheDocument();
-  });
-
-  it("招待URLとコピーボタンを表示する", () => {
-    setup({ inviteUrl: "https://idea-flow.example/invite/ZZ99XX" });
-
-    expect(
-      screen.getByText("https://idea-flow.example/invite/ZZ99XX"),
-    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "招待URLをコピー" }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "招待コードをコピー" }),
+    ).toBeInTheDocument();
+    // 値そのものは画面に出さない
+    expect(screen.queryByText("ZZ99XX")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("https://idea-flow.example/invite/ZZ99XX"),
+    ).not.toBeInTheDocument();
   });
 
   it("付箋を配置する", () => {
@@ -227,28 +230,18 @@ describe("退出ボタン（#70 退室機能）", () => {
 });
 
 describe("招待URL/コード（host 限定表示）", () => {
-  it("host のとき招待URLと招待コードが表示される", () => {
-    setup({
-      isHost: true,
-      inviteCode: "ZZ99XX",
-      inviteUrl: "https://example/invite/ZZ99XX",
-    });
-    expect(
-      screen.getByText("https://example/invite/ZZ99XX"),
-    ).toBeInTheDocument();
-    expect(screen.getByText("ZZ99XX")).toBeInTheDocument();
-  });
-
-  it("非 host のとき招待URLと招待コードが表示されない", () => {
+  it("非 host のときコピーボタンが出ない", () => {
     setup({
       isHost: false,
       inviteCode: "ZZ99XX",
       inviteUrl: "https://example/invite/ZZ99XX",
     });
     expect(
-      screen.queryByText("https://example/invite/ZZ99XX"),
+      screen.queryByRole("button", { name: "招待URLをコピー" }),
     ).not.toBeInTheDocument();
-    expect(screen.queryByText("ZZ99XX")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "招待コードをコピー" }),
+    ).not.toBeInTheDocument();
   });
 });
 

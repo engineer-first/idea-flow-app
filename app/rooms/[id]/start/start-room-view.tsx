@@ -105,29 +105,13 @@ export function StartRoomView({
 
           {isHost ? (
             // 招待URL / 招待コードはホストだけが共有できる情報。
-            // 非ホストには伏せて、誤って共有するリスクを避ける。
+            // 値そのものは出さず、コピーボタンだけを並べる。
             <div
-              className="flex flex-col items-center gap-3"
+              className="flex flex-wrap items-center justify-center gap-3"
               data-testid="start-room-view-invite"
             >
-              <div className="flex flex-col items-center gap-2">
-                <span className="text-sm text-muted-foreground">招待URL</span>
-                <span className="flex items-center gap-2 text-sm">
-                  <span className="max-w-[18rem] truncate font-mono text-xs">
-                    {inviteUrl}
-                  </span>
-                  <CopyInviteButton value={inviteUrl} itemLabel="招待URL" />
-                </span>
-              </div>
-              <div className="flex flex-col items-center gap-2">
-                <span className="text-sm text-muted-foreground">招待コード</span>
-                <span className="flex items-center gap-2 text-sm">
-                  <span className="font-mono text-sm font-semibold text-foreground">
-                    {inviteCode}
-                  </span>
-                  <CopyInviteButton value={inviteCode} itemLabel="招待コード" />
-                </span>
-              </div>
+              <CopyInviteButton value={inviteUrl} itemLabel="招待URL" />
+              <CopyInviteButton value={inviteCode} itemLabel="招待コード" />
             </div>
           ) : null}
 

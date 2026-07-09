@@ -96,23 +96,14 @@ export function BoardView({
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           {isHost ? (
             // 招待URL / 招待コードはホストだけが共有できる情報。
-            // 非ホストには伏せて、誤って共有するリスクを避ける。
-            <>
-              <span className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>招待URL</span>
-                <span className="max-w-[18rem] truncate font-mono text-xs text-foreground">
-                  {inviteUrl}
-                </span>
-                <CopyInviteButton value={inviteUrl} itemLabel="招待URL" />
-              </span>
-              <span className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>招待コード</span>
-                <span className="font-mono text-base font-semibold text-foreground">
-                  {inviteCode}
-                </span>
-                <CopyInviteButton value={inviteCode} itemLabel="招待コード" />
-              </span>
-            </>
+            // 値そのものは出さず、コピーボタンだけを並べる。
+            <div
+              className="flex flex-wrap items-center gap-2"
+              data-testid="board-view-invite"
+            >
+              <CopyInviteButton value={inviteUrl} itemLabel="招待URL" />
+              <CopyInviteButton value={inviteCode} itemLabel="招待コード" />
+            </div>
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-3">

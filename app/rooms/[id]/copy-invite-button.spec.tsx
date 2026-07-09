@@ -15,13 +15,22 @@ afterEach(() => {
 describe("CopyInviteButton", () => {
   it("クリックで value をクリップボードへ書き込む", async () => {
     const writeText = stubClipboard(() => Promise.resolve());
-    render(<CopyInviteButton value="https://idea-flow.example/invite/ABC234" />);
+    render(
+      <CopyInviteButton value="https://idea-flow.example/invite/ABC234" />,
+    );
 
-    fireEvent.click(screen.getByRole("button", { name: /コピー/ }));
+    fireEvent.click(screen.getByRole("button", { name: "招待URLをコピー" }));
 
     expect(writeText).toHaveBeenCalledWith(
       "https://idea-flow.example/invite/ABC234",
     );
+  });
+
+  it("ボタン文言は itemLabel（招待URL / 招待コード）を表示する", () => {
+    render(<CopyInviteButton value="ABC234" itemLabel="招待コード" />);
+    expect(
+      screen.getByRole("button", { name: "招待コードをコピー" }),
+    ).toHaveTextContent("招待コード");
   });
 
   it("招待コードも同じ UI でコピーできる", async () => {
@@ -37,9 +46,11 @@ describe("CopyInviteButton", () => {
 
   it("コピー成功後は「コピーしました」に変わる", async () => {
     stubClipboard(() => Promise.resolve());
-    render(<CopyInviteButton value="https://idea-flow.example/invite/ABC234" />);
+    render(
+      <CopyInviteButton value="https://idea-flow.example/invite/ABC234" />,
+    );
 
-    fireEvent.click(screen.getByRole("button", { name: /コピー/ }));
+    fireEvent.click(screen.getByRole("button", { name: "招待URLをコピー" }));
 
     await waitFor(() =>
       expect(
@@ -50,9 +61,11 @@ describe("CopyInviteButton", () => {
 
   it("コピー失敗時はラベルを変えない（成功表示を出さない）", async () => {
     stubClipboard(() => Promise.reject(new Error("denied")));
-    render(<CopyInviteButton value="https://idea-flow.example/invite/ABC234" />);
+    render(
+      <CopyInviteButton value="https://idea-flow.example/invite/ABC234" />,
+    );
 
-    fireEvent.click(screen.getByRole("button", { name: /コピー/ }));
+    fireEvent.click(screen.getByRole("button", { name: "招待URLをコピー" }));
 
     await waitFor(() =>
       expect(
