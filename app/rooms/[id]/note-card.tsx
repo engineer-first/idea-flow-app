@@ -220,7 +220,7 @@ export function NoteCard({
       data-testid="note-card"
       data-selected={isSelected || undefined}
       data-editing={isEditing || undefined}
-      className={`absolute flex flex-col overflow-hidden rounded-[2px] bg-amber-100 dark:bg-amber-900 ${
+      className={`absolute isolate flex flex-col overflow-hidden rounded-[2px] bg-amber-100 dark:bg-amber-900 ${
         isSelected
           ? "outline-2 outline-blue-500 dark:outline-blue-400"
           : "outline-none"

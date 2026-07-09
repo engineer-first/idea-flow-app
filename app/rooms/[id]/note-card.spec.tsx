@@ -144,6 +144,12 @@ describe("NoteCard", () => {
   });
 
   describe("選択", () => {
+    it("付箋ごとに重なり順を閉じ込めるstacking contextを作る", () => {
+      setup();
+
+      expect(getCard()).toHaveClass("isolate");
+    });
+
     it("未選択の付箋はpointerdownでonSelectを呼ぶ", () => {
       const onSelect = vi.fn();
       setup({ onSelect });
