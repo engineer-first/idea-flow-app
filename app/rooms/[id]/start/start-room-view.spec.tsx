@@ -136,26 +136,23 @@ describe("退出ボタン（#70 退室機能）", () => {
 });
 
 describe("招待URL/コード（host 限定表示）", () => {
-  it("host のとき招待URL・招待コードのコピーボタンだけがある", () => {
+  it("host のとき招待URLと招待コードのラベルと値が表示される", () => {
     renderView({
       isHost: true,
       inviteCode: "ZZ99XX",
       inviteUrl: "https://example/invite/ZZ99XX",
     });
+    expect(screen.getByText("招待URL")).toBeInTheDocument();
+    expect(screen.getByText("招待コード")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "招待URLをコピー" }),
-    ).toBeInTheDocument();
+    ).toHaveTextContent("https://example/invite/ZZ99XX");
     expect(
       screen.getByRole("button", { name: "招待コードをコピー" }),
-    ).toBeInTheDocument();
-    // 値そのものは画面に出さない
-    expect(
-      screen.queryByText("https://example/invite/ZZ99XX"),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText("ZZ99XX")).not.toBeInTheDocument();
+    ).toHaveTextContent("ZZ99XX");
   });
 
-  it("非 host のときコピーボタンが出ない", () => {
+  it("非 host のとき招待URL/コードが出ない", () => {
     renderView({
       isHost: false,
       inviteCode: "ZZ99XX",

@@ -1,22 +1,23 @@
 "use client";
 
-import { Check, Copy } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export type CopyInviteButtonProps = {
-  // クリップボードへ書き込む文字列（招待URL / 招待コードなど）。
+  // 表示・クリップボードへ書き込む文字列（招待URL / 招待コード）。
   value: string;
   // aria-label 用の対象名。既定は「招待URL」。
   itemLabel?: string;
+  className?: string;
 };
 
-// 招待URL・招待コードをワンクリックでクリップボードへコピーする。
+// 招待URL・招待コード自体を表示し、クリックでクリップボードへコピーする。
 // 成功したときだけ一時的に「コピーしました」に切り替える
 // （失敗時に成功表示を出すと、貼り付けたら空だった、という事故になる）。
 export function CopyInviteButton({
   value,
   itemLabel = "招待URL",
+  className,
 }: CopyInviteButtonProps) {
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -43,24 +44,17 @@ export function CopyInviteButton({
   }, [value, itemLabel]);
 
   return (
-    <Button
+    <button
       type="button"
-      variant="outline"
-      size="sm"
       onClick={handleCopy}
       aria-label={copied ? "コピーしました" : `${itemLabel}をコピー`}
-    >
-      {copied ? (
-        <>
-          <Check className="h-4 w-4" aria-hidden="true" />
-          コピーしました
-        </>
-      ) : (
-        <>
-          <Copy className="h-4 w-4" aria-hidden="true" />
-          {itemLabel}
-        </>
+      title={copied ? "コピーしました" : `クリックで${itemLabel}をコピー`}
+      className={cn(
+        "max-w-full cursor-pointer truncate text-center font-mono text-sm font-semibold tracking-wider text-foreground underline-offset-2 hover:underline",
+        className,
       )}
-    </Button>
+    >
+      {copied ? "コピーしました" : value}
+    </button>
   );
 }

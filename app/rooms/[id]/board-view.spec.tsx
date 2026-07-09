@@ -48,24 +48,21 @@ function clickNote(card: HTMLElement) {
 }
 
 describe("BoardView", () => {
-  it("host のとき招待URL・招待コードのコピーボタンだけを表示する", () => {
+  it("host のとき招待URLと招待コードのラベルと値を表示する", () => {
     setup({
       isHost: true,
       inviteCode: "ZZ99XX",
       inviteUrl: "https://idea-flow.example/invite/ZZ99XX",
     });
 
+    expect(screen.getByText("招待URL")).toBeInTheDocument();
+    expect(screen.getByText("招待コード")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "招待URLをコピー" }),
-    ).toBeInTheDocument();
+    ).toHaveTextContent("https://idea-flow.example/invite/ZZ99XX");
     expect(
       screen.getByRole("button", { name: "招待コードをコピー" }),
-    ).toBeInTheDocument();
-    // 値そのものは画面に出さない
-    expect(screen.queryByText("ZZ99XX")).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("https://idea-flow.example/invite/ZZ99XX"),
-    ).not.toBeInTheDocument();
+    ).toHaveTextContent("ZZ99XX");
   });
 
   it("付箋を配置する", () => {
@@ -235,12 +232,13 @@ describe("退出・解散ボタン（#70 退室機能）", () => {
 });
 
 describe("招待URL/コード（host 限定表示）", () => {
-  it("非 host のときコピーボタンが出ない", () => {
+  it("非 host のとき招待URL/コードが出ない", () => {
     setup({
       isHost: false,
       inviteCode: "ZZ99XX",
       inviteUrl: "https://example/invite/ZZ99XX",
     });
+    expect(screen.queryByText("ZZ99XX")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "招待URLをコピー" }),
     ).not.toBeInTheDocument();

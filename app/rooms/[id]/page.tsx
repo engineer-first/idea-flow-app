@@ -54,8 +54,6 @@ export default async function RoomPage({ params }: RoomPageProps) {
     : [];
 
   // 招待URL の origin は設定値（NEXT_PUBLIC_SITE_URL、本番では必須）から作る。
-  // x-forwarded-host / host はクライアントが偽装できるヘッダーで、Cloudflare も
-  // 既定では剥がさない。共有される URL の origin をそこから組み立てない。
   const inviteUrl = buildInviteUrl(getBaseUrl(), parsed.data.inviteCode);
 
   // key={roomId} で、クライアント遷移（/rooms/A → /rooms/B）時に RoomBoard を

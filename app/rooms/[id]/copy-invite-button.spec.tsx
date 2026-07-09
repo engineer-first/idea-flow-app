@@ -13,6 +13,15 @@ afterEach(() => {
 });
 
 describe("CopyInviteButton", () => {
+  it("value 自体を表示する", () => {
+    render(
+      <CopyInviteButton value="https://idea-flow.example/invite/ABC234" />,
+    );
+    expect(
+      screen.getByRole("button", { name: "招待URLをコピー" }),
+    ).toHaveTextContent("https://idea-flow.example/invite/ABC234");
+  });
+
   it("クリックで value をクリップボードへ書き込む", async () => {
     const writeText = stubClipboard(() => Promise.resolve());
     render(
@@ -26,13 +35,6 @@ describe("CopyInviteButton", () => {
     );
   });
 
-  it("ボタン文言は itemLabel（招待URL / 招待コード）を表示する", () => {
-    render(<CopyInviteButton value="ABC234" itemLabel="招待コード" />);
-    expect(
-      screen.getByRole("button", { name: "招待コードをコピー" }),
-    ).toHaveTextContent("招待コード");
-  });
-
   it("招待コードも同じ UI でコピーできる", async () => {
     const writeText = stubClipboard(() => Promise.resolve());
     render(<CopyInviteButton value="ABC234" itemLabel="招待コード" />);
@@ -40,6 +42,9 @@ describe("CopyInviteButton", () => {
     fireEvent.click(screen.getByRole("button", { name: "招待コードをコピー" }));
 
     expect(writeText).toHaveBeenCalledWith("ABC234");
+    expect(
+      screen.getByRole("button", { name: "招待コードをコピー" }),
+    ).toHaveTextContent("ABC234");
   });
 
   it("コピー成功後は「コピーしました」に変わる", async () => {
@@ -70,5 +75,8 @@ describe("CopyInviteButton", () => {
         screen.queryByRole("button", { name: /コピーしました/ }),
       ).not.toBeInTheDocument(),
     );
+    expect(
+      screen.getByRole("button", { name: "招待URLをコピー" }),
+    ).toHaveTextContent("https://idea-flow.example/invite/ABC234");
   });
 });
