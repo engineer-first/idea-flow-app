@@ -34,7 +34,8 @@ export function RoomMembers({
     >
       {visible.map((member) => {
         const isMe = member.userId === currentUserId;
-        const isHostMember = hostUserId !== undefined && member.userId === hostUserId;
+        const isHostMember =
+          hostUserId !== undefined && member.userId === hostUserId;
         return (
           <div
             key={member.userId}

@@ -22,9 +22,7 @@ describe("HomeView", () => {
 
   it("案内文言「ルームを作成するか…」は出さない", () => {
     renderView();
-    expect(
-      screen.queryByText(/ルームを作成するか/),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/ルームを作成するか/)).not.toBeInTheDocument();
   });
 
   it("「ルームを作成」ボタンがある", () => {

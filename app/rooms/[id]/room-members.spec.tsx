@@ -65,11 +65,7 @@ describe("RoomMembers", () => {
     const members = buildMembers(2, ME);
     const hostId = members[1]!.userId;
     render(
-      <RoomMembers
-        members={members}
-        currentUserId={ME}
-        hostUserId={hostId}
-      />,
+      <RoomMembers members={members} currentUserId={ME} hostUserId={hostId} />,
     );
     expect(screen.getByTestId(`member-host-label-${hostId}`)).toHaveTextContent(
       "ホスト",

@@ -37,9 +37,7 @@ describe("CopyInviteButton", () => {
     const writeText = stubClipboard(() => Promise.resolve());
     render(<CopyInviteButton value="ABC234" itemLabel="招待コード" />);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "招待コードをコピー" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "招待コードをコピー" }));
 
     expect(writeText).toHaveBeenCalledWith("ABC234");
   });

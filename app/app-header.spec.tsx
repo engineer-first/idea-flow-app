@@ -38,6 +38,8 @@ describe("AppHeader", () => {
 
   it("userName が空ならユーザー名は描画しない", () => {
     render(<AppHeader userName="" />);
-    expect(screen.queryByTestId("app-header-user-name")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("app-header-user-name"),
+    ).not.toBeInTheDocument();
   });
 });
