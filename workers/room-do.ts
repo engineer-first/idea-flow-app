@@ -32,7 +32,7 @@ import {
   WS_CLOSE_ROOM_DISBANDED,
   WS_CLOSE_ROOM_DISBANDED_REASON,
 } from "../contracts/room-protocol";
-import { migrateRoomStorage } from "./room-do-migrations";
+import { migrateRoomStorage, ROOM_DO_MIGRATIONS } from "./room-do-migrations";
 import { filterVisible, visibleTo } from "./visibility";
 
 // api-worker がセッション検証済みのユーザーIDを DO へ引き継ぐヘッダー。
@@ -71,11 +71,11 @@ type UpsertMemberResult = { ok: true } | { ok: false; reason: "room-full" };
 export class RoomDO extends DurableObject {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    // スキーマは room-do-migrations.ts の版管理で管理する。
+    // スキーマは room-do-migrations/ の版管理で管理する。
     // マイグレーション完了までイベント配信を止め、移行中のストレージに
     // 古い・新しいスキーマ前提の操作が届かないようにする。
     this.ctx.blockConcurrencyWhile(async () => {
-      migrateRoomStorage(this.ctx.storage);
+      migrateRoomStorage(this.ctx.storage, ROOM_DO_MIGRATIONS);
     });
   }
 

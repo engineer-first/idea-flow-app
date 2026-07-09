@@ -474,8 +474,8 @@
       <tbody>
         <tr>
           <td>置き場所</td>
-          <td><code>workers/migrations/*.sql</code>（連番ファイル）</td>
-          <td><code>workers/room-do-migrations.ts</code> の <code>ROOM_DO_MIGRATIONS</code> 配列（追記のみ）</td>
+          <td><code>workers/migrations/*.sql</code>（連番ファイル、<code>wrangler d1 migrations</code> がディレクトリを直接読む）</td>
+          <td><code>workers/room-do-migrations/*.sql</code>（タイムスタンプ名ファイル）。適用順序を決める集約 <code>index.ts</code> は <code>npm run gen:room-do-migrations</code> が自動生成する（手編集しない）</td>
         </tr>
         <tr>
           <td>適用タイミング</td>
@@ -645,33 +645,29 @@
   </div>
 
   <h3>RoomDO 側 — 将来のマイグレーションのイメージ</h3>
-  <p>Q1 で見た版管理の仕組みに乗せると、増分は <code>ROOM_DO_MIGRATIONS</code> への追記になります（配列は追記のみ・過去の要素は不変、が運用ルール）。各 DO は次に起きたときに不足分だけを原子的に適用します。</p>
-  <pre><code>export const ROOM_DO_MIGRATIONS: readonly string[] = [
-  /* v1: members / notes（適用済み・変更しない） */,
+  <p>Q1 で見た版管理の仕組みに乗せると、増分は <code>workers/room-do-migrations/</code> 配下に <code>YYYYMMDDHHmmss-短い説明.sql</code> を1つ追加するだけです。適用順序を決める集約ファイル <code>index.ts</code> は手で編集せず、<code>npm run gen:room-do-migrations</code> が全 <code>*.sql</code> をタイムスタンプ順に読んで自動生成します（CI は <code>gen:room-do-migrations:check</code> で生成結果と一致しているかを検証します）。ファイル名のタイムスタンプが衝突することはまずなく、万一 #79 と #80 が同じ秒に別々のファイルを追加しても、生成スクリプトが重複として検出してエラーにします。各 DO は次に起きたときに不足分だけを原子的に適用します。</p>
+  <pre><code>-- workers/room-do-migrations/20260810103000-phase-and-note-kind.sql（イメージ）
+CREATE TABLE room_state (
+  phase TEXT NOT NULL DEFAULT 'lobby',   -- lobby/map/hmw/sketch/decide
+  step  INTEGER NOT NULL DEFAULT 1,
+  timer_ends_at TEXT                     -- 個人ワークのタイマー締切
+);
+ALTER TABLE notes ADD COLUMN kind TEXT NOT NULL DEFAULT 'problem';
+ALTER TABLE notes ADD COLUMN group_id TEXT;
 
-  // v2: フェーズ進行と付箋の種別（イメージ）
-  `CREATE TABLE room_state (
-     phase TEXT NOT NULL DEFAULT 'lobby',   -- lobby/map/hmw/sketch/decide
-     step  INTEGER NOT NULL DEFAULT 1,
-     timer_ends_at TEXT                     -- 個人ワークのタイマー締切
-   );
-   ALTER TABLE notes ADD COLUMN kind TEXT NOT NULL DEFAULT 'problem';
-   ALTER TABLE notes ADD COLUMN group_id TEXT;`,
-
-  // v3: 投票と決定（イメージ）
-  `CREATE TABLE votes (
-     voter_id TEXT NOT NULL,                -- サーバーが接続から決める
-     note_id  TEXT NOT NULL,
-     dot      TEXT NOT NULL,                -- 'subjective' | 'objective'
-     phase    TEXT NOT NULL,
-     PRIMARY KEY (voter_id, note_id, dot, phase)
-   );
-   CREATE TABLE decisions (
-     phase   TEXT PRIMARY KEY,
-     note_id TEXT NOT NULL
-   );`,
-];</code></pre>
-  <p class="code-caption">イメージ（実際のスキーマは実装時に contracts と同時に設計する）</p>
+-- workers/room-do-migrations/20260812141500-votes-and-decisions.sql（イメージ）
+CREATE TABLE votes (
+  voter_id TEXT NOT NULL,                -- サーバーが接続から決める
+  note_id  TEXT NOT NULL,
+  dot      TEXT NOT NULL,                -- 'subjective' | 'objective'
+  phase    TEXT NOT NULL,
+  PRIMARY KEY (voter_id, note_id, dot, phase)
+);
+CREATE TABLE decisions (
+  phase   TEXT PRIMARY KEY,
+  note_id TEXT NOT NULL
+);</code></pre>
+  <p class="code-caption">イメージ（実際のスキーマは実装時に contracts と同時に設計する）。それぞれ別ファイル・別タイムスタンプなので、#79 と #80 が同時期に着手しても編集箇所もタイムスタンプも衝突しません。</p>
 
   <h3>データと同時に増えるもの — 契約と可視性</h3>
   <p>Q2・Q1 の構造から、テーブルを足すときは必ず3点セットで増えることになります。ここが今のアーキテクチャの効き所です。</p>
@@ -692,7 +688,8 @@
 <footer>
   根拠にした主なファイル:
   <code>workers/migrations/0001_lobby.sql</code> /
-  <code>workers/room-do-migrations.ts</code> /
+  <code>workers/room-do-migrations/</code> /
+  <code>scripts/generate-room-do-migrations.mjs</code> /
   <code>workers/room-do.ts</code> /
   <code>workers/api-worker.ts</code> /
   <code>workers/visibility.ts</code> /

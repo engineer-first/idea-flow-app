@@ -39,6 +39,9 @@ jobs:
       - name: Check D1 migration numbers
         run: npm run check:migrations
 
+      - name: Check RoomDO migrations index is up to date
+        run: npm run gen:room-do-migrations:check
+
   test:
     runs-on: ubuntu-latest
     steps:

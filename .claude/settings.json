@@ -22,6 +22,10 @@
           {
             "type": "command",
             "command": ".claude/hooks/check-boundaries.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/sync-room-do-migrations.sh"
           }
         ]
       }
