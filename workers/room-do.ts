@@ -753,15 +753,18 @@ export class RoomDO extends DurableObject {
 
   private saveGroups(groups: PersistentGroup[]): void {
     this.ctx.storage.transactionSync(() => {
+      // 削除前に元のグループの作成日時をメモリ上に退避する
+      const existingRows = this.ctx.storage.sql
+        .exec("SELECT id, created_at FROM groups")
+        .toArray();
+      const createdAtById = new Map<string, string>(
+        existingRows.map((row) => [row.id as string, row.created_at as string]),
+      );
+
       this.ctx.storage.sql.exec("DELETE FROM groups");
       const now = new Date().toISOString();
       for (const g of groups) {
-        // 元々存在していた場合は作成日時を保持したいので、再編成前に元々持っていたグループの createdAt を探す
-        const existing = this.ctx.storage.sql
-          .exec("SELECT created_at FROM groups WHERE id = ?1", g.id)
-          .toArray();
-        const createdAt =
-          existing.length > 0 ? (existing[0].created_at as string) : now;
+        const createdAt = createdAtById.get(g.id) ?? now;
 
         this.ctx.storage.sql.exec(
           `INSERT INTO groups (id, name, note_ids, created_at, updated_at)

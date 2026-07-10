@@ -27,8 +27,10 @@ export function NoteGroupCard({
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setLocalName(name);
-  }, [name]);
+    if (!isEditing) {
+      setLocalName(name);
+    }
+  }, [name, isEditing]);
 
   useEffect(() => {
     if (isEditing) {

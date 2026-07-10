@@ -47,8 +47,8 @@ export type ProtocolNote = z.infer<typeof NoteSchema>;
 
 export const GroupSchema = z.object({
   id: z.string().uuid(),
-  name: z.string(),
-  noteIds: z.array(z.string().uuid()),
+  name: z.string().max(50, "グループ名は50文字以内で入力してください。"),
+  noteIds: z.array(z.string().uuid()).min(2),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

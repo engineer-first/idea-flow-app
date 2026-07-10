@@ -155,8 +155,12 @@ export function reorganizeGroups(
 
       // メンバー数が2個以上残っている場合のみグループを存続
       if (newNoteIds.length >= 2) {
+        const idExists = newGroups.some((g) => g.id === originalGroup.id);
+        const nextId = idExists ? crypto.randomUUID() : originalGroup.id;
+
         newGroups.push({
           ...originalGroup,
+          id: nextId,
           noteIds: newNoteIds,
         });
       }
