@@ -7,23 +7,27 @@ FILE=$(jq -r '.tool_input.file_path // empty' <<<"$PAYLOAD")
 [[ -z "$FILE" ]] && exit 0
 
 BASENAME=$(basename "$FILE")
-NEW_TEXT=$(jq -r '
-  [
-    .tool_input.content?,
-    .tool_input.new_string?,
-    (.tool_input.edits[]?.new_string?)
-  ]
-  | map(select(type == "string"))
-  | join("\n")
-' <<<"$PAYLOAD")
-OLD_TEXT=$(jq -r '
-  [
-    .tool_input.old_string?,
-    (.tool_input.edits[]?.old_string?)
-  ]
-  | map(select(type == "string"))
-  | join("\n")
-' <<<"$PAYLOAD")
+NEW_TEXT=$(
+  jq -r '
+    [
+      .tool_input.content?,
+      .tool_input.new_string?,
+      (.tool_input.edits[]?.new_string?)
+    ]
+    | map(select(type == "string"))
+    | join("\n")
+  ' <<<"$PAYLOAD"
+)
+OLD_TEXT=$(
+  jq -r '
+    [
+      .tool_input.old_string?,
+      (.tool_input.edits[]?.old_string?)
+    ]
+    | map(select(type == "string"))
+    | join("\n")
+  ' <<<"$PAYLOAD"
+)
 HAS_FULL_CONTENT=$(jq -r '(.tool_input.content? | type) == "string"' <<<"$PAYLOAD")
 
 deny() {
