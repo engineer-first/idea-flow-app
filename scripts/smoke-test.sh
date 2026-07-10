@@ -11,10 +11,10 @@
 # 落ちたら、まずローカルで `npm run smoke` を動かして再現するのが最短の
 # デバッグ経路になる（同じスクリプトを通るので、CI 固有の環境差分を疑う前に
 # ロジック側の問題を切り分けられる）。
-set -uo pipefail
+set -euo pipefail
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-cd "$PROJECT_DIR"
+cd "$PROJECT_DIR" || exit 1
 
 PORT="${SMOKE_PORT:-8788}"
 URL="http://localhost:${PORT}/api/health"
