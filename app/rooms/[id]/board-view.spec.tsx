@@ -113,6 +113,45 @@ describe("BoardView", () => {
     expect(screen.getByText("客観 残り1")).toBeInTheDocument();
   });
 
+  it("phase3 のホストはフェーズ4へ進める", () => {
+    setup({ isHost: true, phase: "phase3" });
+
+    expect(
+      screen.getByRole("button", { name: "次のフェーズへ" }),
+    ).not.toBeDisabled();
+  });
+
+  it("phase4 では中央の投票結果ランキングだけを表示する", () => {
+    setup({
+      phase: "phase4",
+      members: buildMembers(2, ME),
+      notes: buildNotes(4).map((note, index) => ({
+        ...note,
+        content: ["課題A", "課題B", "課題C", "課題D"][index],
+        dotVotes: {
+          subjective: {
+            count: [2, 0, 0, 0][index],
+            votedByMe: false,
+            ownCount: 0,
+          },
+          objective: {
+            count: [1, 5, 0, 0][index],
+            votedByMe: false,
+            ownCount: 0,
+          },
+        },
+      })),
+    });
+
+    expect(screen.getByTestId("vote-result-ranking")).toBeInTheDocument();
+    expect(screen.queryByTestId("board-canvas")).not.toBeInTheDocument();
+    expect(screen.getByText("TOP 3")).toBeInTheDocument();
+    expect(screen.getByText("1位")).toBeInTheDocument();
+    expect(screen.getByText("2位")).toBeInTheDocument();
+    expect(screen.getByText("3位")).toBeInTheDocument();
+    expect(screen.getAllByText("課題A")).toHaveLength(2);
+  });
+
   it("付箋のドット投票ボタンでonNoteVoteを呼ぶ", () => {
     const onNoteVote = vi.fn();
     setup({ onNoteVote });

@@ -124,6 +124,7 @@ export function RoomBoard({
   const handleServerMessage = useCallback((message: ServerMessage) => {
     if (message.type === "error") {
       console.warn(`ルーム操作エラー (${message.code}): ${message.message}`);
+      notify.error(message.message);
       if (message.code === "forbidden") {
         setIsNextPhasePending(false);
       }

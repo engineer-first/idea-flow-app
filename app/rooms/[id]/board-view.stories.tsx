@@ -111,6 +111,28 @@ export const DotVoting: Story = {
   },
 };
 
+export const VoteTotaled: Story = {
+  args: {
+    phase: "phase4",
+    members: buildMembers(2, ME),
+    notes: buildNotes(2).map((note, index) => ({
+      ...note,
+      dotVotes: {
+        subjective: {
+          count: index === 0 ? 2 : 0,
+          votedByMe: false,
+          ownCount: 0,
+        },
+        objective: {
+          count: index === 0 ? 1 : 5,
+          votedByMe: false,
+          ownCount: 0,
+        },
+      },
+    })),
+  },
+};
+
 // loading相当: WebSocket 接続の確立中（初回接続時。snapshot 未着なので付箋も空）。
 export const Connecting: Story = {
   args: {

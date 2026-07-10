@@ -38,7 +38,7 @@ export default async function StartPage({ params }: StartPageProps) {
     notFound();
   }
 
-  // 既にボード工程（phase1-3）ならボードへ直行（スタート画面に留まる意味がない）。
+  // 既にボード工程（phase1-3）または投票結果（phase4）ならボードへ直行する。
   if (parsed.data.phase !== "lobby") {
     redirect(`/rooms/${parsed.data.roomId}`);
   }

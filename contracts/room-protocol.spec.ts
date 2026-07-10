@@ -17,11 +17,12 @@ const USER_A = "11111111-1111-4111-8111-111111111111";
 const USER_B = "22222222-2222-4222-8222-222222222222";
 
 describe("PhaseSchema", () => {
-  it("lobby と phase1-3 を受け入れる", () => {
+  it("lobby と phase1-4 を受け入れる", () => {
     expect(PhaseSchema.parse("lobby")).toBe("lobby");
     expect(PhaseSchema.parse("phase1")).toBe("phase1");
     expect(PhaseSchema.parse("phase2")).toBe("phase2");
     expect(PhaseSchema.parse("phase3")).toBe("phase3");
+    expect(PhaseSchema.parse("phase4")).toBe("phase4");
   });
 
   it("旧 writing は拒否する（互換は RoomDO getPhase 側）", () => {
@@ -113,7 +114,7 @@ describe("ServerMessageSchema", () => {
     });
   });
 
-  it("phase:updated は lobby / phase1-3 を受け入れる", () => {
+  it("phase:updated は lobby / phase1-4 を受け入れる", () => {
     expect(
       ServerMessageSchema.parse({ type: "phase:updated", phase: "lobby" }),
     ).toEqual({ type: "phase:updated", phase: "lobby" });
@@ -123,6 +124,9 @@ describe("ServerMessageSchema", () => {
     expect(
       ServerMessageSchema.parse({ type: "phase:updated", phase: "phase2" }),
     ).toEqual({ type: "phase:updated", phase: "phase2" });
+    expect(
+      ServerMessageSchema.parse({ type: "phase:updated", phase: "phase4" }),
+    ).toEqual({ type: "phase:updated", phase: "phase4" });
   });
 
   it("phase:next クライアントメッセージを受け入れる", () => {

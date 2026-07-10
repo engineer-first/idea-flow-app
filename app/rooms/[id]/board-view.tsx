@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { DotVoteSummary } from "@/app/components/dotvote/organisms/dot-vote-summary";
+import { VoteTotalingPanel } from "@/app/components/vote-totaling/organisms/vote-totaling-panel";
 import { CopyInviteButton } from "@/app/rooms/[id]/copy-invite-button";
 import { NoteCard } from "@/app/rooms/[id]/note-card";
 import { NoteGroupCard } from "@/app/rooms/[id]/note-group-card";
@@ -51,6 +52,7 @@ const PHASE_LABELS: Record<Phase, string> = {
   phase1: "フェーズ1",
   phase2: "フェーズ2",
   phase3: "フェーズ3",
+  phase4: "フェーズ4（投票結果）",
 };
 
 export type BoardViewProps = {
@@ -204,7 +206,7 @@ export function BoardView({
                 <Button
                   type="button"
                   disabled={
-                    isDisconnected || isNextPhasePending || phase === "phase3"
+                    isDisconnected || isNextPhasePending || phase === "phase4"
                   }
                 >
                   次のフェーズへ
@@ -248,9 +250,11 @@ export function BoardView({
               {CONNECTION_STATUS_LABELS[connectionStatus]}
             </span>
           )}
-          <Button type="button" onClick={onAddNote} disabled={isDisconnected}>
-            付箋を追加
-          </Button>
+          {phase !== "phase4" ? (
+            <Button type="button" onClick={onAddNote} disabled={isDisconnected}>
+              付箋を追加
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="outline"
@@ -269,59 +273,67 @@ export function BoardView({
         </div>
       </div>
 
-      <div className="relative overflow-auto rounded-md border border-border bg-muted/30">
-        <div
-          data-testid="board-canvas"
-          className="relative"
-          style={{ width: BOARD_WIDTH, height: BOARD_HEIGHT }}
-          onPointerDown={handleBoardPointerDown}
-        >
-          {notes.length === 0 ? (
-            <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-              付箋がまだありません
-            </p>
-          ) : null}
-
-          {renderGroups.map((rg) => {
-            const handleUpdateName = (newName: string) => {
-              if (rg.isTemp && rg.representativeNoteId) {
-                const noteIds = rg.id.replace("temp-", "").split(",");
-                onGroupCreate?.(newName, noteIds);
-              } else if (rg.persistentGroupId) {
-                onGroupUpdateName?.(rg.persistentGroupId, newName);
-              }
-            };
-
-            return (
-              <NoteGroupCard
-                key={rg.id}
-                group={rg}
-                name={rg.name}
-                onUpdateName={handleUpdateName}
-              />
-            );
-          })}
-
-          {notes.map((note) => (
-            <NoteCard
-              key={note.id}
-              note={note}
-              isOwnDrag={draggingNoteId === note.id}
-              isSelected={selectedNoteId === note.id}
-              disabled={isDisconnected}
-              onSelect={setSelectedNoteId}
-              onDragStart={onNoteDragStart}
-              onDragMove={onNoteDragMove}
-              onDragEnd={onNoteDragEnd}
-              onContentChange={onNoteContentChange}
-              onDelete={handleNoteDelete}
-              voteRemaining={voteRemaining}
-              onVote={onNoteVote}
-              onVoteReset={onNoteVoteReset}
-            />
-          ))}
+      {phase === "phase4" ? (
+        <div className="flex flex-1 items-center">
+          <VoteTotalingPanel members={members} notes={notes} />
         </div>
-      </div>
+      ) : (
+        <div className="relative overflow-auto rounded-md border border-border bg-muted/30">
+          <div
+            data-testid="board-canvas"
+            className="relative"
+            style={{ width: BOARD_WIDTH, height: BOARD_HEIGHT }}
+            onPointerDown={handleBoardPointerDown}
+          >
+            {notes.length === 0 ? (
+              <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
+                付箋がまだありません
+              </p>
+            ) : null}
+
+            {renderGroups.map((renderGroup) => {
+              const handleUpdateName = (newName: string) => {
+                if (renderGroup.isTemp && renderGroup.representativeNoteId) {
+                  const noteIds = renderGroup.id
+                    .replace("temp-", "")
+                    .split(",");
+                  onGroupCreate?.(newName, noteIds);
+                } else if (renderGroup.persistentGroupId) {
+                  onGroupUpdateName?.(renderGroup.persistentGroupId, newName);
+                }
+              };
+
+              return (
+                <NoteGroupCard
+                  key={renderGroup.id}
+                  group={renderGroup}
+                  name={renderGroup.name}
+                  onUpdateName={handleUpdateName}
+                />
+              );
+            })}
+
+            {notes.map((note) => (
+              <NoteCard
+                key={note.id}
+                note={note}
+                isOwnDrag={draggingNoteId === note.id}
+                isSelected={selectedNoteId === note.id}
+                disabled={isDisconnected}
+                onSelect={setSelectedNoteId}
+                onDragStart={onNoteDragStart}
+                onDragMove={onNoteDragMove}
+                onDragEnd={onNoteDragEnd}
+                onContentChange={onNoteContentChange}
+                onDelete={handleNoteDelete}
+                voteRemaining={voteRemaining}
+                onVote={onNoteVote}
+                onVoteReset={onNoteVoteReset}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       <LeaveConfirmDialog
         open={leaveDialogOpen}
