@@ -135,7 +135,7 @@ describe("snapshot（接続・再接続の復帰パス）", () => {
     // member が切断している間に host が phase1 へ進める
     member.close();
     send(owner, { type: "start_phase" });
-    await expectType(owner, "phase_changed");
+    await expectType(owner, "phase:updated");
 
     const reconnected = await connectRoomAs(MEMBER, roomId, {
       hostId: OWNER.sub,
@@ -324,13 +324,13 @@ describe("member_left（退出の Realtime 反映）", () => {
   });
 });
 
-describe("start_phase / phase_changed（ホストだけ進行状態を進められる）", () => {
-  it("ホストが start_phase を送ると、phase_changed が全員に届く", async () => {
+describe("start_phase / phase:updated（ホストだけ進行状態を進められる）", () => {
+  it("ホストが start_phase を送ると、phase:updated が全員に届く", async () => {
     const { owner, member } = await setupRoom();
 
     send(owner, { type: "start_phase" });
-    const toOwner = await expectType(owner, "phase_changed");
-    const toMember = await expectType(member, "phase_changed");
+    const toOwner = await expectType(owner, "phase:updated");
+    const toMember = await expectType(member, "phase:updated");
     expect(toOwner.phase).toBe("phase1");
     expect(toMember.phase).toBe("phase1");
 
@@ -338,7 +338,7 @@ describe("start_phase / phase_changed（ホストだけ進行状態を進めら�
     member.close();
   });
 
-  it("非ホストが start_phase を送ると forbidden で拒否され、phase_changed は誰にも届かない", async () => {
+  it("非ホストが start_phase を送ると forbidden で拒否され、phase:updated は誰にも届かない", async () => {
     const { roomId, owner, member } = await setupRoom();
 
     send(member, { type: "start_phase" });
@@ -361,8 +361,8 @@ describe("start_phase / phase_changed（ホストだけ進行状態を進めら�
     const { roomId, owner, member } = await setupRoom();
 
     send(owner, { type: "start_phase" });
-    await expectType(owner, "phase_changed");
-    await expectType(member, "phase_changed");
+    await expectType(owner, "phase:updated");
+    await expectType(member, "phase:updated");
     owner.close();
     member.close();
 

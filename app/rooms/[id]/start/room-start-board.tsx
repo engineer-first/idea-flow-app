@@ -4,7 +4,7 @@
 // 表示は StartRoomView に委譲し、ここでは
 //   - RoomDO への WebSocket 接続（lib/room-client）とサーバーメッセージの適用
 //   - ホスト判定付きの start_phase 送信
-//   - phase_changed 受信後の /rooms/[id] への自動遷移
+//   - phase:updated 受信後の /rooms/[id] への自動遷移
 //   - members / phase state の管理（app/rooms/room-reducer.ts）
 //   - 退出のトリガ
 //   - 自分自身の遷移に応じた通知（toast）
@@ -177,7 +177,7 @@ export function RoomStartBoard({
     if (!isHost) return;
     setIsStarting(true);
     sendMessage({ type: "start_phase" });
-    // 成功時は phase_changed → router.replace で /rooms/[id] へ遷移。
+    // 成功時は phase:updated → router.replace で /rooms/[id] へ遷移。
     // 失敗時（forbidden / 接続断）は上記の error ハンドラで isStarting を解除。
     // 万一何も起きない場合は 5 秒でタイムアウトさせて再操作可能にする。
     clearStartTimeout();

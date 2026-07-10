@@ -1,5 +1,5 @@
 // RoomDO 単体の契約テスト。
-// メンバーシップの真実（join の冪等性・isMember 判定・name の保持・進行状態）と、
+// メンバーシップの真実（upsert の冪等性・isMember 判定・name の保持・進行状態）と、
 // api-worker を経由しない到達への深層防御を検証する。
 // Realtime 配信（新規メンバーの member_joined broadcast）は
 // room-protocol.spec.ts の E2E テスト（実 WS 接続）で検証する。
@@ -16,11 +16,11 @@ function roomStub(name: string) {
 }
 
 describe("RoomDO メンバーシップ", () => {
-  it("join は冪等（複数回呼んでもメンバーは1件のまま）", async () => {
+  it("upsertMember は冪等（複数回呼んでもメンバーは1件のまま）", async () => {
     const stub = roomStub("room-idempotent");
-    await stub.join(USER_A);
-    await stub.join(USER_A);
-    await stub.join(USER_A);
+    await stub.upsertMember(USER_A, "Alpha");
+    await stub.upsertMember(USER_A, "Alpha");
+    await stub.upsertMember(USER_A, "Alpha");
     expect(await listMemberIds("room-idempotent")).toEqual([USER_A]);
   });
 
@@ -52,15 +52,15 @@ describe("RoomDO メンバーシップ", () => {
 
   it("メンバーでないユーザーは isMember で false になる", async () => {
     const stub = roomStub("room-membership");
-    await stub.join(USER_A);
+    await stub.upsertMember(USER_A, "Alpha");
     expect(await stub.isMember(USER_A)).toBe(true);
     expect(await stub.isMember(USER_B)).toBe(false);
   });
 
   it("メンバーは参加順に並ぶ", async () => {
     const stub = roomStub("room-order");
-    await stub.join(USER_A);
-    await stub.join(USER_B);
+    await stub.upsertMember(USER_A, "Alpha");
+    await stub.upsertMember(USER_B, "Beta");
     expect(await listMemberIds("room-order")).toEqual([USER_A, USER_B]);
   });
 });
@@ -93,6 +93,29 @@ describe("RoomDO 進行状態", () => {
   });
 });
 
+describe("RoomDO 解散", () => {
+  it("disband はストレージを完全に空にする（schema_version 含む）", async () => {
+    const roomId = "room-disband-empty";
+    const stub = roomStub(roomId);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.upsertMember(USER_B, "Member");
+    expect(await listMemberIds(roomId)).toEqual([USER_A, USER_B]);
+
+    await stub.disband();
+
+    // deleteAll 後はテーブル自体が消える。listMembers RPC は使わず storage を直接見る。
+    await runInRoomDO(roomId, (_instance, state) => {
+      const tables = state.storage.sql
+        .exec(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+        )
+        .toArray()
+        .map((row) => String(row.name));
+      expect(tables).toEqual([]);
+    });
+  });
+});
+
 describe("RoomDO WebSocket の深層防御", () => {
   it("WebSocket 以外のリクエストは 426", async () => {
     const res = await roomStub("room-guard").fetch("https://do/anything");
@@ -108,7 +131,7 @@ describe("RoomDO WebSocket の深層防御", () => {
 
   it("HOST_ID_HEADER なしの upgrade は 403", async () => {
     const stub = roomStub("room-guard-no-host");
-    await stub.join(USER_A);
+    await stub.upsertMember(USER_A, "Alpha");
     const res = await stub.fetch("https://do/ws", {
       headers: { Upgrade: "websocket", [USER_ID_HEADER]: USER_A },
     });
@@ -128,7 +151,7 @@ describe("RoomDO WebSocket の深層防御", () => {
 
   it("メンバーのユーザーID + hostId ヘッダーでの upgrade は 101", async () => {
     const stub = roomStub("room-guard-member");
-    await stub.join(USER_A);
+    await stub.upsertMember(USER_A, "Alpha");
     const res = await stub.fetch("https://do/ws", {
       headers: {
         Upgrade: "websocket",
@@ -143,13 +166,13 @@ describe("RoomDO WebSocket の深層防御", () => {
 });
 
 // start_phase の認可は WebSocket 経由の room-protocol.spec.ts で検証する
-// （ホストだけ phase_changed が届くこと、非ホストは forbidden で拒否されること）。
+// （ホストだけ phase:updated が届くこと、非ホストは forbidden で拒否されること）。
 
 describe("RoomDO snapshot", () => {
   it("host は snapshot で isHost=true になる", async () => {
     const stub = roomStub("room-snapshot-host");
 
-    await stub.join(USER_A, true);
+    await stub.initializeNewRoom(USER_A, "Host");
 
     const res = await stub.fetch("https://do/ws", {
       headers: {
@@ -182,8 +205,8 @@ describe("RoomDO snapshot", () => {
   it("member は snapshot で isHost=false になる", async () => {
     const stub = roomStub("room-snapshot-member");
 
-    await stub.join(USER_A, true);
-    await stub.join(USER_B);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.upsertMember(USER_B, "Member");
 
     const res = await stub.fetch("https://do/ws", {
       headers: {
@@ -215,7 +238,7 @@ describe("RoomDO phase:next", () => {
   it("host は phase を進められる", async () => {
     const stub = roomStub("room-phase-host");
 
-    await stub.join(USER_A, true);
+    await stub.initializeNewRoom(USER_A, "Host");
     // 既定 phase1 のまま phase:next → phase2
     await stub.setPhase("phase1", USER_A, USER_A);
 
@@ -239,21 +262,13 @@ describe("RoomDO phase:next", () => {
 
     ws.send(JSON.stringify({ type: "phase:next" }));
 
-    // phase:updated と phase_changed の二重配信がある
-    const messages: unknown[] = [];
-    while (messages.length < 2) {
-      const message = await new Promise<MessageEvent>((resolve) => {
-        ws.addEventListener("message", resolve, { once: true });
-      });
-      messages.push(JSON.parse(String(message.data)));
-    }
+    const message = await new Promise<MessageEvent>((resolve) => {
+      ws.addEventListener("message", resolve, { once: true });
+    });
+    const body = JSON.parse(String(message.data));
 
-    const types = messages.map((m) => (m as { type: string }).type);
-    expect(types).toContain("phase:updated");
-    expect(types).toContain("phase_changed");
-    expect(
-      messages.every((m) => (m as { phase: string }).phase === "phase2"),
-    ).toBe(true);
+    expect(body.type).toBe("phase:updated");
+    expect(body.phase).toBe("phase2");
 
     ws.close();
   });
@@ -261,8 +276,8 @@ describe("RoomDO phase:next", () => {
   it("member は phase を進められない", async () => {
     const stub = roomStub("room-phase-member");
 
-    await stub.join(USER_A, true);
-    await stub.join(USER_B);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.upsertMember(USER_B, "Member");
     await stub.setPhase("phase1", USER_A, USER_A);
 
     const res = await stub.fetch("https://do/ws", {
@@ -300,8 +315,8 @@ describe("RoomDO phase:next", () => {
   it("phase 更新は全クライアントへ配信される", async () => {
     const stub = roomStub("room-phase-broadcast");
 
-    await stub.join(USER_A, true);
-    await stub.join(USER_B);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.upsertMember(USER_B, "Member");
     await stub.setPhase("phase1", USER_A, USER_A);
 
     const hostRes = await stub.fetch("https://do/ws", {
@@ -339,37 +354,29 @@ describe("RoomDO phase:next", () => {
       }),
     ]);
 
-    // 各クライアントは phase:updated + phase_changed の2通を受ける
-    const collectTwo = (ws: WebSocket) =>
-      new Promise<unknown[]>((resolve) => {
-        const collected: unknown[] = [];
+    // 各クライアントは phase:updated の1通を受ける
+    const collectOne = (ws: WebSocket) =>
+      new Promise<unknown>((resolve) => {
         const onMessage = (event: MessageEvent) => {
-          collected.push(JSON.parse(String(event.data)));
-          if (collected.length >= 2) {
-            ws.removeEventListener("message", onMessage);
-            resolve(collected);
-          }
+          ws.removeEventListener("message", onMessage);
+          resolve(JSON.parse(String(event.data)));
         };
         ws.addEventListener("message", onMessage);
       });
 
-    const hostPromise = collectTwo(host);
-    const memberPromise = collectTwo(member);
+    const hostPromise = collectOne(host);
+    const memberPromise = collectOne(member);
 
     host.send(JSON.stringify({ type: "phase:next" }));
 
-    const [hostMessages, memberMessages] = await Promise.all([
+    const [hostMessage, memberMessage] = await Promise.all([
       hostPromise,
       memberPromise,
     ]);
 
-    for (const messages of [hostMessages, memberMessages]) {
-      const types = messages.map((m) => (m as { type: string }).type);
-      expect(types).toContain("phase:updated");
-      expect(types).toContain("phase_changed");
-      expect(
-        messages.every((m) => (m as { phase: string }).phase === "phase2"),
-      ).toBe(true);
+    for (const msg of [hostMessage, memberMessage]) {
+      expect((msg as { type: string }).type).toBe("phase:updated");
+      expect((msg as { phase: string }).phase).toBe("phase2");
     }
 
     host.close();

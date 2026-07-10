@@ -137,7 +137,7 @@ export function RoomBoard({
         notify.memberLeft(left.name);
       }
     }
-    if (message.type === "phase:updated" || message.type === "phase_changed") {
+    if (message.type === "phase:updated") {
       setIsNextPhasePending(false);
     }
     // ref を同期更新して、連続メッセージでも最新 members を引けるようにする。

@@ -77,19 +77,12 @@ export function applyServerMessage(
 
     case "member_joined":
     case "member_left":
-    case "phase_changed": {
-      // ノート以外の状態は別リデューサが担当する（app/rooms/room-reducer.ts）。
-      // ここでは notes に触れない（早期 return）。
-      return notes;
-    }
-
-    case "error": {
-      // 通知・ログはコンテナ（room-board.tsx）の責務。ここでは状態を変えない。
-      return notes;
-    }
-
     case "phase:updated":
+    case "error": {
+      // ノート以外の状態は別リデューサが担当する（app/rooms/room-reducer.ts）。
+      // 通知・ログはコンテナ（room-board.tsx）の責務。ここでは notes に触れない。
       return notes;
+    }
 
     default: {
       const _exhaustive: never = message;

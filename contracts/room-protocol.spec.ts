@@ -113,16 +113,13 @@ describe("ServerMessageSchema", () => {
     });
   });
 
-  it("phase_changed は lobby / phase1-3 を受け入れる", () => {
+  it("phase:updated は lobby / phase1-3 を受け入れる", () => {
     expect(
-      ServerMessageSchema.parse({ type: "phase_changed", phase: "lobby" }),
-    ).toEqual({ type: "phase_changed", phase: "lobby" });
+      ServerMessageSchema.parse({ type: "phase:updated", phase: "lobby" }),
+    ).toEqual({ type: "phase:updated", phase: "lobby" });
     expect(
-      ServerMessageSchema.parse({ type: "phase_changed", phase: "phase1" }),
-    ).toEqual({ type: "phase_changed", phase: "phase1" });
-  });
-
-  it("phase:updated を受け入れる", () => {
+      ServerMessageSchema.parse({ type: "phase:updated", phase: "phase1" }),
+    ).toEqual({ type: "phase:updated", phase: "phase1" });
     expect(
       ServerMessageSchema.parse({ type: "phase:updated", phase: "phase2" }),
     ).toEqual({ type: "phase:updated", phase: "phase2" });
@@ -134,10 +131,19 @@ describe("ServerMessageSchema", () => {
     });
   });
 
-  it("phase_changed に未知のフェーズは拒否する", () => {
+  it("phase:updated に未知のフェーズは拒否する", () => {
     expect(
-      ServerMessageSchema.safeParse({ type: "phase_changed", phase: "done" })
+      ServerMessageSchema.safeParse({ type: "phase:updated", phase: "done" })
         .success,
+    ).toBe(false);
+  });
+
+  it("旧 phase_changed は受け付けない", () => {
+    expect(
+      ServerMessageSchema.safeParse({
+        type: "phase_changed",
+        phase: "phase1",
+      }).success,
     ).toBe(false);
   });
 
@@ -258,10 +264,10 @@ describe("parseClientMessage", () => {
     ).toBeNull();
   });
 
-  it("phase_changed もクライアント送信メッセージには存在しない", () => {
+  it("phase:updated はクライアント送信メッセージには存在しない", () => {
     expect(
       parseClientMessage(
-        JSON.stringify({ type: "phase_changed", phase: "phase1" }),
+        JSON.stringify({ type: "phase:updated", phase: "phase1" }),
       ),
     ).toBeNull();
   });

@@ -70,8 +70,8 @@ describe("applyMemberServerMessage", () => {
     expect(applyMemberServerMessage([A], message)).toEqual([A]);
   });
 
-  it("phase_changed は members を変えない", () => {
-    const message: ServerMessage = { type: "phase_changed", phase: "phase1" };
+  it("phase:updated は members を変えない", () => {
+    const message: ServerMessage = { type: "phase:updated", phase: "phase1" };
     expect(applyMemberServerMessage([A], message)).toEqual([A]);
   });
 
@@ -103,14 +103,19 @@ describe("applyPhaseServerMessage", () => {
     ).toBe("lobby");
   });
 
-  it("phase_changed で phase1 に進める", () => {
-    const message: ServerMessage = { type: "phase_changed", phase: "phase1" };
-    expect(applyPhaseServerMessage("lobby", message)).toBe("phase1");
-  });
-
-  it("phase:updated でも phase が進む", () => {
-    const message: ServerMessage = { type: "phase:updated", phase: "phase2" };
-    expect(applyPhaseServerMessage("phase1", message)).toBe("phase2");
+  it("phase:updated で phase が進む", () => {
+    expect(
+      applyPhaseServerMessage("lobby", {
+        type: "phase:updated",
+        phase: "phase1",
+      }),
+    ).toBe("phase1");
+    expect(
+      applyPhaseServerMessage("phase1", {
+        type: "phase:updated",
+        phase: "phase2",
+      }),
+    ).toBe("phase2");
   });
 
   it("ノート系メッセージは phase を変えない", () => {

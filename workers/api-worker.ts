@@ -193,9 +193,12 @@ async function handleLeaveRoom(
   }
 
   // ホストの「退出」はルーム解散。残メンバーを開始不能にしない。
+  // D1 のディレクトリ抹消を先に行い fail-closed にする。
+  // disband 成功後に deleteRoom が失敗すると「招待コードで解決できるが
+  // 中身は空」のゾンビルームが残り、ホストは既にメンバー外で再試行 404 になる。
   if (room.hostId === session.sub) {
-    await stub.disband();
     await deleteRoom(env.DB, roomId);
+    await stub.disband();
     return new Response(null, { status: 204 });
   }
 

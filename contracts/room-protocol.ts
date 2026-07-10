@@ -142,11 +142,6 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
   }),
   // start_phase 成功時（ロビー離脱）にも phase:next 成功時にも使う。
   z.object({
-    type: z.literal("phase_changed"),
-    phase: PhaseSchema,
-  }),
-  // phase:next 成功時に配信（board 側が購読）。
-  z.object({
     type: z.literal("phase:updated"),
     phase: PhaseSchema,
   }),

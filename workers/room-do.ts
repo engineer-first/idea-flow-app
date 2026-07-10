@@ -98,14 +98,6 @@ export class RoomDO extends DurableObject {
     }
   }
 
-  // 旧シグネチャ + isHost フラグ。ホスト初回 join で room_owner を記録。
-  async join(userId: string, isHost = false): Promise<void> {
-    await this.upsertMember(userId, undefined);
-    if (isHost) {
-      this.ensureHost(userId);
-    }
-  }
-
   // 新規ルーム作成直後にロビー状態へ。
   async initializeNewRoom(
     hostId: string,
@@ -163,7 +155,10 @@ export class RoomDO extends DurableObject {
     this.broadcastToAllExcept({ type: "member_left", userId }, userId);
   }
 
-  // ルーム解散（ホスト操作）。全 WS を閉じ、members / notes を空にする。
+  // ルーム解散（ホスト操作）。全 WS を閉じ、ストレージを完全に空にする。
+  // deleteAll しないと room_state / room_owner / schema_version が残り、
+  // Durable Object が GC 対象にならない。次回起床時は constructor の
+  // マイグレーションがスキーマを再構築する。
   async disband(): Promise<void> {
     for (const socket of this.ctx.getWebSockets()) {
       try {
@@ -172,12 +167,7 @@ export class RoomDO extends DurableObject {
         // 既に閉じている等のエラーは握りつぶす
       }
     }
-    this.ctx.storage.sql.exec("DELETE FROM notes");
-    this.ctx.storage.sql.exec("DELETE FROM note_votes");
-    this.ctx.storage.sql.exec("DELETE FROM members");
-    this.ctx.storage.sql.exec(
-      "UPDATE room_state SET phase = 'lobby' WHERE id = 1",
-    );
+    await this.ctx.storage.deleteAll();
   }
 
   // メンバー一覧を参加順（joined_at 昇順）で返す。snapshot 構築に使う。
@@ -527,7 +517,6 @@ export class RoomDO extends DurableObject {
           return;
         }
         await this.setPhase("phase1", userId, hostId);
-        this.broadcastToAll({ type: "phase_changed", phase: "phase1" });
         this.broadcastToAll({ type: "phase:updated", phase: "phase1" });
         return;
       }
@@ -554,7 +543,6 @@ export class RoomDO extends DurableObject {
         const next = this.nextSprintPhase();
         this.savePhase(next);
         this.broadcastToAll({ type: "phase:updated", phase: next });
-        this.broadcastToAll({ type: "phase_changed", phase: next });
         return;
       }
 

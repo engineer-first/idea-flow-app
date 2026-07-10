@@ -1,5 +1,5 @@
 // RoomStartBoard（コンテナ）の統合テスト。
-// フェイク WebSocket を注入し、start_phase 送信と phase_changed 受信の
+// フェイク WebSocket を注入し、start_phase 送信と phase:updated 受信の
 // 両方向の配線を検証する。
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -230,7 +230,7 @@ describe("サーバーメッセージ → 画面反映", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
-  it("phase_changed: phase1 を受信すると /rooms/[id] へ router.replace する", () => {
+  it("phase:updated: phase1 を受信すると /rooms/[id] へ router.replace する", () => {
     renderStart();
     // snapshot でメンバー確定
     const socket = findSocket();
@@ -245,7 +245,7 @@ describe("サーバーメッセージ → 画面反映", () => {
     );
     act(() =>
       socket.simulateServerMessage({
-        type: "phase_changed",
+        type: "phase:updated",
         phase: "phase1",
       }),
     );
