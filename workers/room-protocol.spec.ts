@@ -577,6 +577,27 @@ describe("note:vote（課題ドット投票）", () => {
     owner.close();
   });
 
+  it("参加者ごとに客観ドットを3票ずつ投票できる", async () => {
+    const { owner, member } = await setupRoom();
+    const noteId = await createNote({ owner, member });
+
+    for (const voter of [owner, member]) {
+      for (let count = 0; count < 3; count++) {
+        send(voter, { type: "note:vote", noteId, kind: "objective" });
+        await expectType(owner, "note:updated");
+        await expectType(member, "note:updated");
+      }
+    }
+
+    send(owner, { type: "note:vote", noteId, kind: "objective" });
+    expect((await expectType(owner, "error")).code).toBe("forbidden");
+    send(member, { type: "note:vote", noteId, kind: "objective" });
+    expect((await expectType(member, "error")).code).toBe("forbidden");
+
+    owner.close();
+    member.close();
+  });
+
   it("客観ドットは同じ付箋に残り数まで積める", async () => {
     const { owner, member } = await setupRoom();
     const noteId = await createNote({ owner, member });

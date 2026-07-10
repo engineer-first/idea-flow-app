@@ -9,7 +9,7 @@
 //
 // フェーズモデル:
 // - lobby: 開始前ロビー（メンバー確認・招待）。start_phase で phase1 へ。
-// - phase1/2/3: ボード上のスプリント工程。phase:next で進む（ホストのみ）。
+// - phase1-3: 課題の記入・整理・投票工程。phase4 は投票結果の確認画面。
 import { z } from "zod";
 import { BOARD_HEIGHT, BOARD_WIDTH } from "./board";
 
@@ -55,8 +55,14 @@ export const GroupSchema = z.object({
 
 export type ProtocolGroup = z.infer<typeof GroupSchema>;
 
-// lobby = 開始前 / phase1-3 = ボード上の工程
-export const PhaseSchema = z.enum(["lobby", "phase1", "phase2", "phase3"]);
+// lobby = 開始前 / phase1-3 = ボード上の工程 / phase4 = 投票結果
+export const PhaseSchema = z.enum([
+  "lobby",
+  "phase1",
+  "phase2",
+  "phase3",
+  "phase4",
+]);
 export type Phase = z.infer<typeof PhaseSchema>;
 
 // メンバー一覧スナップショットの単位。
@@ -119,7 +125,7 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
   }),
   // ロビーからボードへ（lobby → phase1）。ホストのみ。
   z.object({ type: z.literal("start_phase") }),
-  // ボード内の次工程（phase1 → phase2 → phase3）。ホストのみ。
+  // ボード内の次工程（phase1 → phase2 → phase3 → phase4）。ホストのみ。
   z.object({ type: z.literal("phase:next") }),
 ]);
 

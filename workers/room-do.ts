@@ -1,7 +1,7 @@
 // 1ルーム = 1 Durable Object の権威サーバー。
 // - メンバーシップ（誰がこのルームに入れるか）の真実をここで持つ
 // - 付箋の確定状態（notes）の真実をここで持つ
-// - 進行状態 (lobby / phase1-3) の真実をここで持つ
+// - 進行状態 (lobby / phase1-4) の真実をここで持つ
 // - 配信は必ず visibleTo（workers/visibility.ts）を通す（選択的送信）
 //   メンバー参加・進行状態のように参加者全員が受け取る情報は
 //   broadcastToAll という別経路で送る（visibleTo はノートにだけ適用する）
@@ -193,7 +193,8 @@ export class RoomDO extends DurableObject {
       phase === "lobby" ||
       phase === "phase1" ||
       phase === "phase2" ||
-      phase === "phase3"
+      phase === "phase3" ||
+      phase === "phase4"
     ) {
       return phase;
     }
@@ -230,7 +231,9 @@ export class RoomDO extends DurableObject {
       case "phase2":
         return "phase3";
       case "phase3":
-        return "phase3";
+        return "phase4";
+      case "phase4":
+        return "phase4";
     }
   }
 
@@ -311,6 +314,17 @@ export class RoomDO extends DurableObject {
     message: ClientMessage,
   ): Promise<void> {
     const { userId, hostId } = attachment;
+    // phase4 は投票結果を確認しながら既存ボードで話し合う工程。
+    // WebSocket を直接送っても投票結果や付箋配置を変えられないよう、
+    // 変更系メッセージを境界で一元的に拒否する。
+    if (this.getPhase() === "phase4" && this.isBoardMutation(message)) {
+      this.sendTo(ws, {
+        type: "error",
+        code: "forbidden",
+        message: "投票結果の確認中はボードを変更できません。",
+      });
+      return;
+    }
     switch (message.type) {
       case "note:create": {
         const now = new Date().toISOString();
@@ -598,7 +612,7 @@ export class RoomDO extends DurableObject {
       }
 
       case "phase:next": {
-        // phase1 → phase2 → phase3。ホストのみ。lobby では不可。
+        // phase1 → phase2 → phase3 → phase4。ホストのみ。lobby では不可。
         if (userId !== hostId && !this.isHostUser(userId)) {
           this.sendTo(ws, {
             type: "error",
@@ -616,6 +630,14 @@ export class RoomDO extends DurableObject {
           });
           return;
         }
+        if (current === "phase3" && !this.haveAllMembersCompletedVoting()) {
+          this.sendTo(ws, {
+            type: "error",
+            code: "forbidden",
+            message: "全員の主観・客観投票が完了していません。",
+          });
+          return;
+        }
         const next = this.nextSprintPhase();
         this.savePhase(next);
         this.broadcastToAll({ type: "phase:updated", phase: next });
@@ -627,6 +649,24 @@ export class RoomDO extends DurableObject {
         void _exhaustive;
         return;
       }
+    }
+  }
+
+  private isBoardMutation(message: ClientMessage): boolean {
+    switch (message.type) {
+      case "note:create":
+      case "note:update-content":
+      case "note:move":
+      case "note:drag":
+      case "note:delete":
+      case "note:vote":
+      case "note:vote-reset":
+      case "group:create":
+      case "group:update-name":
+        return true;
+      case "start_phase":
+      case "phase:next":
+        return false;
     }
   }
 
@@ -896,6 +936,22 @@ export class RoomDO extends DurableObject {
       )
       .toArray();
     return Number(rows[0]?.count ?? 0);
+  }
+
+  private haveAllMembersCompletedVoting(): boolean {
+    const rows = this.ctx.storage.sql
+      .exec(
+        `SELECT m.user_id
+         FROM members m
+         LEFT JOIN note_votes v ON v.user_id = m.user_id
+         GROUP BY m.user_id
+         HAVING COALESCE(SUM(CASE WHEN v.kind = 'subjective' THEN v.vote_count END), 0) != ?1
+             OR COALESCE(SUM(CASE WHEN v.kind = 'objective' THEN v.vote_count END), 0) != ?2`,
+        DOT_VOTE_LIMITS.subjective,
+        DOT_VOTE_LIMITS.objective,
+      )
+      .toArray();
+    return rows.length === 0;
   }
 
   private countNoteVotes(noteId: string, kind: DotVoteKind): number {

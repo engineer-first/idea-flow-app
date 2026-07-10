@@ -18,6 +18,7 @@ const notifyMocks = vi.hoisted(() => ({
   memberJoined: vi.fn(),
   memberLeft: vi.fn(),
   roomDisbanded: vi.fn(),
+  error: vi.fn(),
 }));
 
 vi.mock("@/app/_lib/notify", () => ({
@@ -28,7 +29,7 @@ vi.mock("@/app/_lib/notify", () => ({
     roomCreated: vi.fn(),
     joinedAsHost: vi.fn(),
     joinedAsGuest: vi.fn(),
-    error: vi.fn(),
+    error: notifyMocks.error,
   },
 }));
 
@@ -175,6 +176,7 @@ afterEach(() => {
   notifyMocks.memberJoined.mockReset();
   notifyMocks.memberLeft.mockReset();
   notifyMocks.roomDisbanded.mockReset();
+  notifyMocks.error.mockReset();
 });
 
 describe("メンバー参加・退出の通知", () => {
@@ -216,6 +218,22 @@ describe("メンバー参加・退出の通知", () => {
 });
 
 describe("サーバーメッセージ → 画面反映", () => {
+  it("phase3 の投票未完了エラーを受信するとポップアップ通知を表示する", () => {
+    const { socket } = connectWithSnapshot([], { phase: "phase3" });
+
+    act(() =>
+      socket.simulateServerMessage({
+        type: "error",
+        code: "forbidden",
+        message: "全員の主観・客観投票が完了していません。",
+      }),
+    );
+
+    expect(notifyMocks.error).toHaveBeenCalledWith(
+      "全員の主観・客観投票が完了していません。",
+    );
+  });
+
   it("snapshot の付箋がボードに描画される", () => {
     connectWithSnapshot([protocolNote()]);
     expect(screen.getByDisplayValue("最初の付箋")).toBeInTheDocument();

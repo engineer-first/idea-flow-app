@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { DotVoteSummary } from "@/app/components/dotvote/organisms/dot-vote-summary";
+import { VoteTotalingPanel } from "@/app/components/vote-totaling/organisms/vote-totaling-panel";
 import { CopyInviteButton } from "@/app/rooms/[id]/copy-invite-button";
 import { NoteCard } from "@/app/rooms/[id]/note-card";
 import { NoteGroupCard } from "@/app/rooms/[id]/note-group-card";
@@ -21,6 +22,13 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 // ルームボードの表示用コンポーネント。データ層には一切依存せず、
 // 付箋の配列と各種コールバックをpropsで受け取る。
 // WebSocket接続・スロットル・プロトコル送信はroom-board.tsx（コンテナ）の責務。
@@ -51,6 +59,7 @@ const PHASE_LABELS: Record<Phase, string> = {
   phase1: "フェーズ1",
   phase2: "フェーズ2",
   phase3: "フェーズ3",
+  phase4: "フェーズ4（投票結果）",
 };
 
 export type BoardViewProps = {
@@ -114,11 +123,18 @@ export function BoardView({
 }: BoardViewProps) {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const [voteTotalingDialogOpen, setVoteTotalingDialogOpen] = useState(
+    phase === "phase4",
+  );
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    setVoteTotalingDialogOpen(phase === "phase4");
+  }, [phase]);
 
   // ハイドレーション直後の高速接続確立によるMismatchedを防ぐため、マウント完了までは接続中（非活性）扱いにする
   const isDisconnected = isMounted ? connectionStatus !== "open" : true;
@@ -204,7 +220,7 @@ export function BoardView({
                 <Button
                   type="button"
                   disabled={
-                    isDisconnected || isNextPhasePending || phase === "phase3"
+                    isDisconnected || isNextPhasePending || phase === "phase4"
                   }
                 >
                   次のフェーズへ
@@ -248,9 +264,18 @@ export function BoardView({
               {CONNECTION_STATUS_LABELS[connectionStatus]}
             </span>
           )}
-          <Button type="button" onClick={onAddNote} disabled={isDisconnected}>
-            付箋を追加
-          </Button>
+          {phase === "phase4" ? (
+            <Button
+              type="button"
+              onClick={() => setVoteTotalingDialogOpen(true)}
+            >
+              投票結果を表示
+            </Button>
+          ) : (
+            <Button type="button" onClick={onAddNote} disabled={isDisconnected}>
+              付箋を追加
+            </Button>
+          )}
           <Button
             type="button"
             variant="outline"
@@ -282,21 +307,21 @@ export function BoardView({
             </p>
           ) : null}
 
-          {renderGroups.map((rg) => {
+          {renderGroups.map((renderGroup) => {
             const handleUpdateName = (newName: string) => {
-              if (rg.isTemp && rg.representativeNoteId) {
-                const noteIds = rg.id.replace("temp-", "").split(",");
+              if (renderGroup.isTemp && renderGroup.representativeNoteId) {
+                const noteIds = renderGroup.id.replace("temp-", "").split(",");
                 onGroupCreate?.(newName, noteIds);
-              } else if (rg.persistentGroupId) {
-                onGroupUpdateName?.(rg.persistentGroupId, newName);
+              } else if (renderGroup.persistentGroupId) {
+                onGroupUpdateName?.(renderGroup.persistentGroupId, newName);
               }
             };
 
             return (
               <NoteGroupCard
-                key={rg.id}
-                group={rg}
-                name={rg.name}
+                key={renderGroup.id}
+                group={renderGroup}
+                name={renderGroup.name}
                 onUpdateName={handleUpdateName}
               />
             );
@@ -322,6 +347,25 @@ export function BoardView({
           ))}
         </div>
       </div>
+
+      <Dialog
+        open={voteTotalingDialogOpen}
+        onOpenChange={setVoteTotalingDialogOpen}
+      >
+        <DialogContent className="max-h-[80vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>投票結果</DialogTitle>
+            <DialogDescription>
+              付箋ごとの投票結果を確認し、ボードに戻って話し合います。
+            </DialogDescription>
+          </DialogHeader>
+          <VoteTotalingPanel
+            isVotingComplete={phase === "phase4"}
+            members={members}
+            notes={notes}
+          />
+        </DialogContent>
+      </Dialog>
 
       <LeaveConfirmDialog
         open={leaveDialogOpen}

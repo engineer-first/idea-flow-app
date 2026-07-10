@@ -113,6 +113,55 @@ describe("BoardView", () => {
     expect(screen.getByText("客観 残り1")).toBeInTheDocument();
   });
 
+  it("phase3 のホストはフェーズ4へ進める", () => {
+    setup({ isHost: true, phase: "phase3" });
+
+    expect(
+      screen.getByRole("button", { name: "次のフェーズへ" }),
+    ).not.toBeDisabled();
+  });
+
+  it("phase4 では投票結果をダイアログ表示し、閉じると元のボードで話し合える", () => {
+    setup({
+      phase: "phase4",
+      members: buildMembers(2, ME),
+      notes: buildNotes(4).map((note, index) => ({
+        ...note,
+        content: ["課題A", "課題B", "課題C", "課題D"][index],
+        dotVotes: {
+          subjective: {
+            count: [2, 0, 0, 0][index],
+            votedByMe: false,
+            ownCount: 0,
+          },
+          objective: {
+            count: [1, 5, 0, 0][index],
+            votedByMe: false,
+            ownCount: 0,
+          },
+        },
+      })),
+    });
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("vote-result-ranking")).toBeInTheDocument();
+    expect(screen.getByTestId("board-canvas")).toBeInTheDocument();
+    expect(screen.getByText("総合ポイントが高い順")).toBeInTheDocument();
+    expect(screen.getByText("1位")).toBeInTheDocument();
+    expect(screen.getByText("2位")).toBeInTheDocument();
+    expect(screen.getAllByText("3位")).toHaveLength(2);
+    expect(screen.queryByText("TOP 3")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByTestId("board-canvas")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "投票結果を表示" }));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
   it("付箋のドット投票ボタンでonNoteVoteを呼ぶ", () => {
     const onNoteVote = vi.fn();
     setup({ onNoteVote });
