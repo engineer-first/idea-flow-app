@@ -33,6 +33,9 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      - name: Check D1 migration numbers
+        run: npm run check:migrations
+
   test:
     runs-on: ubuntu-latest
     steps:
