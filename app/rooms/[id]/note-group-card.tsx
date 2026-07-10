@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { RenderGroup } from "@/contracts/grouping";
 
 export type NoteGroupCardProps = {
@@ -48,9 +48,10 @@ export function NoteGroupCard({
   };
 
   // 同時グループの色被りを防ぐため contracts/grouping で計算された等分 hue を優先し、無い場合はフォールバック
-  const colorSeed = group.persistentGroupId || group.representativeNoteId || group.id;
+  const colorSeed =
+    group.persistentGroupId || group.representativeNoteId || group.id;
   const hash = getHashCode(colorSeed);
-  const hue = group.hue !== undefined ? group.hue : (hash % 360);
+  const hue = group.hue !== undefined ? group.hue : hash % 360;
 
   return (
     <div
@@ -66,9 +67,20 @@ export function NoteGroupCard({
       }}
     >
       {name !== "" && (
+        // biome-ignore lint/a11y/useSemanticElements: input element is nested during editing, so we use a div with role="button" instead of button
         <div
+          role="button"
+          tabIndex={isEditing ? -1 : 0}
           className="pointer-events-auto absolute -top-4 left-3 cursor-pointer rounded border border-[hsl(var(--group-hue),65%,85%)] bg-background px-2 py-0.5 text-sm font-bold text-[hsl(var(--group-hue),75%,35%)] shadow-sm select-none dark:border-[hsl(var(--group-hue),55%,30%)] dark:text-[hsl(var(--group-hue),55%,70%)]"
-          onClick={() => setIsEditing(true)}
+          onClick={() => {
+            if (!isEditing) setIsEditing(true);
+          }}
+          onKeyDown={(e) => {
+            if (!isEditing && (e.key === "Enter" || e.key === " ")) {
+              e.preventDefault();
+              setIsEditing(true);
+            }
+          }}
         >
           {isEditing ? (
             <input

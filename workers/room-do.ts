@@ -14,14 +14,15 @@ import {
   NOTE_SPAWN_X_MIN,
   NOTE_SPAWN_Y_MIN,
 } from "../contracts/board";
+import { type PersistentGroup, reorganizeGroups } from "../contracts/grouping";
 import {
   type ClientMessage,
   DOT_VOTE_LIMITS,
   type DotVoteKind,
   type Phase,
+  type ProtocolGroup,
   type ProtocolMember,
   type ProtocolNote,
-  type ProtocolGroup,
   parseClientMessage,
   type ServerMessage,
   WS_CLOSE_LEFT_ROOM,
@@ -29,10 +30,6 @@ import {
   WS_CLOSE_ROOM_DISBANDED,
   WS_CLOSE_ROOM_DISBANDED_REASON,
 } from "../contracts/room-protocol";
-import {
-  reorganizeGroups,
-  type PersistentGroup,
-} from "../contracts/grouping";
 import { migrateRoomStorage } from "./room-do-migrations";
 import { filterVisible, visibleTo } from "./visibility";
 
@@ -455,7 +452,10 @@ export class RoomDO extends DurableObject {
 
       case "group:update-name": {
         const rows = this.ctx.storage.sql
-          .exec("SELECT id, name, note_ids, created_at FROM groups WHERE id = ?1", message.groupId)
+          .exec(
+            "SELECT id, name, note_ids, created_at FROM groups WHERE id = ?1",
+            message.groupId,
+          )
           .toArray();
         if (rows.length === 0) {
           this.sendTo(ws, {
@@ -760,7 +760,8 @@ export class RoomDO extends DurableObject {
         const existing = this.ctx.storage.sql
           .exec("SELECT created_at FROM groups WHERE id = ?1", g.id)
           .toArray();
-        const createdAt = existing.length > 0 ? (existing[0].created_at as string) : now;
+        const createdAt =
+          existing.length > 0 ? (existing[0].created_at as string) : now;
 
         this.ctx.storage.sql.exec(
           `INSERT INTO groups (id, name, note_ids, created_at, updated_at)
@@ -779,7 +780,6 @@ export class RoomDO extends DurableObject {
     const currentGroups = this.listGroups();
     const nextGroups = reorganizeGroups(notes, currentGroups);
 
-    const prevIds = new Set(currentGroups.map((g) => g.id));
     const nextIds = new Set(nextGroups.map((g) => g.id));
 
     this.saveGroups(nextGroups);
@@ -789,7 +789,9 @@ export class RoomDO extends DurableObject {
       if (!nextIds.has(prevGroup.id)) {
         // 代表となる付箋を1つ解決（配信フィルタリング用）
         const representativeId = prevGroup.noteIds[0];
-        const noteRow = representativeId ? this.findNote(representativeId) : null;
+        const noteRow = representativeId
+          ? this.findNote(representativeId)
+          : null;
         const subject = noteRow
           ? this.toProtocolNote(noteRow, "00000000-0000-0000-0000-000000000000")
           : {
@@ -816,10 +818,7 @@ export class RoomDO extends DurableObject {
     // 2. 更新・作成されたグループをブロードキャスト
     for (const g of nextGroups) {
       const prev = currentGroups.find((p) => p.id === g.id);
-      if (
-        !prev ||
-        JSON.stringify(prev.noteIds) !== JSON.stringify(g.noteIds)
-      ) {
+      if (!prev || JSON.stringify(prev.noteIds) !== JSON.stringify(g.noteIds)) {
         const noteRow = this.findNote(g.noteIds[0]);
         if (noteRow) {
           const group: ProtocolGroup = {
@@ -831,7 +830,10 @@ export class RoomDO extends DurableObject {
           };
           this.broadcast(
             { type: "group:updated", group },
-            this.toProtocolNote(noteRow, "00000000-0000-0000-0000-000000000000"),
+            this.toProtocolNote(
+              noteRow,
+              "00000000-0000-0000-0000-000000000000",
+            ),
           );
         }
       }
