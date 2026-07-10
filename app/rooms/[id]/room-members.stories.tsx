@@ -30,24 +30,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-export const OnlyMe: Story = {
-  args: { members: buildMembers(1, ME) },
-};
-
-export const Empty: Story = {
-  args: { members: [] },
-};
-
-export const FourByThree: Story = {
-  name: "4×3 ちょうど（12 人）",
-  args: { members: buildMembers(ROOM_MEMBERS_MAX_VISIBLE, ME) },
-};
-
-export const WithOverflow: Story = {
-  name: "13 人以上（+N）",
-  args: { members: buildMembers(ROOM_MEMBERS_MAX_VISIBLE + 3, ME) },
-};
-
+/** ホスト以外視点（王冠が自分に付かない） */
 export const NonHostView: Story = {
   args: {
     members: buildMembers(4, ME),
@@ -55,6 +38,7 @@ export const NonHostView: Story = {
   },
 };
 
+/** 人数バリエーションを一覧で比較 */
 export const AllStates: Story = {
   render: () => {
     const states = [

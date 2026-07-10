@@ -42,72 +42,36 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 // ---------------------------------------------------------------------------
-// 参加人数（ホスト視点）
+// ホスト
 // ---------------------------------------------------------------------------
 
-/** 自分だけ参加 */
-export const Solo: Story = {
-  name: "参加 1 人（自分のみ）",
-  args: { members: buildMembers(1, ME) },
+export const HostSolo: Story = {
+  name: "ホスト・1 人",
+  args: { isHost: true, members: buildMembers(1, ME) },
 };
 
-/** 少人数 */
-export const FewMembers: Story = {
-  name: "参加 3 人",
-  args: { members: buildMembers(3, ME) },
-};
-
-/** 2 列が効く人数 */
-export const SixMembers: Story = {
-  name: "参加 6 人",
-  args: { members: buildMembers(6, ME) },
-};
-
-/** 表示上限ちょうど 4×3（+N なし） */
-export const TwelveMembers: Story = {
-  name: "参加 12 人（4×3 上限ちょうど）",
-  args: { members: buildMembers(ROOM_MEMBERS_MAX_VISIBLE, ME) },
-};
-
-/** 13 人 → 最終マスが +N */
-export const ThirteenMembers: Story = {
-  name: "参加 13 人（+N）",
-  args: { members: buildMembers(ROOM_MEMBERS_MAX_VISIBLE + 1, ME) },
-};
-
-/** 多人数 */
-export const FifteenMembers: Story = {
-  name: "参加 15 人（+N）",
-  args: { members: buildMembers(15, ME) },
+export const HostSix: Story = {
+  name: "ホスト・6 人",
+  args: { isHost: true, members: buildMembers(6, ME) },
 };
 
 // ---------------------------------------------------------------------------
-// 役割・接続
+// 参加者（ゲスト）
 // ---------------------------------------------------------------------------
 
-/** ホスト（既定・招待カードあり） */
-export const Host: Story = {
-  name: "ホスト",
-  args: { isHost: true },
+export const GuestTwo: Story = {
+  name: "参加者・2 人",
+  args: { isHost: false, members: buildMembers(2, ME) },
 };
 
-/** ゲスト（招待カードなし・開始待機） */
-export const Guest: Story = {
-  name: "ゲスト（待機中）",
-  args: {
-    isHost: false,
-    members: buildMembers(4, ME),
-  },
+export const GuestSix: Story = {
+  name: "参加者・6 人",
+  args: { isHost: false, members: buildMembers(6, ME) },
 };
 
-/** ゲスト + 12 人超 */
-export const GuestWithOverflow: Story = {
-  name: "ゲスト・参加 15 人",
-  args: {
-    isHost: false,
-    members: buildMembers(15, ME),
-  },
-};
+// ---------------------------------------------------------------------------
+// 処理中・接続
+// ---------------------------------------------------------------------------
 
 export const Starting: Story = {
   name: "開始処理中",
@@ -130,22 +94,21 @@ export const Leaving: Story = {
 };
 
 // ---------------------------------------------------------------------------
-// カタログ
+// カタログ（状態網羅）
 // ---------------------------------------------------------------------------
 
-/** 参加状態を一覧で比較（人数バリエーション中心） */
 export const AllParticipationStates: Story = {
   name: "一覧: 参加人数",
   render: () => {
     const states: { label: string; count: number; isHost?: boolean }[] = [
-      { label: "1 人（自分のみ）", count: 1 },
-      { label: "3 人", count: 3 },
-      { label: "4 人（1 行）", count: 4 },
-      { label: "8 人", count: 8 },
-      { label: "12 人（4×3 上限）", count: ROOM_MEMBERS_MAX_VISIBLE },
-      { label: "13 人（+N）", count: ROOM_MEMBERS_MAX_VISIBLE + 1 },
-      { label: "15 人（+N）", count: 15 },
-      { label: "ゲスト・15 人", count: 15, isHost: false },
+      { label: "ホスト・1 人", count: 1 },
+      { label: "ホスト・3 人", count: 3 },
+      { label: "ホスト・6 人", count: 6 },
+      { label: "ホスト・12 人（4×3 上限）", count: ROOM_MEMBERS_MAX_VISIBLE },
+      { label: "ホスト・15 人（+N）", count: 15 },
+      { label: "参加者・2 人", count: 2, isHost: false },
+      { label: "参加者・6 人", count: 6, isHost: false },
+      { label: "参加者・15 人", count: 15, isHost: false },
     ];
     return (
       <div className="flex flex-col gap-10 p-4">
@@ -168,7 +131,6 @@ export const AllParticipationStates: Story = {
   },
 };
 
-/** 役割・接続まわりの一覧 */
 export const AllInteractionStates: Story = {
   name: "一覧: 役割・接続",
   render: () => {
