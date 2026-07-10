@@ -146,15 +146,20 @@ describe("BoardView", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByTestId("vote-result-ranking")).toBeInTheDocument();
     expect(screen.getByTestId("board-canvas")).toBeInTheDocument();
-    expect(screen.getByText("投票数が多い順")).toBeInTheDocument();
+    expect(screen.getByText("総合ポイントが高い順")).toBeInTheDocument();
     expect(screen.getByText("1位")).toBeInTheDocument();
     expect(screen.getByText("2位")).toBeInTheDocument();
+    expect(screen.getAllByText("3位")).toHaveLength(2);
     expect(screen.queryByText("TOP 3")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByTestId("board-canvas")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "投票結果を表示" }));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
   it("付箋のドット投票ボタンでonNoteVoteを呼ぶ", () => {

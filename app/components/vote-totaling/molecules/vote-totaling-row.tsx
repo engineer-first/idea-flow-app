@@ -5,7 +5,8 @@ export type VoteTotalingRowViewModel = {
   content: string;
   subjectiveCount: number;
   objectiveCount: number;
-  voteCount: number;
+  score: number;
+  isSelectedChallenge: boolean;
 };
 
 type VoteTotalingRowProps = { row: VoteTotalingRowViewModel; rank: number };
@@ -13,7 +14,7 @@ type VoteTotalingRowProps = { row: VoteTotalingRowViewModel; rank: number };
 export function VoteTotalingRow({ row, rank }: VoteTotalingRowProps) {
   return (
     <li
-      className="grid gap-2 rounded-lg border border-border bg-background p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+      className={`grid gap-2 rounded-lg border p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center ${row.isSelectedChallenge ? "border-emerald-300 bg-emerald-50" : "border-border bg-background"}`}
       data-testid={`vote-totaling-row-${row.noteId}`}
     >
       <div className="flex min-w-0 items-center gap-3">
@@ -25,7 +26,9 @@ export function VoteTotalingRow({ row, rank }: VoteTotalingRowProps) {
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
-        <VoteCountBadge label="合計" value={row.voteCount} tone="score" />
+        <span className="inline-flex h-7 items-center rounded-md border border-zinc-300 bg-zinc-50 px-2 text-xs font-medium tabular-nums text-zinc-900">
+          {row.score}点
+        </span>
         <VoteCountBadge
           label="主観"
           value={row.subjectiveCount}

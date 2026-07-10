@@ -21,20 +21,31 @@ function withVotes(note: Note, subjective: number, objective: number): Note {
 }
 
 describe("calculateVoteTotaling", () => {
-  it("全員分の投票後、投票済み付箋だけを合計票数の降順に並べる", () => {
-    const notes = buildNotes(5).map((note, index) =>
-      withVotes(note, [2, 0, 0, 0, 0][index], [0, 3, 2, 1, 0][index]),
+  it("主観5点・客観1点で集計し、同点なら主観票が多い付箋を取り組む課題にする", () => {
+    const votes = [
+      [2, 3],
+      [2, 3],
+      [2, 3],
+      [1, 8],
+      [0, 13],
+      [1, 0],
+      [1, 0],
+      [1, 0],
+    ];
+    const notes = buildNotes(8).map((note, index) =>
+      withVotes(note, votes[index][0], votes[index][1]),
     );
-    const result = calculateVoteTotaling({ notes, memberCount: 2 });
+    const result = calculateVoteTotaling({ notes, memberCount: 10 });
 
     expect(result.isComplete).toBe(true);
-    expect(result.rows.map((row) => row.noteId)).toEqual([
-      "note-2",
-      "note-1",
-      "note-3",
-      "note-4",
+    expect(result.rows.map((row) => row.score)).toEqual([
+      13, 13, 13, 13, 13, 5, 5, 5,
     ]);
-    expect(result.rows.map((row) => row.voteCount)).toEqual([3, 2, 2, 1]);
+    expect(result.selectedChallenges.map((row) => row.noteId)).toEqual([
+      "note-1",
+      "note-2",
+      "note-3",
+    ]);
   });
 
   it("全員分の投票が終わるまでは結果を確定しない", () => {
@@ -45,24 +56,25 @@ describe("calculateVoteTotaling", () => {
     });
 
     expect(result.isComplete).toBe(false);
+    expect(result.selectedChallenges).toEqual([]);
   });
 
-  it("合計票数が同じ付箋も、投票済みなら集計対象にする", () => {
+  it("無投票の付箋も総合ポイント0としてランキングに含める", () => {
     const votes = [
-      [2, 2],
-      [1, 2],
-      [0, 2],
+      [2, 0],
+      [0, 3],
       [0, 2],
       [0, 1],
+      [0, 0],
     ];
     const notes = buildNotes(5).map((note, index) =>
       withVotes(note, votes[index][0], votes[index][1]),
     );
 
-    const result = calculateVoteTotaling({ notes, memberCount: 3 });
+    const result = calculateVoteTotaling({ notes, memberCount: 2 });
 
     expect(result.isComplete).toBe(true);
-    expect(result.rows.map((row) => row.voteCount)).toEqual([4, 3, 2, 2, 1]);
+    expect(result.rows.map((row) => row.score)).toEqual([10, 3, 2, 1, 0]);
     expect(result.rows.map((row) => row.noteId)).toEqual([
       "note-1",
       "note-2",
@@ -74,7 +86,7 @@ describe("calculateVoteTotaling", () => {
 });
 
 describe("VoteTotalingPanel", () => {
-  it("投票済みの全付箋を投票数順に表示し、未投票の付箋は表示しない", () => {
+  it("すべての付箋を総合ポイント順に表示し、無投票の付箋も含める", () => {
     const notes = buildNotes(5).map((note, index) =>
       withVotes(note, [2, 0, 0, 0, 0][index], [0, 3, 2, 1, 0][index]),
     );
@@ -82,25 +94,22 @@ describe("VoteTotalingPanel", () => {
     render(<VoteTotalingPanel members={buildMembers(2, ME)} notes={notes} />);
 
     expect(screen.getByTestId("vote-result-ranking")).toHaveClass("mx-auto");
-    expect(screen.getByText("投票数が多い順")).toBeInTheDocument();
+    expect(screen.getByText("総合ポイントが高い順")).toBeInTheDocument();
+    expect(screen.getByText("取り組む課題")).toBeInTheDocument();
     expect(
       screen
         .getAllByTestId(/vote-totaling-row-/)
         .map((row) => row.dataset.testid),
     ).toEqual([
-      "vote-totaling-row-note-2",
       "vote-totaling-row-note-1",
+      "vote-totaling-row-note-2",
       "vote-totaling-row-note-3",
       "vote-totaling-row-note-4",
+      "vote-totaling-row-note-5",
     ]);
-    expect(screen.getAllByText("2位")).toHaveLength(2);
+    expect(screen.getByText("5位")).toBeInTheDocument();
     expect(
-      screen.queryByTestId("vote-totaling-row-note-5"),
-    ).not.toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("vote-totaling-row-note-2")).getByText(
-        "合計 3",
-      ),
+      within(screen.getByTestId("vote-totaling-row-note-1")).getByText("10点"),
     ).toBeInTheDocument();
   });
 });

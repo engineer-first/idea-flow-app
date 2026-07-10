@@ -264,11 +264,18 @@ export function BoardView({
               {CONNECTION_STATUS_LABELS[connectionStatus]}
             </span>
           )}
-          {phase !== "phase4" ? (
+          {phase === "phase4" ? (
+            <Button
+              type="button"
+              onClick={() => setVoteTotalingDialogOpen(true)}
+            >
+              投票結果を表示
+            </Button>
+          ) : (
             <Button type="button" onClick={onAddNote} disabled={isDisconnected}>
               付箋を追加
             </Button>
-          ) : null}
+          )}
           <Button
             type="button"
             variant="outline"
@@ -349,7 +356,7 @@ export function BoardView({
           <DialogHeader>
             <DialogTitle>投票結果</DialogTitle>
             <DialogDescription>
-              投票が入った付箋を確認し、ボードに戻って話し合います。
+              付箋ごとの投票結果を確認し、ボードに戻って話し合います。
             </DialogDescription>
           </DialogHeader>
           <VoteTotalingPanel members={members} notes={notes} />

@@ -115,7 +115,7 @@ export const VoteTotaled: Story = {
   args: {
     phase: "phase4",
     members: buildMembers(2, ME),
-    notes: buildNotes(2).map((note, index) => ({
+    notes: buildNotes(3).map((note, index) => ({
       ...note,
       dotVotes: {
         subjective: {
