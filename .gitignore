@@ -61,3 +61,8 @@ build-storybook.log
 .dev.vars
 workers/.dev.vars
 workers/.wrangler/
+
+# スキーマ抽出・ER図生成の成果物（scripts/build-*-schema.ts, tbls が生成）。
+# Chromatic 側で管理するため、リポジトリにはコミットしない。
+/tmp/*.sqlite
+/schema-diagrams/

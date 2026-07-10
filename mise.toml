@@ -1,2 +1,3 @@
 [tools]
 node = "lts"
+tbls = "1.94.5"

@@ -7,7 +7,10 @@ const config: StorybookConfig = {
     "../components/**/*.stories.@(ts|tsx)",
   ],
   addons: ["@storybook/addon-themes", "@storybook/addon-docs"],
-  staticDirs: ["../public"],
+  staticDirs: [
+    "../public",
+    { from: "../schema-diagrams", to: "/schema-diagrams" },
+  ],
   viteFinal: (config) => ({
     ...config,
     envPrefix: ["VITE_", "STORYBOOK_", "NEXT_PUBLIC_"],
