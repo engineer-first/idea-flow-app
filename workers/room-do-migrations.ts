@@ -27,22 +27,63 @@ export const ROOM_DO_MIGRATIONS: readonly string[] = [
      updated_at TEXT NOT NULL
    );
    DROP TABLE IF EXISTS meta;`,
-  // v2: グループ名管理テーブルの追加
-  `CREATE TABLE IF NOT EXISTS group_names (
+
+  // v2: 課題ドット投票 + フェーズ管理追加 + グループ名管理テーブルの追加
+  `
+  CREATE TABLE IF NOT EXISTS group_names (
      representative_note_id TEXT PRIMARY KEY,
      name TEXT NOT NULL,
      created_at TEXT NOT NULL,
      updated_at TEXT NOT NULL
-   );`,
-  // v3: グループ指向自動グループ化対応のgroupsテーブル追加と旧テーブル削除
-  `DROP TABLE IF EXISTS group_names;
-   CREATE TABLE IF NOT EXISTS groups (
-     id TEXT PRIMARY KEY,
-     name TEXT NOT NULL,
-     note_ids TEXT NOT NULL,
+  );
+
+  CREATE TABLE IF NOT EXISTS note_votes (
+     note_id TEXT NOT NULL,
+     user_id TEXT NOT NULL,
+     kind TEXT NOT NULL CHECK (kind IN ('subjective', 'objective')),
      created_at TEXT NOT NULL,
-     updated_at TEXT NOT NULL
-   );`,
+     PRIMARY KEY (note_id, user_id, kind)
+   );
+
+   CREATE INDEX IF NOT EXISTS idx_note_votes_note_kind
+     ON note_votes (note_id, kind);
+
+   CREATE INDEX IF NOT EXISTS idx_note_votes_user_kind
+     ON note_votes (user_id, kind);
+
+   CREATE TABLE IF NOT EXISTS room_state (
+     id INTEGER PRIMARY KEY CHECK (id = 1),
+     phase TEXT NOT NULL DEFAULT 'phase1'
+   );
+
+   INSERT OR IGNORE INTO room_state (id, phase)
+   VALUES (1, 'phase1');
+  `,
+
+  // v3: 客観ドット複数票対応 + host管理 + グループ指向自動グループ化対応（groupsテーブル追加と旧テーブル削除）
+  `
+  DROP TABLE IF EXISTS group_names;
+  CREATE TABLE IF NOT EXISTS groups (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    note_ids TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  ALTER TABLE note_votes ADD COLUMN vote_count INTEGER NOT NULL DEFAULT 1;
+
+  CREATE INDEX IF NOT EXISTS idx_note_votes_user_note_kind
+    ON note_votes (user_id, note_id, kind);
+
+  CREATE TABLE IF NOT EXISTS room_owner (
+    id INTEGER PRIMARY KEY CHECK(id = 1),
+    host_id TEXT
+  );
+
+  INSERT OR IGNORE INTO room_owner (id)
+  VALUES (1);
+  `,
 ];
 
 export function migrateRoomStorage(

@@ -13,6 +13,9 @@ import {
 } from "../contracts/board";
 import {
   type ClientMessage,
+  DOT_VOTE_LIMITS,
+  type DotVoteKind,
+  type Phase,
   type ProtocolNote,
   type ProtocolGroup,
   parseClientMessage,
@@ -59,11 +62,28 @@ export class RoomDO extends DurableObject {
   // ------------------------------------------------------------
 
   // 冪等: 既にメンバーでも何も起きない。
-  join(userId: string): void {
+  join(userId: string, isHost = false): void {
     this.ctx.storage.sql.exec(
       "INSERT OR IGNORE INTO members (user_id) VALUES (?1)",
       userId,
     );
+
+    if (isHost) {
+      const existing = this.ctx.storage.sql
+        .exec("SELECT host_id FROM room_owner WHERE id = 1")
+        .toArray()[0];
+
+      if (!existing?.host_id) {
+        this.ctx.storage.sql.exec(
+          `
+          UPDATE room_owner
+          SET host_id = ?1
+          WHERE id = 1
+          `,
+          userId,
+        );
+      }
+    }
   }
 
   isMember(userId: string): boolean {
@@ -72,6 +92,14 @@ export class RoomDO extends DurableObject {
       userId,
     );
     return cursor.toArray().length > 0;
+  }
+
+  private isHost(userId: string): boolean {
+    const row = this.ctx.storage.sql
+      .exec("SELECT host_id FROM room_owner WHERE id = 1")
+      .toArray()[0];
+
+    return row?.host_id === userId;
   }
 
   // ------------------------------------------------------------
@@ -153,28 +181,28 @@ export class RoomDO extends DurableObject {
     switch (message.type) {
       case "note:create": {
         const now = new Date().toISOString();
-        const note: ProtocolNote = {
+        const note: NoteRow = {
           id: crypto.randomUUID(),
-          authorId: userId,
+          author_id: userId,
           content: "",
           // 新規付箋はボード中央付近に少しずつずらして配置する。
           x: NOTE_SPAWN_X_MIN + Math.random() * NOTE_SPAWN_JITTER,
           y: NOTE_SPAWN_Y_MIN + Math.random() * NOTE_SPAWN_JITTER,
-          createdAt: now,
-          updatedAt: now,
+          created_at: now,
+          updated_at: now,
         };
         this.ctx.storage.sql.exec(
           `INSERT INTO notes (id, author_id, content, x, y, created_at, updated_at)
            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
           note.id,
-          note.authorId,
+          note.author_id,
           note.content,
           note.x,
           note.y,
-          note.createdAt,
-          note.updatedAt,
+          note.created_at,
+          note.updated_at,
         );
-        this.broadcast({ type: "note:inserted", note }, note);
+        this.broadcastNoteInserted(note);
         return;
       }
 
@@ -190,12 +218,11 @@ export class RoomDO extends DurableObject {
           message.content,
           updatedAt,
         );
-        const note = this.toProtocolNote({
+        this.broadcastNoteUpdated({
           ...row,
           content: message.content,
           updated_at: updatedAt,
         });
-        this.broadcast({ type: "note:updated", note }, note);
         return;
       }
 
@@ -210,16 +237,15 @@ export class RoomDO extends DurableObject {
           message.y,
           updatedAt,
         );
-        const note = this.toProtocolNote({
+        this.broadcastNoteUpdated({
           ...row,
           x: message.x,
           y: message.y,
           updated_at: updatedAt,
         });
-        this.broadcast({ type: "note:updated", note }, note);
 
         // 位置が変わったので自動再編成を実行
-        this.autoReorganize(this.listNotes());
+        this.autoReorganize(this.listNotes(userId));
         return;
       }
 
@@ -239,7 +265,7 @@ export class RoomDO extends DurableObject {
             x: message.x,
             y: message.y,
           },
-          this.toProtocolNote(row),
+          this.toProtocolNote(row, userId),
           ws,
         );
         return;
@@ -263,11 +289,11 @@ export class RoomDO extends DurableObject {
         );
         this.broadcast(
           { type: "note:deleted", noteId: message.noteId },
-          this.toProtocolNote(row),
+          this.toProtocolNote(row, userId),
         );
 
         // 付箋が削除されたので自動再編成を実行
-        this.autoReorganize(this.listNotes());
+        this.autoReorganize(this.listNotes(userId));
         return;
       }
 
@@ -289,7 +315,7 @@ export class RoomDO extends DurableObject {
         if (noteRow) {
           this.broadcast(
             { type: "group:updated", group: g },
-            this.toProtocolNote(noteRow),
+            this.toProtocolNote(noteRow, userId),
           );
         }
         return;
@@ -330,9 +356,108 @@ export class RoomDO extends DurableObject {
         if (noteRow) {
           this.broadcast(
             { type: "group:updated", group },
-            this.toProtocolNote(noteRow),
+            this.toProtocolNote(noteRow, userId),
           );
         }
+        return;
+      }
+
+      case "note:vote": {
+        const row = this.requireNote(ws, message.noteId);
+        if (!row) return;
+
+        const ownCount = this.countUserNoteVotes(
+          message.noteId,
+          userId,
+          message.kind,
+        );
+        if (message.kind === "subjective" && ownCount > 0) {
+          this.ctx.storage.sql.exec(
+            `DELETE FROM note_votes
+             WHERE note_id = ?1 AND user_id = ?2 AND kind = ?3`,
+            message.noteId,
+            userId,
+            message.kind,
+          );
+        } else {
+          const used = this.countUserVotes(userId, message.kind);
+          if (used >= DOT_VOTE_LIMITS[message.kind]) {
+            this.sendTo(ws, {
+              type: "error",
+              code: "forbidden",
+              message: "投票上限を超えています。",
+            });
+            return;
+          }
+          if (ownCount > 0) {
+            this.ctx.storage.sql.exec(
+              `UPDATE note_votes
+               SET vote_count = vote_count + 1
+               WHERE note_id = ?1 AND user_id = ?2 AND kind = ?3`,
+              message.noteId,
+              userId,
+              message.kind,
+            );
+          } else {
+            this.ctx.storage.sql.exec(
+              `INSERT INTO note_votes (note_id, user_id, kind, created_at, vote_count)
+               VALUES (?1, ?2, ?3, ?4, 1)`,
+              message.noteId,
+              userId,
+              message.kind,
+              new Date().toISOString(),
+            );
+          }
+        }
+
+        const updatedAt = new Date().toISOString();
+        this.ctx.storage.sql.exec(
+          "UPDATE notes SET updated_at = ?2 WHERE id = ?1",
+          message.noteId,
+          updatedAt,
+        );
+        this.broadcastNoteUpdated({ ...row, updated_at: updatedAt });
+        return;
+      }
+
+      case "note:vote-reset": {
+        const row = this.requireNote(ws, message.noteId);
+        if (!row) return;
+
+        this.ctx.storage.sql.exec(
+          `DELETE FROM note_votes
+           WHERE note_id = ?1 AND user_id = ?2 AND kind = ?3`,
+          message.noteId,
+          userId,
+          message.kind,
+        );
+
+        const updatedAt = new Date().toISOString();
+        this.ctx.storage.sql.exec(
+          "UPDATE notes SET updated_at = ?2 WHERE id = ?1",
+          message.noteId,
+          updatedAt,
+        );
+        this.broadcastNoteUpdated({ ...row, updated_at: updatedAt });
+        return;
+      }
+
+      case "phase:next": {
+        if (!this.isHost(userId)) {
+          this.sendTo(ws, {
+            type: "error",
+            code: "forbidden",
+            message: "ホストのみ操作できます。",
+          });
+          return;
+        }
+
+        const nextPhase = this.nextPhase();
+
+        this.savePhase(nextPhase);
+
+        this.broadcastPhase(nextPhase);
+
         return;
       }
 
@@ -350,14 +475,44 @@ export class RoomDO extends DurableObject {
   // ------------------------------------------------------------
 
   private sendSnapshot(ws: WebSocket, userId: string): void {
-    const notes = this.listNotes();
+    const notes = this.listNotes(userId);
     const groups = this.listGroups();
-
     this.sendTo(ws, {
       type: "snapshot",
       notes: filterVisible({ viewerId: userId }, notes),
       groups,
+      phase: this.getPhase(),
+      isHost: this.isHost(userId),
     });
+  }
+
+  private broadcastNoteInserted(row: NoteRow): void {
+    this.broadcastNote((viewerId) => ({
+      type: "note:inserted",
+      note: this.toProtocolNote(row, viewerId),
+    }));
+  }
+
+  private broadcastNoteUpdated(row: NoteRow): void {
+    this.broadcastNote((viewerId) => ({
+      type: "note:updated",
+      note: this.toProtocolNote(row, viewerId),
+    }));
+  }
+
+  private broadcastNote(
+    buildMessage: (
+      viewerId: string,
+    ) => Extract<ServerMessage, { type: "note:inserted" | "note:updated" }>,
+  ): void {
+    for (const socket of this.ctx.getWebSockets()) {
+      const attachment =
+        socket.deserializeAttachment() as SocketAttachment | null;
+      if (!attachment) continue;
+      const message = buildMessage(attachment.userId);
+      if (!visibleTo({ viewerId: attachment.userId }, message.note)) continue;
+      socket.send(JSON.stringify(message));
+    }
   }
 
   // subject の可視性を受信者ごとに判定して配信する。except は送信者除外用。
@@ -373,6 +528,17 @@ export class RoomDO extends DurableObject {
         socket.deserializeAttachment() as SocketAttachment | null;
       if (!attachment) continue;
       if (!visibleTo({ viewerId: attachment.userId }, subject)) continue;
+      socket.send(payload);
+    }
+  }
+
+  private broadcastPhase(phase: Phase): void {
+    const payload = JSON.stringify({
+      type: "phase:updated",
+      phase,
+    });
+
+    for (const socket of this.ctx.getWebSockets()) {
       socket.send(payload);
     }
   }
@@ -446,7 +612,7 @@ export class RoomDO extends DurableObject {
         const representativeId = prevGroup.noteIds[0];
         const noteRow = representativeId ? this.findNote(representativeId) : null;
         const subject = noteRow
-          ? this.toProtocolNote(noteRow)
+          ? this.toProtocolNote(noteRow, "00000000-0000-0000-0000-000000000000")
           : {
               id: crypto.randomUUID(),
               authorId: "00000000-0000-0000-0000-000000000000",
@@ -455,6 +621,10 @@ export class RoomDO extends DurableObject {
               y: 0,
               createdAt: "",
               updatedAt: "",
+              dotVotes: {
+                subjective: { count: 0, votedByMe: false, ownCount: 0 },
+                objective: { count: 0, votedByMe: false, ownCount: 0 },
+              },
             };
 
         this.broadcast(
@@ -482,7 +652,7 @@ export class RoomDO extends DurableObject {
           };
           this.broadcast(
             { type: "group:updated", group },
-            this.toProtocolNote(noteRow),
+            this.toProtocolNote(noteRow, "00000000-0000-0000-0000-000000000000"),
           );
         }
       }
@@ -508,14 +678,57 @@ export class RoomDO extends DurableObject {
     return row;
   }
 
-  private listNotes(): ProtocolNote[] {
+  private listNotes(viewerId: string): ProtocolNote[] {
     return this.ctx.storage.sql
       .exec("SELECT * FROM notes ORDER BY created_at")
       .toArray()
-      .map((row) => this.toProtocolNote(row as unknown as NoteRow));
+      .map((row) => this.toProtocolNote(row as unknown as NoteRow, viewerId));
   }
 
-  private toProtocolNote(row: NoteRow): ProtocolNote {
+  private hasVote(noteId: string, userId: string, kind: DotVoteKind): boolean {
+    return this.countUserNoteVotes(noteId, userId, kind) > 0;
+  }
+
+  private countUserNoteVotes(
+    noteId: string,
+    userId: string,
+    kind: DotVoteKind,
+  ): number {
+    const rows = this.ctx.storage.sql
+      .exec(
+        `SELECT COALESCE(SUM(vote_count), 0) AS count FROM note_votes
+         WHERE note_id = ?1 AND user_id = ?2 AND kind = ?3`,
+        noteId,
+        userId,
+        kind,
+      )
+      .toArray();
+    return Number(rows[0]?.count ?? 0);
+  }
+
+  private countUserVotes(userId: string, kind: DotVoteKind): number {
+    const rows = this.ctx.storage.sql
+      .exec(
+        "SELECT COALESCE(SUM(vote_count), 0) AS count FROM note_votes WHERE user_id = ?1 AND kind = ?2",
+        userId,
+        kind,
+      )
+      .toArray();
+    return Number(rows[0]?.count ?? 0);
+  }
+
+  private countNoteVotes(noteId: string, kind: DotVoteKind): number {
+    const rows = this.ctx.storage.sql
+      .exec(
+        "SELECT COALESCE(SUM(vote_count), 0) AS count FROM note_votes WHERE note_id = ?1 AND kind = ?2",
+        noteId,
+        kind,
+      )
+      .toArray();
+    return Number(rows[0]?.count ?? 0);
+  }
+
+  private toProtocolNote(row: NoteRow, viewerId: string): ProtocolNote {
     return {
       id: row.id,
       authorId: row.author_id,
@@ -524,6 +737,48 @@ export class RoomDO extends DurableObject {
       y: row.y,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      dotVotes: {
+        subjective: {
+          count: this.countNoteVotes(row.id, "subjective"),
+          votedByMe: this.hasVote(row.id, viewerId, "subjective"),
+          ownCount: this.countUserNoteVotes(row.id, viewerId, "subjective"),
+        },
+        objective: {
+          count: this.countNoteVotes(row.id, "objective"),
+          votedByMe: this.hasVote(row.id, viewerId, "objective"),
+          ownCount: this.countUserNoteVotes(row.id, viewerId, "objective"),
+        },
+      },
     };
+  }
+
+  private getPhase(): Phase {
+    const row = this.ctx.storage.sql
+      .exec("SELECT phase FROM room_state WHERE id = 1")
+      .toArray()[0];
+
+    return (row?.phase ?? "phase1") as Phase;
+  }
+
+  private nextPhase(): Phase {
+    const current = this.getPhase();
+
+    switch (current) {
+      case "phase1":
+        return "phase2";
+
+      case "phase2":
+        return "phase3";
+
+      case "phase3":
+        return "phase3";
+    }
+  }
+
+  private savePhase(phase: Phase): void {
+    this.ctx.storage.sql.exec(
+      "UPDATE room_state SET phase = ?1 WHERE id = 1",
+      phase,
+    );
   }
 }

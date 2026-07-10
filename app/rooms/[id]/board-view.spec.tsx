@@ -9,7 +9,11 @@ function setup(overrides: Partial<Parameters<typeof BoardView>[0]> = {}) {
     notes: buildNotes(2),
     inviteCode: "AB12CD",
     inviteUrl: "https://idea-flow.example/invite/AB12CD",
+    phase: "phase1" as const,
+    isHost: false,
+    isNextPhasePending: false,
     draggingNoteId: null,
+    onNextPhase: vi.fn(),
     onAddNote: vi.fn(),
     onNoteDragStart: vi.fn(),
     onNoteDragMove: vi.fn(),
@@ -18,6 +22,8 @@ function setup(overrides: Partial<Parameters<typeof BoardView>[0]> = {}) {
     onNoteDelete: vi.fn(),
     onGroupCreate: vi.fn(),
     onGroupUpdateName: vi.fn(),
+    onNoteVote: vi.fn(),
+    onNoteVoteReset: vi.fn(),
     connectionStatus: "open" as const,
     groups: [],
     ...overrides,
@@ -77,6 +83,36 @@ describe("BoardView", () => {
     fireEvent.click(screen.getByRole("button", { name: "付箋を追加" }));
 
     expect(onAddNote).toHaveBeenCalledTimes(1);
+  });
+
+  it("残り投票可能数を表示する", () => {
+    setup({
+      notes: buildNotes(2).map((note, index) => ({
+        ...note,
+        dotVotes: {
+          subjective: {
+            count: index === 0 ? 1 : 0,
+            votedByMe: index === 0,
+            ownCount: index === 0 ? 1 : 0,
+          },
+          objective: { count: index + 1, votedByMe: true, ownCount: 1 },
+        },
+      })),
+    });
+
+    expect(screen.getByText("主観 残り0")).toBeInTheDocument();
+    expect(screen.getByText("客観 残り1")).toBeInTheDocument();
+  });
+
+  it("付箋のドット投票ボタンでonNoteVoteを呼ぶ", () => {
+    const onNoteVote = vi.fn();
+    setup({ onNoteVote });
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "主観ドットを投票" })[0],
+    );
+
+    expect(onNoteVote).toHaveBeenCalledWith("note-1", "subjective");
   });
 
   describe("接続状態の表示", () => {
@@ -253,6 +289,33 @@ describe("BoardView", () => {
       fireEvent.keyDown(input, { key: "Enter" });
 
       expect(onGroupUpdateName).toHaveBeenCalledWith("g1", "新しい名前");
+    });
+  });
+
+  describe("フェーズ移行", () => {
+    it("ホストの場合のみ「次のフェーズへ」ボタンを表示する", () => {
+      setup({ isHost: true });
+
+      expect(
+        screen.getByRole("button", { name: "次のフェーズへ" }),
+      ).toBeInTheDocument();
+    });
+
+    it("フェーズ移行前に確認ダイアログを表示し、確認後にonNextPhaseを呼ぶ", () => {
+      const onNextPhase = vi.fn();
+      setup({ isHost: true, onNextPhase });
+
+      fireEvent.click(screen.getByRole("button", { name: "次のフェーズへ" }));
+
+      expect(
+        screen.getByText("次のフェーズへ移行しますか？"),
+      ).toBeInTheDocument();
+
+      expect(onNextPhase).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole("button", { name: "移行する" }));
+
+      expect(onNextPhase).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -15,6 +15,20 @@ import { BOARD_HEIGHT, BOARD_WIDTH } from "./board";
 
 export const NOTE_CONTENT_MAX_LENGTH = 2000;
 
+export const DOT_VOTE_LIMITS = {
+  subjective: 1,
+  objective: 3,
+} as const;
+
+export const DotVoteKindSchema = z.enum(["subjective", "objective"]);
+export type DotVoteKind = z.infer<typeof DotVoteKindSchema>;
+
+const DotVoteSummarySchema = z.object({
+  count: z.number().int().min(0),
+  votedByMe: z.boolean(),
+  ownCount: z.number().int().min(0),
+});
+
 export const NoteSchema = z.object({
   id: z.string().uuid(),
   authorId: z.string().uuid(),
@@ -23,6 +37,10 @@ export const NoteSchema = z.object({
   y: z.number(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  dotVotes: z.object({
+    subjective: DotVoteSummarySchema,
+    objective: DotVoteSummarySchema,
+  }),
 });
 
 export type ProtocolNote = z.infer<typeof NoteSchema>;
@@ -36,6 +54,10 @@ export const GroupSchema = z.object({
 });
 
 export type ProtocolGroup = z.infer<typeof GroupSchema>;
+
+export const PhaseSchema = z.enum(["phase1", "phase2", "phase3"]);
+
+export type Phase = z.infer<typeof PhaseSchema>;
 
 const NotePositionSchema = {
   x: z.number().finite().min(0).max(BOARD_WIDTH),
@@ -80,6 +102,19 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
     groupId: z.string().uuid(),
     name: z.string().max(50, "グループ名は50文字以内で入力してください。"),
   }),
+  z.object({
+    type: z.literal("note:vote"),
+    noteId: z.string().uuid(),
+    kind: DotVoteKindSchema,
+  }),
+  z.object({
+    type: z.literal("note:vote-reset"),
+    noteId: z.string().uuid(),
+    kind: DotVoteKindSchema,
+  }),
+  z.object({
+    type: z.literal("phase:next"),
+  }),
 ]);
 
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;
@@ -94,6 +129,8 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
     type: z.literal("snapshot"),
     notes: z.array(NoteSchema),
     groups: z.array(GroupSchema).optional(),
+    phase: PhaseSchema,
+    isHost: z.boolean(),
   }),
   z.object({ type: z.literal("note:inserted"), note: NoteSchema }),
   z.object({ type: z.literal("note:updated"), note: NoteSchema }),
@@ -111,6 +148,10 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("group:deleted"),
     groupId: z.string().uuid(),
+  }),
+  z.object({
+    type: z.literal("phase:updated"),
+    phase: PhaseSchema,
   }),
   z.object({
     type: z.literal("error"),

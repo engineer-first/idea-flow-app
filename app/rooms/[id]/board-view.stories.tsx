@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { fn } from "storybook/test";
+import { fn, userEvent, within } from "storybook/test";
 import { BoardView } from "@/app/rooms/[id]/board-view";
 import { buildNotes } from "@/app/rooms/[id]/board-view.fixture";
 
@@ -13,8 +13,11 @@ const meta = {
     notes: buildNotes(3),
     inviteCode: "AB12CD",
     inviteUrl: "https://idea-flow.example/invite/AB12CD",
+    phase: "phase1",
+    isHost: false,
     connectionStatus: "open",
     draggingNoteId: null,
+    isNextPhasePending: false,
     onAddNote: fn(),
     onNoteDragStart: fn(),
     onNoteDragMove: fn(),
@@ -24,6 +27,9 @@ const meta = {
     onGroupCreate: fn(),
     onGroupUpdateName: fn(),
     groups: [],
+    onNoteVote: fn(),
+    onNoteVoteReset: fn(),
+    onNextPhase: fn(),
   },
   decorators: [
     (Story) => (
@@ -61,6 +67,26 @@ export const ManyNotes: Story = {
   },
 };
 
+export const DotVoting: Story = {
+  args: {
+    notes: buildNotes(3).map((note, index) => ({
+      ...note,
+      dotVotes: {
+        subjective: {
+          count: index === 0 ? 1 : 0,
+          votedByMe: index === 0,
+          ownCount: index === 0 ? 1 : 0,
+        },
+        objective: {
+          count: index + 1,
+          votedByMe: index < 2,
+          ownCount: index < 2 ? 1 : 0,
+        },
+      },
+    })),
+  },
+};
+
 // loading相当: WebSocket 接続の確立中（初回接続時。snapshot 未着なので付箋も空）。
 export const Connecting: Story = {
   args: {
@@ -73,5 +99,30 @@ export const Connecting: Story = {
 export const Reconnecting: Story = {
   args: {
     connectionStatus: "closed",
+  },
+};
+
+// ホストがフェーズ移行操作を行える状態。
+export const HostCanMovePhase: Story = {
+  args: {
+    isHost: true,
+    phase: "phase1",
+  },
+};
+
+// 「次のフェーズへ」押下後、確認ダイアログが表示されている状態。
+export const NextPhaseConfirmDialog: Story = {
+  args: {
+    isHost: true,
+    phase: "phase1",
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(
+      await canvas.findByRole("button", {
+        name: "次のフェーズへ",
+      }),
+    );
   },
 };
