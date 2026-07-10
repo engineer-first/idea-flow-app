@@ -1,8 +1,12 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { BoardView } from "@/app/rooms/[id]/board-view";
 import { buildNotes } from "@/app/rooms/[id]/board-view.fixture";
 import { buildNote } from "@/app/rooms/[id]/note-card.fixture";
+import { buildMembers } from "@/app/rooms/[id]/room-members.fixture";
+
+const ME = "11111111-1111-4111-8111-111111111111";
 
 function setup(overrides: Partial<Parameters<typeof BoardView>[0]> = {}) {
   const props = {
@@ -13,6 +17,9 @@ function setup(overrides: Partial<Parameters<typeof BoardView>[0]> = {}) {
     isHost: false,
     isNextPhasePending: false,
     draggingNoteId: null,
+    members: buildMembers(2, ME),
+    currentUserId: ME,
+    hostUserId: ME,
     onNextPhase: vi.fn(),
     onAddNote: vi.fn(),
     onNoteDragStart: vi.fn(),
@@ -22,6 +29,8 @@ function setup(overrides: Partial<Parameters<typeof BoardView>[0]> = {}) {
     onNoteDelete: vi.fn(),
     onGroupCreate: vi.fn(),
     onGroupUpdateName: vi.fn(),
+    onLeave: vi.fn(),
+    isLeaving: false,
     onNoteVote: vi.fn(),
     onNoteVoteReset: vi.fn(),
     connectionStatus: "open" as const,
@@ -47,21 +56,21 @@ function clickNote(card: HTMLElement) {
 }
 
 describe("BoardView", () => {
-  it("招待コードを表示する", () => {
-    setup({ inviteCode: "ZZ99XX" });
+  it("host のとき招待URLと招待コードのラベルと値を表示する", () => {
+    setup({
+      isHost: true,
+      inviteCode: "ZZ99XX",
+      inviteUrl: "https://idea-flow.example/invite/ZZ99XX",
+    });
 
-    expect(screen.getByText("ZZ99XX")).toBeInTheDocument();
-  });
-
-  it("招待URLとコピーボタンを表示する", () => {
-    setup({ inviteUrl: "https://idea-flow.example/invite/ZZ99XX" });
-
-    expect(
-      screen.getByText("https://idea-flow.example/invite/ZZ99XX"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("招待URL")).toBeInTheDocument();
+    expect(screen.getByText("招待コード")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "招待URLをコピー" }),
-    ).toBeInTheDocument();
+    ).toHaveTextContent("https://idea-flow.example/invite/ZZ99XX");
+    expect(
+      screen.getByRole("button", { name: "招待コードをコピー" }),
+    ).toHaveTextContent("ZZ99XX");
   });
 
   it("付箋を配置する", () => {
@@ -317,5 +326,106 @@ describe("BoardView", () => {
 
       expect(onNextPhase).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+describe("退出・解散ボタン", () => {
+  it("ホストは「ルームを解散」ボタンが描画される", () => {
+    setup({ isHost: true });
+    expect(
+      screen.getByRole("button", { name: "ルームを解散" }),
+    ).toBeInTheDocument();
+  });
+
+  it("非ホストは「退出する」ボタンが描画される", () => {
+    setup({ isHost: false });
+    expect(
+      screen.getByRole("button", { name: "退出する" }),
+    ).toBeInTheDocument();
+  });
+
+  it("ホストの「ルームを解散」で確認 Dialog が開き、確定で onLeave が呼ばれる", async () => {
+    const onLeave = vi.fn();
+    const user = userEvent.setup();
+    setup({ onLeave, isHost: true });
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "ルームを解散" }));
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(screen.getByText("ルームを解散しますか？")).toBeInTheDocument();
+    await user.click(screen.getByTestId("leave-confirm-action"));
+    expect(onLeave).toHaveBeenCalledTimes(1);
+  });
+
+  it("「キャンセル」で Dialog が閉じて onLeave は呼ばれない", async () => {
+    const onLeave = vi.fn();
+    const user = userEvent.setup();
+    setup({ onLeave, isHost: true });
+    await user.click(screen.getByRole("button", { name: "ルームを解散" }));
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "キャンセル" }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(onLeave).not.toHaveBeenCalled();
+  });
+
+  it("isLeaving=true のときホストボタンは disabled で文言が「解散中…」になる", () => {
+    setup({ isLeaving: true, isHost: true });
+    const button = screen.getByRole("button", { name: /解散/ });
+    expect(button).toBeDisabled();
+    expect(button).toHaveTextContent("解散中…");
+  });
+});
+
+describe("招待URL/コード（host 限定表示）", () => {
+  it("非 host のとき招待URL/コードが出ない", () => {
+    setup({
+      isHost: false,
+      inviteCode: "ZZ99XX",
+      inviteUrl: "https://example/invite/ZZ99XX",
+    });
+    expect(screen.queryByText("ZZ99XX")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "招待URLをコピー" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "招待コードをコピー" }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("メンバー一覧（名前常時表示）", () => {
+  it("メンバー名が Avatar の隣に常時表示される（ホバー不要）", () => {
+    setup();
+    // 自分
+    expect(screen.getByText("Yuki Tanaka")).toBeInTheDocument();
+    // 自分以外（fixture の NAMES[0] と NAMES[1]）
+    expect(screen.getByText("Taro Yamada")).toBeInTheDocument();
+  });
+
+  it("自分メンバーは data-self と ring で識別し、（あなた）文言は出さない", () => {
+    setup();
+    const meRow = screen.getByTestId(`member-row-${ME}`);
+    expect(meRow).toHaveAttribute("data-self", "true");
+    expect(meRow.textContent).toContain("Yuki Tanaka");
+    expect(meRow.textContent).not.toContain("（あなた）");
+  });
+
+  it("ホストの名前下に「ホスト」ラベルが出る", () => {
+    setup({ hostUserId: ME });
+    expect(screen.getByTestId(`member-host-label-${ME}`)).toHaveTextContent(
+      "ホスト",
+    );
+  });
+
+  it("ボード画面は最大 12 人（4×3）まで表示し、超過は +N になる", () => {
+    // 13 人 → 表示 11 + +2
+    setup({ members: buildMembers(13) });
+    expect(screen.getAllByTestId("avatar")).toHaveLength(11);
+    expect(screen.getByLabelText("他 2 名")).toBeInTheDocument();
+  });
+
+  it("12 人以下なら全員表示され +N は出ない", () => {
+    setup({ members: buildMembers(5) });
+    expect(screen.getAllByTestId("avatar")).toHaveLength(5);
+    expect(screen.queryByLabelText(/他 \d+ 名/)).not.toBeInTheDocument();
   });
 });

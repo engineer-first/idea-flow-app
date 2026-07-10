@@ -19,6 +19,9 @@ const meta = {
     onDragEnd: fn(),
     onContentChange: fn(),
     onDelete: fn(),
+    voteRemaining: { subjective: 1, objective: 3 },
+    onVote: fn(),
+    onVoteReset: fn(),
   },
   decorators: [
     (Story) => (
@@ -61,5 +64,17 @@ export const Dragging: Story = {
   args: {
     isSelected: true,
     isOwnDrag: true,
+  },
+};
+
+export const Voted: Story = {
+  args: {
+    note: buildNote({
+      dotVotes: {
+        subjective: { count: 1, votedByMe: true, ownCount: 1 },
+        objective: { count: 3, votedByMe: false, ownCount: 0 },
+      },
+    }),
+    voteRemaining: { subjective: 0, objective: 1 },
   },
 };

@@ -46,7 +46,10 @@ describe("migrateRoomStorage", () => {
       expect(tableNames(state.storage)).toEqual([
         "groups",
         "members",
+        "note_votes",
         "notes",
+        "room_owner",
+        "room_state",
         "schema_version",
       ]);
       expect(schemaVersion(state.storage)).toBe(ROOM_DO_MIGRATIONS.length);
@@ -97,6 +100,7 @@ describe("migrateRoomStorage", () => {
       expect(members).toEqual([{ user_id: USER_A }]);
       // 旧 meta テーブル（招待コードの複製）は掃除される。
       expect(tableNames(state.storage)).not.toContain("meta");
+      expect(tableNames(state.storage)).toContain("note_votes");
     });
   });
 
@@ -156,9 +160,46 @@ describe("RoomDO constructor の配線", () => {
       expect(tableNames(state.storage)).toEqual([
         "groups",
         "members",
+        "note_votes",
         "notes",
+        "room_owner",
+        "room_state",
         "schema_version",
       ]);
+    });
+  });
+
+  it("v1 → 最新: members.name と room_state / room_owner が追加され、既存行は保持される", async () => {
+    await runInRoomDO("mig-v2-alter", (_instance, state) => {
+      dropAllTables(state.storage);
+      const v1 = ROOM_DO_MIGRATIONS[0];
+      migrateRoomStorage(state.storage, [v1]);
+
+      // v1 時点でメンバーを追加（name カラムがまだ無い）
+      state.storage.sql.exec(
+        "INSERT INTO members (user_id) VALUES (?1)",
+        USER_A,
+      );
+      expect(
+        state.storage.sql.exec("SELECT user_id FROM members").toArray(),
+      ).toEqual([{ user_id: USER_A }]);
+
+      migrateRoomStorage(state.storage);
+
+      // v4 適用後もメンバー行が残り、name は空文字
+      const rows = state.storage.sql
+        .exec("SELECT user_id, name FROM members")
+        .toArray();
+      expect(rows).toEqual([{ user_id: USER_A, name: "" }]);
+
+      // room_state 既定は phase1（新規ルームは initializeNewRoom で lobby へ）
+      const stateRows = state.storage.sql
+        .exec("SELECT phase FROM room_state")
+        .toArray();
+      expect(stateRows).toEqual([{ phase: "phase1" }]);
+
+      expect(tableNames(state.storage)).toContain("room_owner");
+      expect(tableNames(state.storage)).toContain("note_votes");
     });
   });
 });

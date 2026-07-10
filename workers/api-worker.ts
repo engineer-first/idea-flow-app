@@ -14,6 +14,7 @@ import {
 } from "../contracts/session";
 import { verifyToken } from "../lib/session/token";
 import {
+  deleteRoom,
   ensureUser,
   findRoomByCode,
   findRoomById,
@@ -22,7 +23,7 @@ import {
 } from "./lib/db";
 import { getSessionFromRequest } from "./lib/session";
 import { requireSessionSecret } from "./lib/session-secret";
-import { RoomDO, USER_ID_HEADER } from "./room-do";
+import { HOST_ID_HEADER, RoomDO, USER_ID_HEADER } from "./room-do";
 
 export { RoomDO };
 
@@ -84,7 +85,8 @@ async function handleCreateRoom(
     name: session.name,
   });
   const room = await insertRoom(env.DB, session.sub);
-  await roomStub(env, room.roomId).join(session.sub);
+  // 作成者をホスト登録し、フェーズを lobby（開始前）に初期化する。
+  await roomStub(env, room.roomId).initializeNewRoom(session.sub, session.name);
   return json({ roomId: room.roomId, inviteCode: room.inviteCode });
 }
 
@@ -109,12 +111,15 @@ async function handleJoinRoom(
     return error(404, "ルームが見つかりませんでした。");
   }
 
-  await roomStub(env, room.roomId).join(session.sub);
+  const stub = roomStub(env, room.roomId);
+  await stub.upsertMember(session.sub, session.name);
   return json({ roomId: room.roomId });
 }
 
 // GET /api/rooms/:id — メンバーだけがルーム情報を取得できる。
 // 非メンバーには存在しないルームと同じ 404 を返し、存在を推測させない。
+// isHost / hostUserId / phase はこのエンドポイントでのみ返す。
+// メンバー限定（非メンバーは 404）。hostUserId はメンバー一覧でホスト表示に使う。
 async function handleGetRoom(
   env: Env,
   session: SessionPayload,
@@ -125,16 +130,114 @@ async function handleGetRoom(
     return error(404, "ルームが見つかりませんでした。");
   }
 
-  const member = await roomStub(env, roomId).isMember(session.sub);
+  const stub = roomStub(env, roomId);
+  const member = await stub.isMember(session.sub);
   if (!member) {
     return error(404, "ルームが見つかりませんでした。");
   }
 
-  return json({ roomId: room.roomId, inviteCode: room.inviteCode });
+  const phase = await stub.getPhase();
+  return json({
+    roomId: room.roomId,
+    inviteCode: room.inviteCode,
+    isHost: room.hostId === session.sub,
+    hostUserId: room.hostId,
+    phase,
+  });
+}
+
+// GET /api/rooms/:id/members — メンバーだけが参加メンバー一覧を取得できる。
+// 初期表示（SSR）のために name 付きで返す。Realtime 反映は WS の
+// member_joined / snapshot.members で行う。
+async function handleListMembers(
+  env: Env,
+  session: SessionPayload,
+  roomId: string,
+): Promise<Response> {
+  const room = await findRoomById(env.DB, roomId);
+  if (!room) {
+    return error(404, "ルームが見つかりませんでした。");
+  }
+
+  const stub = roomStub(env, roomId);
+  const member = await stub.isMember(session.sub);
+  if (!member) {
+    return error(404, "ルームが見つかりませんでした。");
+  }
+
+  const members = await stub.listMembers();
+  return json({ members });
+}
+
+// POST /api/rooms/:id/leave — 退出 / 解散。
+// - 非ホスト: 自分の WS close + members から外れ、他メンバーに member_left。
+// - ホスト: ルームを解散する（全 WS close + RoomDO クリア + D1 rooms 削除）。
+// 認可:
+//   - 未ログインは 401
+//   - ルームが存在しない、または自分がメンバーでない場合は 404
+//     （存在秘匿。クライアントは 204/404 を成功相当としてよい）
+async function handleLeaveRoom(
+  env: Env,
+  session: SessionPayload,
+  roomId: string,
+): Promise<Response> {
+  const room = await findRoomById(env.DB, roomId);
+  if (!room) {
+    return error(404, "ルームが見つかりませんでした。");
+  }
+
+  const stub = roomStub(env, roomId);
+  const member = await stub.isMember(session.sub);
+  if (!member) {
+    return error(404, "ルームが見つかりませんでした。");
+  }
+
+  // ホストの「退出」はルーム解散。残メンバーを開始不能にしない。
+  // D1 のディレクトリ抹消を先に行い fail-closed にする。
+  // disband 成功後に deleteRoom が失敗すると「招待コードで解決できるが
+  // 中身は空」のゾンビルームが残り、ホストは既にメンバー外で再試行 404 になる。
+  if (room.hostId === session.sub) {
+    await deleteRoom(env.DB, roomId);
+    await stub.disband();
+    return new Response(null, { status: 204 });
+  }
+
+  await stub.leave(session.sub);
+  return new Response(null, { status: 204 });
+}
+
+// GET /api/rooms/lookup?code=XXX — 招待コードからルーム解決して hostname を返す。
+// 招待URL ページ (/invite/[code]) で、入室確認 Dialog の文言に
+// 「hostname さんが作成したルームに参加しますか？」を出すために使う。
+// 未ログインは 401（招待URL ページ側でリダイレクト済みなので到達しない）。
+async function handleLookupRoom(
+  request: Request,
+  env: Env,
+  _session: SessionPayload,
+): Promise<Response> {
+  const url = new URL(request.url);
+  const code = normalizeInviteCode(url.searchParams.get("code") ?? "");
+  if (!isValidInviteCode(code)) {
+    return error(400, "招待コードは英数字6桁で入力してください。");
+  }
+  const room = await findRoomByCode(env.DB, code);
+  if (!room) {
+    return error(404, "ルームが見つかりませんでした。");
+  }
+  // hostname を users.name から引く
+  const host = await env.DB.prepare("SELECT name FROM users WHERE id = ?1")
+    .bind(room.hostId)
+    .first<{ name: string | null }>();
+  return json({
+    roomId: room.roomId,
+    inviteCode: room.inviteCode,
+    hostName: host?.name ?? "ホスト",
+  });
 }
 
 // GET /api/rooms/:id/ws — メンバーのみ WebSocket 接続できる。
-// 認可はここで完結させ、DO へは検証済みユーザーIDをヘッダーで引き継ぐ。
+// 認可はここで完結させ、DO へは検証済みユーザーIDと hostId をヘッダーで
+// 引き継ぐ。hostId は start_phase の認可で RoomDO が再判定に使う。
 async function handleRoomWebSocket(
   request: Request,
   env: Env,
@@ -158,6 +261,7 @@ async function handleRoomWebSocket(
 
   const headers = new Headers(request.headers);
   headers.set(USER_ID_HEADER, session.sub);
+  headers.set(HOST_ID_HEADER, room.hostId);
   return stub.fetch(request.url, { headers });
 }
 
@@ -189,6 +293,12 @@ export default {
       return handleCreateRoom(env, session);
     }
 
+    // /api/rooms/lookup — 招待コードからルーム解決（hostname を返す）
+    const lookupMatch = pathname.match(/^\/api\/rooms\/lookup$/);
+    if (method === "GET" && lookupMatch) {
+      return handleLookupRoom(request, env, session);
+    }
+
     if (method === "POST" && pathname === "/api/rooms/join") {
       return handleJoinRoom(request, env, session);
     }
@@ -199,6 +309,25 @@ export default {
         return error(404, "ルームが見つかりませんでした。");
       }
       return handleRoomWebSocket(request, env, session, wsMatch[1]);
+    }
+
+    // /members は /ws より先に評価する必要はない（path が違う）が、
+    // /rooms/:id 直下の GET と区別するためパスを明示する。
+    const membersMatch = pathname.match(/^\/api\/rooms\/([^/]+)\/members$/);
+    if (method === "GET" && membersMatch?.[1]) {
+      if (!isUuid(membersMatch[1])) {
+        return error(404, "ルームが見つかりませんでした。");
+      }
+      return handleListMembers(env, session, membersMatch[1]);
+    }
+
+    // /leave は /ws /members と同じく「/rooms/:id/...」のサフィックス。
+    const leaveMatch = pathname.match(/^\/api\/rooms\/([^/]+)\/leave$/);
+    if (method === "POST" && leaveMatch?.[1]) {
+      if (!isUuid(leaveMatch[1])) {
+        return error(404, "ルームが見つかりませんでした。");
+      }
+      return handleLeaveRoom(env, session, leaveMatch[1]);
     }
 
     const roomMatch = pathname.match(/^\/api\/rooms\/([^/]+)$/);

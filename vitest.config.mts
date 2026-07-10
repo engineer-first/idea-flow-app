@@ -13,7 +13,9 @@ export default defineConfig({
       "app/**/*.{test,spec}.{ts,tsx}",
       "lib/**/*.{test,spec}.{ts,tsx}",
       "contracts/**/*.{test,spec}.{ts,tsx}",
+      "components/**/*.{test,spec}.{ts,tsx}",
       ".claude/hooks/**/*.spec.ts",
+      ".github/scripts/**/*.spec.ts",
     ],
     coverage: {
       provider: "v8",

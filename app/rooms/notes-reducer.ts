@@ -5,6 +5,9 @@
 // からの位置更新を無視し、ローカルの操作を優先する。そうしないと、ドラッグ中に
 // 古い位置を運ぶ note:updated/note:drag イベントを受信した瞬間に付箋が
 // 巻き戻って見えてしまう。
+//
+// メンバー参加・進行状態などノート以外のメッセージは、members / phase を
+// 別リデューサで扱うため、ここでは notes をそのまま返す（既定挙動）。
 import {
   DOT_VOTE_LIMITS,
   type DotVoteKind,
@@ -72,15 +75,15 @@ export function applyServerMessage(
       );
     }
 
-    case "error": {
-      // 通知・ログはコンテナ（room-board.tsx）の責務。ここでは状態を変えない。
-      return notes;
-    }
-
+    case "member_joined":
+    case "member_left":
+    case "phase:updated":
     case "group:updated":
     case "group:deleted":
-    case "phase:updated": {
+    case "error": {
+      // ノート以外の状態は別リデューサが担当する（app/rooms/room-reducer.ts）。
       // グループ・フェーズの同期は RoomBoard 側で管理するため、ここでは付箋状態を変えない。
+      // 通知・ログはコンテナ（room-board.tsx）の責務。ここでは notes に触れない。
       return notes;
     }
 

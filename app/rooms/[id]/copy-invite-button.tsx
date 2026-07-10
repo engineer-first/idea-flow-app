@@ -1,17 +1,24 @@
 "use client";
 
-import { Check, Copy } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export type CopyInviteButtonProps = {
-  url: string;
+  // 表示・クリップボードへ書き込む文字列（招待URL / 招待コード）。
+  value: string;
+  // aria-label 用の対象名。既定は「招待URL」。
+  itemLabel?: string;
+  className?: string;
 };
 
-// 招待URLをワンクリックでクリップボードへコピーする。
+// 招待URL・招待コード自体を表示し、クリックでクリップボードへコピーする。
 // 成功したときだけ一時的に「コピーしました」に切り替える
 // （失敗時に成功表示を出すと、貼り付けたら空だった、という事故になる）。
-export function CopyInviteButton({ url }: CopyInviteButtonProps) {
+export function CopyInviteButton({
+  value,
+  itemLabel = "招待URL",
+  className,
+}: CopyInviteButtonProps) {
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -25,36 +32,29 @@ export function CopyInviteButton({ url }: CopyInviteButtonProps) {
 
   const handleCopy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(value);
       setCopied(true);
       if (timerRef.current !== null) {
         clearTimeout(timerRef.current);
       }
       timerRef.current = setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      console.error("招待URLのコピーに失敗しました:", error);
+      console.error(`${itemLabel}のコピーに失敗しました:`, error);
     }
-  }, [url]);
+  }, [value, itemLabel]);
 
   return (
-    <Button
+    <button
       type="button"
-      variant="outline"
-      size="sm"
       onClick={handleCopy}
-      aria-label={copied ? "コピーしました" : "招待URLをコピー"}
-    >
-      {copied ? (
-        <>
-          <Check className="h-4 w-4" aria-hidden="true" />
-          コピーしました
-        </>
-      ) : (
-        <>
-          <Copy className="h-4 w-4" aria-hidden="true" />
-          コピー
-        </>
+      aria-label={copied ? "コピーしました" : `${itemLabel}をコピー`}
+      title={copied ? "コピーしました" : `クリックで${itemLabel}をコピー`}
+      className={cn(
+        "max-w-full cursor-pointer truncate text-center font-mono text-sm font-semibold tracking-wider text-foreground underline-offset-2 hover:underline",
+        className,
       )}
-    </Button>
+    >
+      {copied ? "コピーしました" : value}
+    </button>
   );
 }

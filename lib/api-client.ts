@@ -5,6 +5,8 @@
 // 呼び出したユーザー本人として認可される。
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { cookies } from "next/headers";
+import type { z } from "zod";
+import { RoomLookupResponseSchema } from "@/contracts/api";
 import { SESSION_COOKIE_NAME } from "@/contracts/session";
 
 type FetcherLike = {
@@ -58,4 +60,40 @@ export async function apiFetch(
   throw new Error(
     "API_WORKER_URL が未設定です。ローカル開発では `npm run dev:api` を起動し、.env.local に API_WORKER_URL=http://localhost:8787 を設定してください。",
   );
+}
+
+export type RoomLookupResult = z.infer<typeof RoomLookupResponseSchema>;
+
+// 招待コードからルームを解決する。
+// - found: 404/400 以外の成功レスポンスでボディがスキーマに合う
+// - not_found: 404 / 400（存在しない・形式不正）
+// - unavailable: 5xx・ネットワーク障害・不正ボディ（不存在と誤案内しない）
+export type RoomLookupOutcome =
+  | { kind: "found"; room: RoomLookupResult }
+  | { kind: "not_found" }
+  | { kind: "unavailable" };
+
+export async function lookupRoomByInviteCode(
+  code: string,
+): Promise<RoomLookupOutcome> {
+  try {
+    const res = await apiFetch(
+      `/api/rooms/lookup?code=${encodeURIComponent(code)}`,
+    );
+    if (res.status === 404 || res.status === 400) {
+      return { kind: "not_found" };
+    }
+    if (!res.ok) {
+      return { kind: "unavailable" };
+    }
+    const parsed = RoomLookupResponseSchema.safeParse(
+      await res.json().catch(() => null),
+    );
+    if (!parsed.success) {
+      return { kind: "unavailable" };
+    }
+    return { kind: "found", room: parsed.data };
+  } catch {
+    return { kind: "unavailable" };
+  }
 }

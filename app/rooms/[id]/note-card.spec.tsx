@@ -15,6 +15,9 @@ function setup(overrides: Partial<Parameters<typeof NoteCard>[0]> = {}) {
     onDragEnd: vi.fn(),
     onContentChange: vi.fn(),
     onDelete: vi.fn(),
+    voteRemaining: { subjective: 1, objective: 3 },
+    onVote: vi.fn(),
+    onVoteReset: vi.fn(),
     ...overrides,
   };
 
@@ -57,7 +60,96 @@ describe("NoteCard", () => {
     );
   });
 
+  describe("ドット投票", () => {
+    it("主観・客観ドットの集計を表示する", () => {
+      setup({
+        note: buildNote({
+          dotVotes: {
+            subjective: { count: 1, votedByMe: false, ownCount: 0 },
+            objective: { count: 2, votedByMe: true, ownCount: 2 },
+          },
+        }),
+      });
+
+      expect(
+        screen.getByRole("button", { name: "主観ドットを投票" }),
+      ).toHaveTextContent("主観1");
+      expect(
+        screen.getByRole("button", { name: "客観ドットを追加" }),
+      ).toHaveTextContent("客観2");
+      expect(
+        screen.getByRole("button", { name: "客観ドットを0に戻す" }),
+      ).toBeInTheDocument();
+    });
+
+    it("ドット投票ボタンでonVoteを呼ぶ", () => {
+      const onVote = vi.fn();
+      setup({ onVote });
+
+      fireEvent.click(screen.getByRole("button", { name: "主観ドットを投票" }));
+
+      expect(onVote).toHaveBeenCalledWith("note-1", "subjective");
+    });
+
+    it("残数が0の未投票ドットは投票できない", () => {
+      const onVote = vi.fn();
+      setup({
+        voteRemaining: { subjective: 0, objective: 3 },
+        onVote,
+      });
+
+      const button = screen.getByRole("button", { name: "主観ドットを投票" });
+      expect(button).toBeDisabled();
+
+      fireEvent.click(button);
+      expect(onVote).not.toHaveBeenCalled();
+    });
+
+    it("客観ドットは投票済みでも残数があれば同じ付箋に加算できる", () => {
+      const onVote = vi.fn();
+      setup({
+        note: buildNote({
+          dotVotes: {
+            subjective: { count: 0, votedByMe: false, ownCount: 0 },
+            objective: { count: 1, votedByMe: true, ownCount: 1 },
+          },
+        }),
+        voteRemaining: { subjective: 1, objective: 2 },
+        onVote,
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "客観ドットを追加" }));
+
+      expect(onVote).toHaveBeenCalledWith("note-1", "objective");
+    });
+
+    it("客観ドットのリセットボタンでonVoteResetを呼ぶ", () => {
+      const onVoteReset = vi.fn();
+      setup({
+        note: buildNote({
+          dotVotes: {
+            subjective: { count: 0, votedByMe: false, ownCount: 0 },
+            objective: { count: 2, votedByMe: true, ownCount: 2 },
+          },
+        }),
+        onVoteReset,
+      });
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "客観ドットを0に戻す" }),
+      );
+
+      expect(onVoteReset).toHaveBeenCalledWith("note-1", "objective");
+    });
+  });
+
   describe("選択", () => {
+    it("付箋ごとに重なり順を閉じ込めるstacking contextを作る", () => {
+      setup();
+
+      expect(getCard()).toHaveClass("isolate");
+    });
+
     it("未選択の付箋はpointerdownでonSelectを呼ぶ", () => {
       const onSelect = vi.fn();
       setup({ onSelect });

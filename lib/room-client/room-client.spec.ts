@@ -6,7 +6,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRoomClient } from "@/lib/room-client/room-client";
 
-type Listener = (event: { data?: unknown; code?: number }) => void;
+type Listener = (event: {
+  data?: unknown;
+  code?: number;
+  reason?: string;
+}) => void;
 
 class FakeWebSocket {
   static instances: FakeWebSocket[] = [];
@@ -49,7 +53,20 @@ class FakeWebSocket {
     this.emit("close", { code: 1006 });
   }
 
-  private emit(type: string, event: { data?: unknown; code?: number }): void {
+  simulateLeftRoomClose(): void {
+    this.readyState = 3;
+    this.emit("close", { code: 4000, reason: "left the room" });
+  }
+
+  simulateDisbandedClose(): void {
+    this.readyState = 3;
+    this.emit("close", { code: 4001, reason: "room disbanded" });
+  }
+
+  private emit(
+    type: string,
+    event: { data?: unknown; code?: number; reason?: string },
+  ): void {
     for (const listener of this.listeners.get(type) ?? []) {
       listener(event);
     }
@@ -166,6 +183,42 @@ describe("createRoomClient", () => {
     vi.advanceTimersByTime(1000);
 
     expect(FakeWebSocket.instances).toHaveLength(2);
+    client.close();
+  });
+
+  it("個人退出の close（code 4000）では再接続せず ended を通知する", () => {
+    const statuses: string[] = [];
+    const client = createRoomClient({
+      url: "ws://test",
+      onMessage: () => {},
+      onStatusChange: (s) => statuses.push(s),
+      webSocketFactory: factory,
+    });
+    latestSocket().simulateOpen();
+    latestSocket().simulateLeftRoomClose();
+    vi.advanceTimersByTime(10_000);
+
+    expect(FakeWebSocket.instances).toHaveLength(1);
+    expect(statuses).toContain("ended");
+    expect(statuses).not.toContain("closed");
+    client.close();
+  });
+
+  it("解散の close（code 4001）では再接続せず disbanded を通知する", () => {
+    const statuses: string[] = [];
+    const client = createRoomClient({
+      url: "ws://test",
+      onMessage: () => {},
+      onStatusChange: (s) => statuses.push(s),
+      webSocketFactory: factory,
+    });
+    latestSocket().simulateOpen();
+    latestSocket().simulateDisbandedClose();
+    vi.advanceTimersByTime(10_000);
+
+    expect(FakeWebSocket.instances).toHaveLength(1);
+    expect(statuses).toContain("disbanded");
+    expect(statuses).not.toContain("closed");
     client.close();
   });
 
