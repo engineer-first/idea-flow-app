@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { buildNote } from "@/app/rooms/[id]/note-card.fixture";
 import {
   calculateRenderGroups,
-  reorganizeGroups,
   type PersistentGroup,
+  reorganizeGroups,
 } from "./grouping";
-import { buildNote } from "@/app/rooms/[id]/note-card.fixture";
 
 describe("calculateRenderGroups - 仮グループ（新規）", () => {
   it("付箋が空の場合は、グループも空であること", () => {

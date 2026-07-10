@@ -1,13 +1,12 @@
 "use client";
 
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { DotVoteSummary } from "@/app/components/dotvote/organisms/dot-vote-summary";
 import { CopyInviteButton } from "@/app/rooms/[id]/copy-invite-button";
 import { NoteCard } from "@/app/rooms/[id]/note-card";
+import { NoteGroupCard } from "@/app/rooms/[id]/note-group-card";
 import { RoomMembers } from "@/app/rooms/[id]/room-members";
 import { LeaveConfirmDialog } from "@/app/rooms/leave-confirm-dialog";
-import { calculateRenderGroups, type PersistentGroup } from "@/contracts/grouping";
-import { NoteGroupCard } from "@/app/rooms/[id]/note-group-card";
 import type { Note } from "@/app/rooms/notes-reducer";
 import type { Member } from "@/app/rooms/room-reducer";
 import {
@@ -27,6 +26,10 @@ import { Button } from "@/components/ui/button";
 // WebSocket接続・スロットル・プロトコル送信はroom-board.tsx（コンテナ）の責務。
 // 「どの付箋を選択中か」は同期不要な純粋にUIの関心事なので、ここでローカルに持つ。
 import { BOARD_HEIGHT, BOARD_WIDTH } from "@/contracts/board";
+import {
+  calculateRenderGroups,
+  type PersistentGroup,
+} from "@/contracts/grouping";
 import {
   DOT_VOTE_LIMITS,
   type DotVoteKind,

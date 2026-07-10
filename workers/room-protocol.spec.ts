@@ -740,7 +740,7 @@ describe("入力検証（コントラクト境界）", () => {
 describe("グループ指向のグループ同期", () => {
   it("グループを作成・更新でき、再接続時に復元され、付箋の離脱・削除で自動消滅すること", async () => {
     const { roomId, owner, member } = await setupRoom();
-    
+
     // 付箋を2個作成
     const noteId1 = await createNote({ owner, member });
     const noteId2 = await createNote({ owner, member });
@@ -787,7 +787,9 @@ describe("グループ指向のグループ同期", () => {
     const reconnected = await connectRoomAs(OWNER, roomId);
     const snapshot = await expectType(reconnected, "snapshot");
     expect(snapshot.groups).toBeDefined();
-    expect(snapshot.groups?.find(g => g.id === groupId)?.name).toBe("更新されたグループ");
+    expect(snapshot.groups?.find((g) => g.id === groupId)?.name).toBe(
+      "更新されたグループ",
+    );
 
     // 付箋1を削除 -> 残り付箋が1個になるので自動消滅するはず
     const member2 = await connectRoomAs(MEMBER, roomId);

@@ -33,12 +33,12 @@ import {
 } from "@/app/rooms/room-reducer";
 import { createThrottled } from "@/app/rooms/throttle";
 import { DRAG_BROADCAST_THROTTLE_MS } from "@/contracts/board";
+import type { PersistentGroup } from "@/contracts/grouping";
 import type {
   DotVoteKind,
   Phase,
   ServerMessage,
 } from "@/contracts/room-protocol";
-import type { PersistentGroup } from "@/contracts/grouping";
 import {
   createRoomClient,
   type RoomClient,
@@ -302,7 +302,7 @@ export function RoomBoard({
 
   const handleGroupUpdateName = useCallback((groupId: string, name: string) => {
     setGroups((current) =>
-      current.map((g) => (g.id === groupId ? { ...g, name } : g))
+      current.map((g) => (g.id === groupId ? { ...g, name } : g)),
     );
     clientRef.current?.send({
       type: "group:update-name",

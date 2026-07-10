@@ -246,7 +246,11 @@ describe("BoardView", () => {
       setup({
         notes: [note1, note2],
         groups: [
-          { id: "g1", name: "カスタム課題グループ", noteIds: ["note-1", "note-2"] }
+          {
+            id: "g1",
+            name: "カスタム課題グループ",
+            noteIds: ["note-1", "note-2"],
+          },
         ],
       });
 
@@ -275,7 +279,10 @@ describe("BoardView", () => {
       fireEvent.keyDown(input, { key: "Enter" });
 
       // onGroupCreate コールバックが呼ばれ、名前と noteIds が渡されること
-      expect(onGroupCreate).toHaveBeenCalledWith("新規グループ名", ["note-1", "note-2"]);
+      expect(onGroupCreate).toHaveBeenCalledWith("新規グループ名", [
+        "note-1",
+        "note-2",
+      ]);
     });
 
     it("既存グループの名前を編集して確定すると onGroupUpdateName が呼ばれること", () => {
@@ -285,7 +292,7 @@ describe("BoardView", () => {
       setup({
         notes: [note1, note2],
         groups: [
-          { id: "g1", name: "元々の名前", noteIds: ["note-1", "note-2"] }
+          { id: "g1", name: "元々の名前", noteIds: ["note-1", "note-2"] },
         ],
         onGroupUpdateName,
       });
