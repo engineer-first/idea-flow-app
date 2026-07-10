@@ -736,3 +736,94 @@ describe("入力検証（コントラクト境界）", () => {
     member.close();
   });
 });
+
+describe("グループ指向のグループ同期", () => {
+  it("グループを作成・更新でき、再接続時に復元され、付箋の離脱・削除で自動消滅すること", async () => {
+    const { roomId, owner, member } = await setupRoom();
+
+    // 付箋を2個作成
+    const noteId1 = await createNote({ owner, member });
+    const noteId2 = await createNote({ owner, member });
+
+    // G1: [noteId1, noteId2] のグループ作成
+    const groupId = "11111111-1111-4111-8111-111111111111";
+    const group = {
+      id: groupId,
+      name: "テストグループ",
+      noteIds: [noteId1, noteId2],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    send(owner, {
+      type: "group:create",
+      group,
+    });
+
+    // 配信確認
+    const ownerCreate = await expectType(owner, "group:updated");
+    expect(ownerCreate.group.id).toBe(groupId);
+    expect(ownerCreate.group.name).toBe("テストグループ");
+
+    const memberCreate = await expectType(member, "group:updated");
+    expect(memberCreate.group.id).toBe(groupId);
+
+    // グループ名を更新
+    send(owner, {
+      type: "group:update-name",
+      groupId,
+      name: "更新されたグループ",
+    });
+
+    const ownerUpdate = await expectType(owner, "group:updated");
+    expect(ownerUpdate.group.name).toBe("更新されたグループ");
+
+    const memberUpdate = await expectType(member, "group:updated");
+    expect(memberUpdate.group.name).toBe("更新されたグループ");
+
+    // 切断して再接続
+    owner.close();
+    member.close();
+    const reconnected = await connectRoomAs(OWNER, roomId);
+    const snapshot = await expectType(reconnected, "snapshot");
+    expect(snapshot.groups).toBeDefined();
+    expect(snapshot.groups?.find((g) => g.id === groupId)?.name).toBe(
+      "更新されたグループ",
+    );
+
+    // 付箋1を削除 -> 残り付箋が1個になるので自動消滅するはず
+    const member2 = await connectRoomAs(MEMBER, roomId);
+    await expectType(member2, "snapshot");
+
+    send(reconnected, { type: "note:delete", noteId: noteId1 });
+    await expectType(reconnected, "note:deleted");
+    await expectType(member2, "note:deleted");
+
+    // グループ消滅イベントが飛んでくるはず
+    const ownerDel = await expectType(reconnected, "group:deleted");
+    expect(ownerDel.groupId).toBe(groupId);
+
+    const memberDel = await expectType(member2, "group:deleted");
+    expect(memberDel.groupId).toBe(groupId);
+
+    reconnected.close();
+    member2.close();
+  });
+
+  it("存在しない代表付箋IDへのグループ名更新は not-found で拒否されること", async () => {
+    const { owner, member } = await setupRoom();
+    const fakeId = "99999999-9999-4999-8999-999999999999";
+
+    send(owner, {
+      type: "group:update-name",
+      groupId: fakeId,
+      name: "エラーグループ",
+    });
+
+    const error = await expectType(owner, "error");
+    expect(error.code).toBe("not-found");
+
+    owner.close();
+    member.close();
+  });
+});

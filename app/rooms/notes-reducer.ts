@@ -78,8 +78,11 @@ export function applyServerMessage(
     case "member_joined":
     case "member_left":
     case "phase:updated":
+    case "group:updated":
+    case "group:deleted":
     case "error": {
       // ノート以外の状態は別リデューサが担当する（app/rooms/room-reducer.ts）。
+      // グループ・フェーズの同期は RoomBoard 側で管理するため、ここでは付箋状態を変えない。
       // 通知・ログはコンテナ（room-board.tsx）の責務。ここでは notes に触れない。
       return notes;
     }

@@ -45,6 +45,16 @@ export const NoteSchema = z.object({
 
 export type ProtocolNote = z.infer<typeof NoteSchema>;
 
+export const GroupSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().max(50, "グループ名は50文字以内で入力してください。"),
+  noteIds: z.array(z.string().uuid()).min(2),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export type ProtocolGroup = z.infer<typeof GroupSchema>;
+
 // lobby = 開始前 / phase1-3 = ボード上の工程
 export const PhaseSchema = z.enum(["lobby", "phase1", "phase2", "phase3"]);
 export type Phase = z.infer<typeof PhaseSchema>;
@@ -89,6 +99,15 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
     noteId: z.string().uuid(),
   }),
   z.object({
+    type: z.literal("group:create"),
+    group: GroupSchema,
+  }),
+  z.object({
+    type: z.literal("group:update-name"),
+    groupId: z.string().uuid(),
+    name: z.string().max(50, "グループ名は50文字以内で入力してください。"),
+  }),
+  z.object({
     type: z.literal("note:vote"),
     noteId: z.string().uuid(),
     kind: DotVoteKindSchema,
@@ -119,6 +138,7 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("snapshot"),
     notes: z.array(NoteSchema),
+    groups: z.array(GroupSchema).optional(),
     members: z.array(MemberSchema),
     phase: PhaseSchema,
     isHost: z.boolean(),
@@ -131,6 +151,14 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
     noteId: z.string().uuid(),
     x: z.number(),
     y: z.number(),
+  }),
+  z.object({
+    type: z.literal("group:updated"),
+    group: GroupSchema,
+  }),
+  z.object({
+    type: z.literal("group:deleted"),
+    groupId: z.string().uuid(),
   }),
   z.object({
     type: z.literal("member_joined"),

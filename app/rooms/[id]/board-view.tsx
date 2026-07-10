@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { DotVoteSummary } from "@/app/components/dotvote/organisms/dot-vote-summary";
 import { CopyInviteButton } from "@/app/rooms/[id]/copy-invite-button";
 import { NoteCard } from "@/app/rooms/[id]/note-card";
+import { NoteGroupCard } from "@/app/rooms/[id]/note-group-card";
 import { RoomMembers } from "@/app/rooms/[id]/room-members";
 import { LeaveConfirmDialog } from "@/app/rooms/leave-confirm-dialog";
 import type { Note } from "@/app/rooms/notes-reducer";
@@ -25,6 +26,10 @@ import { Button } from "@/components/ui/button";
 // WebSocket接続・スロットル・プロトコル送信はroom-board.tsx（コンテナ）の責務。
 // 「どの付箋を選択中か」は同期不要な純粋にUIの関心事なので、ここでローカルに持つ。
 import { BOARD_HEIGHT, BOARD_WIDTH } from "@/contracts/board";
+import {
+  calculateRenderGroups,
+  type PersistentGroup,
+} from "@/contracts/grouping";
 import {
   DOT_VOTE_LIMITS,
   type DotVoteKind,
@@ -50,6 +55,7 @@ const PHASE_LABELS: Record<Phase, string> = {
 
 export type BoardViewProps = {
   notes: Note[];
+  groups: PersistentGroup[];
   inviteCode: string;
   inviteUrl: string;
   phase: Phase;
@@ -67,6 +73,8 @@ export type BoardViewProps = {
   onNoteDragEnd: (noteId: string, x: number, y: number) => void;
   onNoteContentChange: (noteId: string, content: string) => void;
   onNoteDelete: (noteId: string) => void;
+  onGroupCreate?: (name: string, noteIds: string[]) => void;
+  onGroupUpdateName?: (groupId: string, name: string) => void;
   onNoteVote: (noteId: string, kind: DotVoteKind) => void;
   onNoteVoteReset: (noteId: string, kind: DotVoteKind) => void;
   // 退出。
@@ -79,6 +87,7 @@ export type BoardViewProps = {
 
 export function BoardView({
   notes,
+  groups,
   inviteCode,
   inviteUrl,
   phase,
@@ -95,6 +104,8 @@ export function BoardView({
   onNoteDragEnd,
   onNoteContentChange,
   onNoteDelete,
+  onGroupCreate,
+  onGroupUpdateName,
   onNoteVote,
   onNoteVoteReset,
   onLeave,
@@ -103,8 +114,17 @@ export function BoardView({
 }: BoardViewProps) {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
-  // 未接続中は room-client が送信を黙って破棄するため、操作自体を無効化する。
-  const isDisconnected = connectionStatus !== "open";
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // ハイドレーション直後の高速接続確立によるMismatchedを防ぐため、マウント完了までは接続中（非活性）扱いにする
+  const isDisconnected = isMounted ? connectionStatus !== "open" : true;
+
+  const renderGroups = calculateRenderGroups(notes, groups);
+
   const voteRemaining = {
     subjective: Math.max(
       0,
@@ -261,6 +281,26 @@ export function BoardView({
               付箋がまだありません
             </p>
           ) : null}
+
+          {renderGroups.map((rg) => {
+            const handleUpdateName = (newName: string) => {
+              if (rg.isTemp && rg.representativeNoteId) {
+                const noteIds = rg.id.replace("temp-", "").split(",");
+                onGroupCreate?.(newName, noteIds);
+              } else if (rg.persistentGroupId) {
+                onGroupUpdateName?.(rg.persistentGroupId, newName);
+              }
+            };
+
+            return (
+              <NoteGroupCard
+                key={rg.id}
+                group={rg}
+                name={rg.name}
+                onUpdateName={handleUpdateName}
+              />
+            );
+          })}
 
           {notes.map((note) => (
             <NoteCard

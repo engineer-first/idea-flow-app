@@ -44,6 +44,8 @@ export function applyMemberServerMessage(
     case "note:deleted":
     case "note:drag":
     case "phase:updated":
+    case "group:updated":
+    case "group:deleted":
     case "error":
       return members;
     default: {
@@ -73,6 +75,8 @@ export function applyPhaseServerMessage(
     case "note:drag":
     case "member_joined":
     case "member_left":
+    case "group:updated":
+    case "group:deleted":
     case "error":
       return phase;
     default: {

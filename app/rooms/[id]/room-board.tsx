@@ -33,6 +33,7 @@ import {
 } from "@/app/rooms/room-reducer";
 import { createThrottled } from "@/app/rooms/throttle";
 import { DRAG_BROADCAST_THROTTLE_MS } from "@/contracts/board";
+import type { PersistentGroup } from "@/contracts/grouping";
 import type {
   DotVoteKind,
   Phase,
@@ -79,6 +80,7 @@ export function RoomBoard({
   // 付箋の初期状態は空。確定状態の真実はサーバー（RoomDO）側にあり、
   // 接続直後に送られてくる snapshot で復元される。
   const [notes, setNotes] = useState<Note[]>([]);
+  const [groups, setGroups] = useState<PersistentGroup[]>([]);
   // メンバー一覧と進行状態は SSR で初期値を渡せるので、初回の白画面を防ぐ。
   const [members, setMembers] = useState<Member[]>(initialMembers);
   const [phase, setPhase] = useState<Phase>(initialPhase);
@@ -112,6 +114,13 @@ export function RoomBoard({
     notesRef.current = notes;
   }, [notes]);
 
+  const updateNotes = useCallback((update: (current: Note[]) => Note[]) => {
+    const next = update(notesRef.current);
+    notesRef.current = next;
+    setNotes(next);
+    return next;
+  }, []);
+
   const handleServerMessage = useCallback((message: ServerMessage) => {
     if (message.type === "error") {
       console.warn(`ルーム操作エラー (${message.code}): ${message.message}`);
@@ -120,6 +129,27 @@ export function RoomBoard({
       }
       return;
     }
+
+    if (message.type === "snapshot") {
+      setGroups(message.groups || []);
+    }
+
+    if (message.type === "group:updated") {
+      setGroups((current) => {
+        const index = current.findIndex((g) => g.id === message.group.id);
+        if (index >= 0) {
+          const next = [...current];
+          next[index] = message.group;
+          return next;
+        }
+        return [...current, message.group];
+      });
+    }
+
+    if (message.type === "group:deleted") {
+      setGroups((current) => current.filter((g) => g.id !== message.groupId));
+    }
+
     setNotes((current) =>
       applyServerMessage(current, message, {
         draggingNoteId: draggingNoteIdRef.current,
@@ -191,6 +221,7 @@ export function RoomBoard({
       sendDragRef.current?.cancel();
       sendDragRef.current = null;
       clientRef.current = null;
+      notesRef.current = [];
       client.close();
     };
   }, [roomId, handleServerMessage, handleStatusChange, webSocketFactory]);
@@ -218,38 +249,66 @@ export function RoomBoard({
   const handleNoteDragMove = useCallback(
     (noteId: string, x: number, y: number) => {
       // 自分自身の操作なので即座にローカル反映する。
-      setNotes((current) => moveNoteLocally(current, noteId, x, y));
+      updateNotes((current) => moveNoteLocally(current, noteId, x, y));
       sendDragRef.current?.({ id: noteId, x, y });
     },
-    [],
+    [updateNotes],
   );
 
   const handleNoteDragEnd = useCallback(
     (noteId: string, x: number, y: number) => {
       sendDragRef.current?.cancel();
       setDraggingNoteId(null);
-      setNotes((current) => moveNoteLocally(current, noteId, x, y));
+      updateNotes((current) => moveNoteLocally(current, noteId, x, y));
       // ドロップ確定だけを永続化する（ドラッグ中の座標はサーバーに残らない）。
       clientRef.current?.send({ type: "note:move", noteId, x, y });
     },
-    [],
+    [updateNotes],
   );
 
   const handleNoteContentChange = useCallback(
     (noteId: string, content: string) => {
       // 入力中の見た目を止めないため本文だけは楽観更新する。
-      setNotes((current) =>
+      updateNotes((current) =>
         current.map((note) =>
           note.id === noteId ? { ...note, content } : note,
         ),
       );
       clientRef.current?.send({ type: "note:update-content", noteId, content });
     },
-    [],
+    [updateNotes],
   );
 
   const handleNoteDelete = useCallback((noteId: string) => {
     clientRef.current?.send({ type: "note:delete", noteId });
+  }, []);
+
+  const handleGroupCreate = useCallback((name: string, noteIds: string[]) => {
+    const newGroup = {
+      id: crypto.randomUUID(),
+      name,
+      noteIds,
+    };
+    setGroups((current) => [...current, newGroup]);
+    clientRef.current?.send({
+      type: "group:create",
+      group: {
+        ...newGroup,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  }, []);
+
+  const handleGroupUpdateName = useCallback((groupId: string, name: string) => {
+    setGroups((current) =>
+      current.map((g) => (g.id === groupId ? { ...g, name } : g)),
+    );
+    clientRef.current?.send({
+      type: "group:update-name",
+      groupId,
+      name,
+    });
   }, []);
 
   const handleNoteVote = useCallback((noteId: string, kind: DotVoteKind) => {
@@ -319,6 +378,7 @@ export function RoomBoard({
   return (
     <BoardView
       notes={notes}
+      groups={groups}
       inviteCode={inviteCode}
       inviteUrl={inviteUrl}
       phase={phase}
@@ -336,6 +396,8 @@ export function RoomBoard({
       onNoteDragEnd={handleNoteDragEnd}
       onNoteContentChange={handleNoteContentChange}
       onNoteDelete={handleNoteDelete}
+      onGroupCreate={handleGroupCreate}
+      onGroupUpdateName={handleGroupUpdateName}
       onNoteVote={handleNoteVote}
       onNoteVoteReset={handleNoteVoteReset}
       onLeave={handleLeave}
