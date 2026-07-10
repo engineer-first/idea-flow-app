@@ -27,6 +27,16 @@ export const NoteSchema = z.object({
 
 export type ProtocolNote = z.infer<typeof NoteSchema>;
 
+export const GroupSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  noteIds: z.array(z.string().uuid()),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export type ProtocolGroup = z.infer<typeof GroupSchema>;
+
 const NotePositionSchema = {
   x: z.number().finite().min(0).max(BOARD_WIDTH),
   y: z.number().finite().min(0).max(BOARD_HEIGHT),
@@ -61,6 +71,15 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
     type: z.literal("note:delete"),
     noteId: z.string().uuid(),
   }),
+  z.object({
+    type: z.literal("group:create"),
+    group: GroupSchema,
+  }),
+  z.object({
+    type: z.literal("group:update-name"),
+    groupId: z.string().uuid(),
+    name: z.string().max(50, "グループ名は50文字以内で入力してください。"),
+  }),
 ]);
 
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;
@@ -74,6 +93,7 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("snapshot"),
     notes: z.array(NoteSchema),
+    groups: z.array(GroupSchema).optional(),
   }),
   z.object({ type: z.literal("note:inserted"), note: NoteSchema }),
   z.object({ type: z.literal("note:updated"), note: NoteSchema }),
@@ -83,6 +103,14 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
     noteId: z.string().uuid(),
     x: z.number(),
     y: z.number(),
+  }),
+  z.object({
+    type: z.literal("group:updated"),
+    group: GroupSchema,
+  }),
+  z.object({
+    type: z.literal("group:deleted"),
+    groupId: z.string().uuid(),
   }),
   z.object({
     type: z.literal("error"),

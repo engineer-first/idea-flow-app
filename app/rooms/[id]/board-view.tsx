@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { CopyInviteButton } from "@/app/rooms/[id]/copy-invite-button";
 import { NoteCard } from "@/app/rooms/[id]/note-card";
+import { calculateRenderGroups, type PersistentGroup } from "@/contracts/grouping";
+import { NoteGroupCard } from "@/app/rooms/[id]/note-group-card";
 import type { Note } from "@/app/rooms/notes-reducer";
 import { Button } from "@/components/ui/button";
 // ルームボードの表示用コンポーネント。データ層には一切依存せず、
@@ -23,6 +25,7 @@ const CONNECTION_STATUS_LABELS: Record<BoardConnectionStatus, string | null> = {
 
 export type BoardViewProps = {
   notes: Note[];
+  groups: PersistentGroup[];
   inviteCode: string;
   inviteUrl: string;
   connectionStatus: BoardConnectionStatus;
@@ -33,10 +36,13 @@ export type BoardViewProps = {
   onNoteDragEnd: (noteId: string, x: number, y: number) => void;
   onNoteContentChange: (noteId: string, content: string) => void;
   onNoteDelete: (noteId: string) => void;
+  onGroupCreate?: (name: string, noteIds: string[]) => void;
+  onGroupUpdateName?: (groupId: string, name: string) => void;
 };
 
 export function BoardView({
   notes,
+  groups,
   inviteCode,
   inviteUrl,
   connectionStatus,
@@ -47,10 +53,20 @@ export function BoardView({
   onNoteDragEnd,
   onNoteContentChange,
   onNoteDelete,
+  onGroupCreate,
+  onGroupUpdateName,
 }: BoardViewProps) {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
-  // 未接続中は room-client が送信を黙って破棄するため、操作自体を無効化する。
-  const isDisconnected = connectionStatus !== "open";
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // ハイドレーション直後の高速接続確立によるMismatchedを防ぐため、マウント完了までは接続中（非活性）扱いにする
+  const isDisconnected = isMounted ? connectionStatus !== "open" : true;
+
+  const renderGroups = calculateRenderGroups(notes, groups);
 
   function handleBoardPointerDown(event: React.PointerEvent<HTMLDivElement>) {
     // 付箋の上のpointerdownはバブリングしてくるので、ボード背景を
@@ -118,6 +134,26 @@ export function BoardView({
               付箋がまだありません
             </p>
           ) : null}
+
+          {renderGroups.map((rg) => {
+            const handleUpdateName = (newName: string) => {
+              if (rg.isTemp && rg.representativeNoteId) {
+                const noteIds = rg.id.replace("temp-", "").split(",");
+                onGroupCreate?.(newName, noteIds);
+              } else if (rg.persistentGroupId) {
+                onGroupUpdateName?.(rg.persistentGroupId, newName);
+              }
+            };
+
+            return (
+              <NoteGroupCard
+                key={rg.id}
+                group={rg}
+                name={rg.name}
+                onUpdateName={handleUpdateName}
+              />
+            );
+          })}
 
           {notes.map((note) => (
             <NoteCard

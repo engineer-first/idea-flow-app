@@ -20,6 +20,7 @@ import {
 import { createThrottled } from "@/app/rooms/throttle";
 import { DRAG_BROADCAST_THROTTLE_MS } from "@/contracts/board";
 import type { ServerMessage } from "@/contracts/room-protocol";
+import type { PersistentGroup } from "@/contracts/grouping";
 import {
   createRoomClient,
   type RoomClient,
@@ -47,6 +48,7 @@ export function RoomBoard({
   // 付箋の初期状態は空。確定状態の真実はサーバー（RoomDO）側にあり、
   // 接続直後に送られてくる snapshot で復元される。
   const [notes, setNotes] = useState<Note[]>([]);
+  const [groups, setGroups] = useState<PersistentGroup[]>([]);
   // createRoomClient が生成直後に "connecting" を通知するので初期値と一致する。
   const [connectionStatus, setConnectionStatus] =
     useState<RoomConnectionStatus>("connecting");
@@ -66,11 +68,29 @@ export function RoomBoard({
       console.error(`ルーム操作エラー (${message.code}): ${message.message}`);
       return;
     }
-    setNotes((current) =>
-      applyServerMessage(current, message, {
-        draggingNoteId: draggingNoteIdRef.current,
-      }),
-    );
+
+    if (message.type === "snapshot") {
+      setNotes(message.notes);
+      setGroups(message.groups || []);
+    } else if (message.type === "group:updated") {
+      setGroups((current) => {
+        const index = current.findIndex((g) => g.id === message.group.id);
+        if (index >= 0) {
+          const next = [...current];
+          next[index] = message.group;
+          return next;
+        }
+        return [...current, message.group];
+      });
+    } else if (message.type === "group:deleted") {
+      setGroups((current) => current.filter((g) => g.id !== message.groupId));
+    } else {
+      setNotes((current) =>
+        applyServerMessage(current, message, {
+          draggingNoteId: draggingNoteIdRef.current,
+        }),
+      );
+    }
   }, []);
 
   useEffect(() => {
@@ -146,9 +166,38 @@ export function RoomBoard({
     clientRef.current?.send({ type: "note:delete", noteId });
   }, []);
 
+  const handleGroupCreate = useCallback((name: string, noteIds: string[]) => {
+    const newGroup = {
+      id: crypto.randomUUID(),
+      name,
+      noteIds,
+    };
+    setGroups((current) => [...current, newGroup]);
+    clientRef.current?.send({
+      type: "group:create",
+      group: {
+        ...newGroup,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  }, []);
+
+  const handleGroupUpdateName = useCallback((groupId: string, name: string) => {
+    setGroups((current) =>
+      current.map((g) => (g.id === groupId ? { ...g, name } : g))
+    );
+    clientRef.current?.send({
+      type: "group:update-name",
+      groupId,
+      name,
+    });
+  }, []);
+
   return (
     <BoardView
       notes={notes}
+      groups={groups}
       inviteCode={inviteCode}
       inviteUrl={inviteUrl}
       connectionStatus={connectionStatus}
@@ -159,6 +208,8 @@ export function RoomBoard({
       onNoteDragEnd={handleNoteDragEnd}
       onNoteContentChange={handleNoteContentChange}
       onNoteDelete={handleNoteDelete}
+      onGroupCreate={handleGroupCreate}
+      onGroupUpdateName={handleGroupUpdateName}
     />
   );
 }

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { BoardView } from "@/app/rooms/[id]/board-view";
 import { buildNotes } from "@/app/rooms/[id]/board-view.fixture";
+import { buildNote } from "@/app/rooms/[id]/note-card.fixture";
 
 function setup(overrides: Partial<Parameters<typeof BoardView>[0]> = {}) {
   const props = {
@@ -15,7 +16,10 @@ function setup(overrides: Partial<Parameters<typeof BoardView>[0]> = {}) {
     onNoteDragEnd: vi.fn(),
     onNoteContentChange: vi.fn(),
     onNoteDelete: vi.fn(),
+    onGroupCreate: vi.fn(),
+    onGroupUpdateName: vi.fn(),
     connectionStatus: "open" as const,
+    groups: [],
     ...overrides,
   };
 
@@ -170,6 +174,85 @@ describe("BoardView", () => {
       fireEvent.keyDown(getNoteSurface(first), { key: "Backspace" });
 
       expect(onNoteDelete).toHaveBeenCalledWith("note-1");
+    });
+  });
+
+  describe("付箋のグループ化表示", () => {
+    it("近くに置かれた複数の付箋がある場合、グループ枠が描画されること", () => {
+      const note1 = buildNote({ id: "note-1", x: 100, y: 100 });
+      const note2 = buildNote({ id: "note-2", x: 350, y: 100 }); // 隙間 50px (閾値 60px 以下)
+      setup({ notes: [note1, note2] });
+
+      expect(screen.getByTestId("note-group-card")).toBeInTheDocument();
+      expect(screen.getByText("グループ")).toBeInTheDocument();
+    });
+
+    it("離れた位置に置かれた複数の付箋がある場合、グループ枠は描画されないこと", () => {
+      const note1 = buildNote({ id: "note-1", x: 100, y: 100 });
+      const note2 = buildNote({ id: "note-2", x: 361, y: 100 }); // 隙間 61px (閾値 60px 超)
+      setup({ notes: [note1, note2] });
+
+      expect(screen.queryByTestId("note-group-card")).not.toBeInTheDocument();
+    });
+
+    it("グループ内の付箋に名前が紐づいている場合、その名前でグループが表示されること", () => {
+      const note1 = buildNote({ id: "note-1", x: 100, y: 100 });
+      const note2 = buildNote({ id: "note-2", x: 350, y: 100 });
+      setup({
+        notes: [note1, note2],
+        groups: [
+          { id: "g1", name: "カスタム課題グループ", noteIds: ["note-1", "note-2"] }
+        ],
+      });
+
+      expect(screen.getByText("カスタム課題グループ")).toBeInTheDocument();
+    });
+
+    it("無名の仮グループに名前を入力して確定すると onGroupCreate が呼ばれること", () => {
+      const onGroupCreate = vi.fn();
+      const note1 = buildNote({ id: "note-1", x: 100, y: 100 });
+      const note2 = buildNote({ id: "note-2", x: 350, y: 100 });
+      setup({
+        notes: [note1, note2],
+        onGroupCreate,
+      });
+
+      // ラベルをクリックして編集モードにする
+      const label = screen.getByText("グループ");
+      fireEvent.click(label);
+
+      // input要素が表示されることを確認
+      const input = screen.getByTestId("group-name-input");
+      expect(input).toBeInTheDocument();
+
+      // 値を入力してEnterキーを押下
+      fireEvent.change(input, { target: { value: "新規グループ名" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      // onGroupCreate コールバックが呼ばれ、名前と noteIds が渡されること
+      expect(onGroupCreate).toHaveBeenCalledWith("新規グループ名", ["note-1", "note-2"]);
+    });
+
+    it("既存グループの名前を編集して確定すると onGroupUpdateName が呼ばれること", () => {
+      const onGroupUpdateName = vi.fn();
+      const note1 = buildNote({ id: "note-1", x: 100, y: 100 });
+      const note2 = buildNote({ id: "note-2", x: 350, y: 100 });
+      setup({
+        notes: [note1, note2],
+        groups: [
+          { id: "g1", name: "元々の名前", noteIds: ["note-1", "note-2"] }
+        ],
+        onGroupUpdateName,
+      });
+
+      const label = screen.getByText("元々の名前");
+      fireEvent.click(label);
+
+      const input = screen.getByTestId("group-name-input");
+      fireEvent.change(input, { target: { value: "新しい名前" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      expect(onGroupUpdateName).toHaveBeenCalledWith("g1", "新しい名前");
     });
   });
 });

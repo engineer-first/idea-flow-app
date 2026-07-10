@@ -68,6 +68,12 @@ export function applyServerMessage(
       return notes;
     }
 
+    case "group:updated":
+    case "group:deleted": {
+      // グループの同期は RoomBoard 側で管理するため、ここでは付箋状態を変えない。
+      return notes;
+    }
+
     default: {
       const _exhaustive: never = message;
       return _exhaustive;

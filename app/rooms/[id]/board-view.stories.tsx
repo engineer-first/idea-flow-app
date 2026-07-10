@@ -21,6 +21,9 @@ const meta = {
     onNoteDragEnd: fn(),
     onNoteContentChange: fn(),
     onNoteDelete: fn(),
+    onGroupCreate: fn(),
+    onGroupUpdateName: fn(),
+    groups: [],
   },
   decorators: [
     (Story) => (

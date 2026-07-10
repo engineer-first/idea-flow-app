@@ -44,6 +44,7 @@ describe("migrateRoomStorage", () => {
       dropAllTables(state.storage);
       migrateRoomStorage(state.storage);
       expect(tableNames(state.storage)).toEqual([
+        "groups",
         "members",
         "notes",
         "schema_version",
@@ -153,6 +154,7 @@ describe("RoomDO constructor の配線", () => {
     await runInRoomDO("mig-wired", (_instance, state) => {
       expect(schemaVersion(state.storage)).toBe(ROOM_DO_MIGRATIONS.length);
       expect(tableNames(state.storage)).toEqual([
+        "groups",
         "members",
         "notes",
         "schema_version",

@@ -14,9 +14,14 @@ import {
 import {
   type ClientMessage,
   type ProtocolNote,
+  type ProtocolGroup,
   parseClientMessage,
   type ServerMessage,
 } from "../contracts/room-protocol";
+import {
+  reorganizeGroups,
+  type PersistentGroup,
+} from "../contracts/grouping";
 import { migrateRoomStorage } from "./room-do-migrations";
 import { filterVisible, visibleTo } from "./visibility";
 
@@ -212,6 +217,9 @@ export class RoomDO extends DurableObject {
           updated_at: updatedAt,
         });
         this.broadcast({ type: "note:updated", note }, note);
+
+        // 位置が変わったので自動再編成を実行
+        this.autoReorganize(this.listNotes());
         return;
       }
 
@@ -257,6 +265,74 @@ export class RoomDO extends DurableObject {
           { type: "note:deleted", noteId: message.noteId },
           this.toProtocolNote(row),
         );
+
+        // 付箋が削除されたので自動再編成を実行
+        this.autoReorganize(this.listNotes());
+        return;
+      }
+
+      case "group:create": {
+        const g = message.group;
+        const now = new Date().toISOString();
+        this.ctx.storage.sql.exec(
+          `INSERT INTO groups (id, name, note_ids, created_at, updated_at)
+           VALUES (?1, ?2, ?3, ?4, ?5)
+           ON CONFLICT(id) DO UPDATE SET name = ?2, note_ids = ?3, updated_at = ?5`,
+          g.id,
+          g.name,
+          JSON.stringify(g.noteIds),
+          g.createdAt || now,
+          now,
+        );
+
+        const noteRow = this.findNote(g.noteIds[0]);
+        if (noteRow) {
+          this.broadcast(
+            { type: "group:updated", group: g },
+            this.toProtocolNote(noteRow),
+          );
+        }
+        return;
+      }
+
+      case "group:update-name": {
+        const rows = this.ctx.storage.sql
+          .exec("SELECT id, name, note_ids, created_at FROM groups WHERE id = ?1", message.groupId)
+          .toArray();
+        if (rows.length === 0) {
+          this.sendTo(ws, {
+            type: "error",
+            code: "not-found",
+            message: "指定されたグループが見つかりません。",
+          });
+          return;
+        }
+
+        const row = rows[0];
+        const now = new Date().toISOString();
+        this.ctx.storage.sql.exec(
+          "UPDATE groups SET name = ?2, updated_at = ?3 WHERE id = ?1",
+          message.groupId,
+          message.name,
+          now,
+        );
+
+        const noteIds = JSON.parse(row.note_ids as string) as string[];
+        const group: ProtocolGroup = {
+          id: message.groupId,
+          name: message.name,
+          noteIds,
+          createdAt: row.created_at as string,
+          updatedAt: now,
+        };
+
+        const noteRow = this.findNote(noteIds[0]);
+        if (noteRow) {
+          this.broadcast(
+            { type: "group:updated", group },
+            this.toProtocolNote(noteRow),
+          );
+        }
         return;
       }
 
@@ -275,9 +351,12 @@ export class RoomDO extends DurableObject {
 
   private sendSnapshot(ws: WebSocket, userId: string): void {
     const notes = this.listNotes();
+    const groups = this.listGroups();
+
     this.sendTo(ws, {
       type: "snapshot",
       notes: filterVisible({ viewerId: userId }, notes),
+      groups,
     });
   }
 
@@ -313,6 +392,102 @@ export class RoomDO extends DurableObject {
   // ------------------------------------------------------------
   // ストレージアクセス
   // ------------------------------------------------------------
+
+  private listGroups(): ProtocolGroup[] {
+    const rows = this.ctx.storage.sql
+      .exec("SELECT id, name, note_ids, created_at, updated_at FROM groups")
+      .toArray();
+    return rows.map((row) => ({
+      id: row.id as string,
+      name: row.name as string,
+      noteIds: JSON.parse(row.note_ids as string) as string[],
+      createdAt: row.created_at as string,
+      updatedAt: row.updated_at as string,
+    }));
+  }
+
+  private saveGroups(groups: PersistentGroup[]): void {
+    this.ctx.storage.transactionSync(() => {
+      this.ctx.storage.sql.exec("DELETE FROM groups");
+      const now = new Date().toISOString();
+      for (const g of groups) {
+        // 元々存在していた場合は作成日時を保持したいので、再編成前に元々持っていたグループの createdAt を探す
+        const existing = this.ctx.storage.sql
+          .exec("SELECT created_at FROM groups WHERE id = ?1", g.id)
+          .toArray();
+        const createdAt = existing.length > 0 ? (existing[0].created_at as string) : now;
+
+        this.ctx.storage.sql.exec(
+          `INSERT INTO groups (id, name, note_ids, created_at, updated_at)
+           VALUES (?1, ?2, ?3, ?4, ?5)`,
+          g.id,
+          g.name,
+          JSON.stringify(g.noteIds),
+          createdAt,
+          now,
+        );
+      }
+    });
+  }
+
+  private autoReorganize(notes: ProtocolNote[]): void {
+    const currentGroups = this.listGroups();
+    const nextGroups = reorganizeGroups(notes, currentGroups);
+
+    const prevIds = new Set(currentGroups.map((g) => g.id));
+    const nextIds = new Set(nextGroups.map((g) => g.id));
+
+    this.saveGroups(nextGroups);
+
+    // 1. 削除されたグループをブロードキャスト
+    for (const prevGroup of currentGroups) {
+      if (!nextIds.has(prevGroup.id)) {
+        // 代表となる付箋を1つ解決（配信フィルタリング用）
+        const representativeId = prevGroup.noteIds[0];
+        const noteRow = representativeId ? this.findNote(representativeId) : null;
+        const subject = noteRow
+          ? this.toProtocolNote(noteRow)
+          : {
+              id: crypto.randomUUID(),
+              authorId: "00000000-0000-0000-0000-000000000000",
+              content: "",
+              x: 0,
+              y: 0,
+              createdAt: "",
+              updatedAt: "",
+            };
+
+        this.broadcast(
+          { type: "group:deleted", groupId: prevGroup.id },
+          subject,
+        );
+      }
+    }
+
+    // 2. 更新・作成されたグループをブロードキャスト
+    for (const g of nextGroups) {
+      const prev = currentGroups.find((p) => p.id === g.id);
+      if (
+        !prev ||
+        JSON.stringify(prev.noteIds) !== JSON.stringify(g.noteIds)
+      ) {
+        const noteRow = this.findNote(g.noteIds[0]);
+        if (noteRow) {
+          const group: ProtocolGroup = {
+            id: g.id,
+            name: g.name,
+            noteIds: g.noteIds,
+            createdAt: prev?.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          this.broadcast(
+            { type: "group:updated", group },
+            this.toProtocolNote(noteRow),
+          );
+        }
+      }
+    }
+  }
 
   private findNote(noteId: string): NoteRow | null {
     const rows = this.ctx.storage.sql

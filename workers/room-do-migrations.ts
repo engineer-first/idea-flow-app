@@ -27,6 +27,22 @@ export const ROOM_DO_MIGRATIONS: readonly string[] = [
      updated_at TEXT NOT NULL
    );
    DROP TABLE IF EXISTS meta;`,
+  // v2: グループ名管理テーブルの追加
+  `CREATE TABLE IF NOT EXISTS group_names (
+     representative_note_id TEXT PRIMARY KEY,
+     name TEXT NOT NULL,
+     created_at TEXT NOT NULL,
+     updated_at TEXT NOT NULL
+   );`,
+  // v3: グループ指向自動グループ化対応のgroupsテーブル追加と旧テーブル削除
+  `DROP TABLE IF EXISTS group_names;
+   CREATE TABLE IF NOT EXISTS groups (
+     id TEXT PRIMARY KEY,
+     name TEXT NOT NULL,
+     note_ids TEXT NOT NULL,
+     created_at TEXT NOT NULL,
+     updated_at TEXT NOT NULL
+   );`,
 ];
 
 export function migrateRoomStorage(
