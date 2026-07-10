@@ -1,7 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { buildInviteUrl } from "@/app/invite/invite-url";
 import { RoomBoard } from "@/app/rooms/[id]/room-board";
-import { RoomInfoResponseSchema } from "@/contracts/api";
+import {
+  RoomInfoResponseSchema,
+  RoomMembersResponseSchema,
+} from "@/contracts/api";
 import { isUuid } from "@/contracts/ids";
 import { apiFetch } from "@/lib/api-client";
 import { getCurrentUser } from "@/lib/session/current-user";
@@ -37,23 +40,48 @@ export default async function RoomPage({ params }: RoomPageProps) {
     notFound();
   }
 
+  // lobby 状態なら付箋画面に直行させず、スタート画面へ誘導する。
+  // phase1-3 ならボードを直接開く。
+  if (parsed.data.phase === "lobby") {
+    redirect(`/rooms/${parsed.data.roomId}/start`);
+  }
+
+  // メンバー一覧を SSR で取得して初回描画時の flicker を抑える。
+  // 非 2xx・不正ボディ・ネットワーク障害でも snapshot で復元できるので空配列へ。
+  let initialMembers: { userId: string; name: string }[] = [];
+  try {
+    const membersRes = await apiFetch(`/api/rooms/${id}/members`);
+    const membersParsed = membersRes.ok
+      ? RoomMembersResponseSchema.safeParse(
+          await membersRes.json().catch(() => null),
+        )
+      : null;
+    if (membersParsed?.success) {
+      initialMembers = membersParsed.data.members;
+    }
+  } catch {
+    initialMembers = [];
+  }
+
   // 招待URL の origin は設定値（NEXT_PUBLIC_SITE_URL、本番では必須）から作る。
-  // x-forwarded-host / host はクライアントが偽装できるヘッダーで、Cloudflare も
-  // 既定では剥がさない。共有される URL の origin をそこから組み立てない。
   const inviteUrl = buildInviteUrl(getBaseUrl(), parsed.data.inviteCode);
 
   // key={roomId} で、クライアント遷移（/rooms/A → /rooms/B）時に RoomBoard を
   // 強制的に再マウントする。これがないと notes state（や draggingNoteId）が
   // 旧ルームの値を保持し、新ルームの snapshot が届くまで旧データが表示される。
   return (
-    <main className="flex h-screen flex-col gap-4 p-4">
-      <h1 className="text-lg font-semibold">IdeaFlow ルーム</h1>
-      <div className="min-h-0 flex-1">
+    <main className="flex h-full min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4">
+      <div className="min-h-0 flex-1 overflow-hidden">
         <RoomBoard
           key={parsed.data.roomId}
           roomId={parsed.data.roomId}
           inviteCode={parsed.data.inviteCode}
           inviteUrl={inviteUrl}
+          currentUserId={user.sub}
+          isHost={parsed.data.isHost}
+          hostUserId={parsed.data.hostUserId}
+          initialMembers={initialMembers}
+          initialPhase={parsed.data.phase}
         />
       </div>
     </main>

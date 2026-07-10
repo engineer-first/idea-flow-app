@@ -8,7 +8,8 @@ const meta = {
     layout: "centered",
   },
   args: {
-    url: "https://idea-flow.example/invite/ABC234",
+    value: "https://idea-flow.example/invite/ABC234",
+    itemLabel: "招待URL",
   },
 } satisfies Meta<typeof CopyInviteButton>;
 
@@ -17,3 +18,10 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const InviteCode: Story = {
+  args: {
+    value: "ABC234",
+    itemLabel: "招待コード",
+  },
+};

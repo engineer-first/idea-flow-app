@@ -31,6 +31,7 @@ describe("applyServerMessage", () => {
     const message: ServerMessage = {
       type: "snapshot",
       notes: [note],
+      members: [],
       phase: "phase1",
       isHost: false,
     };
@@ -46,6 +47,7 @@ describe("applyServerMessage", () => {
     const message: ServerMessage = {
       type: "snapshot",
       notes: [snapshotNote],
+      members: [],
       phase: "phase1",
       isHost: false,
     };

@@ -4,7 +4,10 @@ import { useCallback, useState } from "react";
 import { DotVoteSummary } from "@/app/components/dotvote/organisms/dot-vote-summary";
 import { CopyInviteButton } from "@/app/rooms/[id]/copy-invite-button";
 import { NoteCard } from "@/app/rooms/[id]/note-card";
+import { RoomMembers } from "@/app/rooms/[id]/room-members";
+import { LeaveConfirmDialog } from "@/app/rooms/leave-confirm-dialog";
 import type { Note } from "@/app/rooms/notes-reducer";
+import type { Member } from "@/app/rooms/room-reducer";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,8 +25,11 @@ import { Button } from "@/components/ui/button";
 // WebSocket接続・スロットル・プロトコル送信はroom-board.tsx（コンテナ）の責務。
 // 「どの付箋を選択中か」は同期不要な純粋にUIの関心事なので、ここでローカルに持つ。
 import { BOARD_HEIGHT, BOARD_WIDTH } from "@/contracts/board";
-import type { Phase } from "@/contracts/room-protocol";
-import { DOT_VOTE_LIMITS, type DotVoteKind } from "@/contracts/room-protocol";
+import {
+  DOT_VOTE_LIMITS,
+  type DotVoteKind,
+  type Phase,
+} from "@/contracts/room-protocol";
 
 // WebSocket 接続の表示用状態。値の生成は room-board（コンテナ）の責務で、
 // ここでは受け取った状態を表示するだけ（このコンポーネントはデータ層に依存しない）。
@@ -35,6 +41,13 @@ const CONNECTION_STATUS_LABELS: Record<BoardConnectionStatus, string | null> = {
   closed: "接続が切れました。再接続します…",
 };
 
+const PHASE_LABELS: Record<Phase, string> = {
+  lobby: "開始待ち",
+  phase1: "フェーズ1",
+  phase2: "フェーズ2",
+  phase3: "フェーズ3",
+};
+
 export type BoardViewProps = {
   notes: Note[];
   inviteCode: string;
@@ -43,6 +56,10 @@ export type BoardViewProps = {
   isHost: boolean;
   connectionStatus: BoardConnectionStatus;
   draggingNoteId: string | null;
+  members: Member[];
+  currentUserId: string;
+  // ホストの userId（メンバー一覧の「ホスト」ラベル表示用）。
+  hostUserId: string;
   isNextPhasePending: boolean;
   onAddNote: () => void;
   onNoteDragStart: (noteId: string) => void;
@@ -52,6 +69,11 @@ export type BoardViewProps = {
   onNoteDelete: (noteId: string) => void;
   onNoteVote: (noteId: string, kind: DotVoteKind) => void;
   onNoteVoteReset: (noteId: string, kind: DotVoteKind) => void;
+  // 退出。
+  onLeave: () => void;
+  // 退出処理中（多重押下防止）。true の間「退出する」ボタンは disabled。
+  isLeaving: boolean;
+  // 次フェーズへ。ホストのみ UI 表示。
   onNextPhase: () => void;
 };
 
@@ -63,6 +85,9 @@ export function BoardView({
   isHost,
   connectionStatus,
   draggingNoteId,
+  members,
+  currentUserId,
+  hostUserId,
   isNextPhasePending,
   onAddNote,
   onNoteDragStart,
@@ -72,9 +97,12 @@ export function BoardView({
   onNoteDelete,
   onNoteVote,
   onNoteVoteReset,
+  onLeave,
+  isLeaving,
   onNextPhase,
 }: BoardViewProps) {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   // 未接続中は room-client が送信を黙って破棄するため、操作自体を無効化する。
   const isDisconnected = connectionStatus !== "open";
   const voteRemaining = {
@@ -116,37 +144,48 @@ export function BoardView({
     <div className="flex h-full flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-3">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          <span className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>招待URL</span>
-            <span className="max-w-[18rem] truncate font-mono text-xs text-foreground">
-              {inviteUrl}
-            </span>
-            <CopyInviteButton url={inviteUrl} />
-          </span>
-          <span className="text-sm text-muted-foreground">
-            または招待コード:{" "}
-            <span className="font-mono text-base font-semibold text-foreground">
-              {inviteCode}
-            </span>
-          </span>
+          {isHost ? (
+            // 招待URL / 招待コードはホストだけが共有できる情報。
+            // 値自体を表示し、クリックでコピー。中央揃え。
+            <div
+              className="flex max-w-full flex-col items-center gap-3"
+              data-testid="board-view-invite"
+            >
+              <div className="flex max-w-full flex-col items-center gap-0.5">
+                <span className="text-xs text-muted-foreground">招待URL</span>
+                <CopyInviteButton value={inviteUrl} itemLabel="招待URL" />
+              </div>
+              <div className="flex max-w-full flex-col items-center gap-0.5">
+                <span className="text-xs text-muted-foreground">
+                  招待コード
+                </span>
+                <CopyInviteButton value={inviteCode} itemLabel="招待コード" />
+              </div>
+            </div>
+          ) : null}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <RoomMembers
+            members={members}
+            currentUserId={currentUserId}
+            hostUserId={hostUserId}
+          />
           <DotVoteSummary voteRemaining={voteRemaining} />
           <span className="text-sm text-muted-foreground">
             Phase:
-            <span className="ml-1 font-semibold text-foreground">{phase}</span>
+            <span className="ml-1 font-semibold text-foreground">
+              {PHASE_LABELS[phase]}
+            </span>
           </span>
-
-          {isHost && (
-            <span className="text-xs text-muted-foreground">ホスト</span>
-          )}
 
           {isHost && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
                   type="button"
-                  disabled={isDisconnected || isNextPhasePending}
+                  disabled={
+                    isDisconnected || isNextPhasePending || phase === "phase3"
+                  }
                 >
                   次のフェーズへ
                 </Button>
@@ -159,7 +198,8 @@ export function BoardView({
                   </AlertDialogTitle>
 
                   <AlertDialogDescription>
-                    {phase}から次のフェーズへ移行します。
+                    {PHASE_LABELS[phase]}
+                    から次のフェーズへ移行します。
                     移行すると現在の付箋が整理され、一部の内容が引き継がれない場合があります。
                   </AlertDialogDescription>
                 </AlertDialogHeader>
@@ -190,6 +230,21 @@ export function BoardView({
           )}
           <Button type="button" onClick={onAddNote} disabled={isDisconnected}>
             付箋を追加
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setLeaveDialogOpen(true)}
+            disabled={isLeaving}
+            data-testid="leave-button"
+          >
+            {isHost
+              ? isLeaving
+                ? "解散中…"
+                : "ルームを解散"
+              : isLeaving
+                ? "退出中…"
+                : "退出する"}
           </Button>
         </div>
       </div>
@@ -227,6 +282,14 @@ export function BoardView({
           ))}
         </div>
       </div>
+
+      <LeaveConfirmDialog
+        open={leaveDialogOpen}
+        onOpenChange={setLeaveDialogOpen}
+        onConfirm={onLeave}
+        isLeaving={isLeaving}
+        mode={isHost ? "disband" : "leave"}
+      />
     </div>
   );
 }

@@ -4,14 +4,47 @@
 // BoardView / NoteCard / notes-reducer 自体の仕様は各ファイルの spec が担う。
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+// useRouter の戻り値は毎レンダー同じ参照にする（effect の再実行ループ防止）。
+const navigationMocks = vi.hoisted(() => {
+  const replace = vi.fn();
+  return { replace, router: { replace } };
+});
+vi.mock("next/navigation", () => ({
+  useRouter: () => navigationMocks.router,
+}));
+
+const notifyMocks = vi.hoisted(() => ({
+  memberJoined: vi.fn(),
+  memberLeft: vi.fn(),
+  roomDisbanded: vi.fn(),
+}));
+
+vi.mock("@/app/_lib/notify", () => ({
+  notify: {
+    memberJoined: notifyMocks.memberJoined,
+    memberLeft: notifyMocks.memberLeft,
+    roomDisbanded: notifyMocks.roomDisbanded,
+    roomCreated: vi.fn(),
+    joinedAsHost: vi.fn(),
+    joinedAsGuest: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
 import { RoomBoard } from "@/app/rooms/[id]/room-board";
 import type { ProtocolNote } from "@/contracts/room-protocol";
 
 const ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const USER_ID = "11111111-1111-4111-8111-111111111111";
+const OTHER_USER_ID = "22222222-2222-4222-8222-222222222222";
 const NOTE_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 
-type Listener = (event: { data?: unknown }) => void;
+type Listener = (event: {
+  data?: unknown;
+  code?: number;
+  reason?: string;
+}) => void;
 
 class FakeWebSocket {
   static instances: FakeWebSocket[] = [];
@@ -48,11 +81,24 @@ class FakeWebSocket {
     this.emit("close", {});
   }
 
+  simulateLeftRoomClose(): void {
+    this.readyState = 3;
+    this.emit("close", { code: 4000, reason: "left the room" });
+  }
+
+  simulateDisbandedClose(): void {
+    this.readyState = 3;
+    this.emit("close", { code: 4001, reason: "room disbanded" });
+  }
+
   simulateServerMessage(message: unknown): void {
     this.emit("message", { data: JSON.stringify(message) });
   }
 
-  private emit(type: string, event: { data?: unknown }): void {
+  private emit(
+    type: string,
+    event: { data?: unknown; code?: number; reason?: string },
+  ): void {
     for (const listener of this.listeners.get(type) ?? []) {
       listener(event);
     }
@@ -85,6 +131,11 @@ function renderBoard(options: { open?: boolean } = {}) {
       roomId={ROOM_ID}
       inviteCode="AB12CD"
       inviteUrl="https://idea-flow.example/invite/AB12CD"
+      currentUserId={USER_ID}
+      isHost
+      hostUserId={USER_ID}
+      initialMembers={[]}
+      initialPhase="phase1"
       webSocketFactory={factory}
     />,
   );
@@ -109,6 +160,7 @@ function connectWithSnapshot(
     socket.simulateServerMessage({
       type: "snapshot",
       notes,
+      members: [],
       phase: options?.phase ?? "phase1",
       isHost: options?.isHost ?? true,
     }),
@@ -119,6 +171,48 @@ function connectWithSnapshot(
 
 afterEach(() => {
   vi.restoreAllMocks();
+  navigationMocks.replace.mockReset();
+  notifyMocks.memberJoined.mockReset();
+  notifyMocks.memberLeft.mockReset();
+  notifyMocks.roomDisbanded.mockReset();
+});
+
+describe("メンバー参加・退出の通知", () => {
+  it("member_joined を受信すると notify.memberJoined を呼ぶ", () => {
+    const { socket } = connectWithSnapshot([]);
+    act(() =>
+      socket.simulateServerMessage({
+        type: "member_joined",
+        member: { userId: OTHER_USER_ID, name: "Taro" },
+      }),
+    );
+    expect(notifyMocks.memberJoined).toHaveBeenCalledTimes(1);
+    expect(notifyMocks.memberJoined).toHaveBeenCalledWith("Taro");
+  });
+
+  it("member_left を受信すると members から名前を引き、notify.memberLeft を呼ぶ", () => {
+    const { socket } = renderBoard();
+    act(() =>
+      socket.simulateServerMessage({
+        type: "snapshot",
+        notes: [],
+        members: [
+          { userId: USER_ID, name: "Host" },
+          { userId: OTHER_USER_ID, name: "Taro" },
+        ],
+        phase: "phase1",
+        isHost: true,
+      }),
+    );
+    act(() =>
+      socket.simulateServerMessage({
+        type: "member_left",
+        userId: OTHER_USER_ID,
+      }),
+    );
+    expect(notifyMocks.memberLeft).toHaveBeenCalledTimes(1);
+    expect(notifyMocks.memberLeft).toHaveBeenCalledWith("Taro");
+  });
 });
 
 describe("サーバーメッセージ → 画面反映", () => {
@@ -197,6 +291,15 @@ describe("接続状態 → 画面反映", () => {
     act(() => socket.simulateUnexpectedClose());
 
     expect(screen.getByRole("status")).toHaveTextContent("再接続");
+  });
+
+  it("解散による WS close で理由を通知して /home へ router.replace する", () => {
+    const { socket } = connectWithSnapshot([]);
+    act(() => socket.simulateDisbandedClose());
+    expect(notifyMocks.roomDisbanded).toHaveBeenCalledTimes(1);
+    expect(navigationMocks.replace).toHaveBeenCalledWith("/home");
+    // 再接続メッセージは出さない
+    expect(screen.queryByText(/再接続/)).not.toBeInTheDocument();
   });
 });
 

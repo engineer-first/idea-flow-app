@@ -2,6 +2,9 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { fn, userEvent, within } from "storybook/test";
 import { BoardView } from "@/app/rooms/[id]/board-view";
 import { buildNotes } from "@/app/rooms/[id]/board-view.fixture";
+import { buildMembers } from "@/app/rooms/[id]/room-members.fixture";
+
+const ME = "11111111-1111-4111-8111-111111111111";
 
 const meta = {
   title: "Rooms/BoardView",
@@ -14,9 +17,12 @@ const meta = {
     inviteCode: "AB12CD",
     inviteUrl: "https://idea-flow.example/invite/AB12CD",
     phase: "phase1",
-    isHost: false,
+    isHost: true,
     connectionStatus: "open",
     draggingNoteId: null,
+    members: buildMembers(3, ME),
+    currentUserId: ME,
+    hostUserId: ME,
     isNextPhasePending: false,
     onAddNote: fn(),
     onNoteDragStart: fn(),
@@ -26,6 +32,8 @@ const meta = {
     onNoteDelete: fn(),
     onNoteVote: fn(),
     onNoteVoteReset: fn(),
+    onLeave: fn(),
+    isLeaving: false,
     onNextPhase: fn(),
   },
   decorators: [
@@ -61,6 +69,22 @@ export const Dragging: Story = {
 export const ManyNotes: Story = {
   args: {
     notes: buildNotes(12),
+  },
+};
+
+// 参加者が多い状態（メンバー一覧の +N 省略が発火する）。
+export const ManyMembers: Story = {
+  args: {
+    members: buildMembers(10, ME),
+  },
+};
+
+// 非ホストの状態（自分は ring のみ。ホストラベルは hostUserId のメンバーに付く）。
+export const NonHost: Story = {
+  args: {
+    isHost: false,
+    // 自分以外をホストにする（fixture の 2 人目）。
+    hostUserId: buildMembers(3, ME).find((m) => m.userId !== ME)?.userId ?? ME,
   },
 };
 

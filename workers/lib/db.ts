@@ -151,6 +151,14 @@ export async function findRoomById(
   return { roomId: row.id, inviteCode: row.invite_code, hostId: row.host_id };
 }
 
+// ルーム行を削除する（ホストによる解散）。冪等: 無い id でも no-op。
+export async function deleteRoom(
+  db: D1Database,
+  roomId: string,
+): Promise<void> {
+  await db.prepare("DELETE FROM rooms WHERE id = ?1").bind(roomId).run();
+}
+
 function isUniqueViolation(error: unknown): boolean {
   return (
     error instanceof Error && error.message.includes("UNIQUE constraint failed")

@@ -1,7 +1,10 @@
 // 1ルーム = 1 Durable Object の権威サーバー。
 // - メンバーシップ（誰がこのルームに入れるか）の真実をここで持つ
 // - 付箋の確定状態（notes）の真実をここで持つ
+// - 進行状態 (lobby / phase1-3) の真実をここで持つ
 // - 配信は必ず visibleTo（workers/visibility.ts）を通す（選択的送信）
+//   メンバー参加・進行状態のように参加者全員が受け取る情報は
+//   broadcastToAll という別経路で送る（visibleTo はノートにだけ適用する）
 //
 // D1 の rooms 行は「招待コード → ルーム解決」のためのディレクトリにすぎない。
 // 単一スレッドで直列化されるため、フェーズ遷移や同時編集のレースは構造的に起きない。
@@ -16,9 +19,14 @@ import {
   DOT_VOTE_LIMITS,
   type DotVoteKind,
   type Phase,
+  type ProtocolMember,
   type ProtocolNote,
   parseClientMessage,
   type ServerMessage,
+  WS_CLOSE_LEFT_ROOM,
+  WS_CLOSE_LEFT_ROOM_REASON,
+  WS_CLOSE_ROOM_DISBANDED,
+  WS_CLOSE_ROOM_DISBANDED_REASON,
 } from "../contracts/room-protocol";
 import { migrateRoomStorage } from "./room-do-migrations";
 import { filterVisible, visibleTo } from "./visibility";
@@ -27,8 +35,13 @@ import { filterVisible, visibleTo } from "./visibility";
 // DO は外部から直接到達できないため、これは常に api-worker が設定する。
 export const USER_ID_HEADER = "X-Idea-Flow-User-Id";
 
+// ルーム作成者のユーザーID。start_phase の認可（ホスト判定）で使う。
+// api-worker が D1 rooms.host_id を解決してセットする。
+export const HOST_ID_HEADER = "X-Idea-Flow-Host-Id";
+
 type SocketAttachment = {
   userId: string;
+  hostId: string;
 };
 
 type NoteRow = {
@@ -39,6 +52,11 @@ type NoteRow = {
   y: number;
   created_at: string;
   updated_at: string;
+};
+
+type MemberRow = {
+  user_id: string;
+  name: string;
 };
 
 export class RoomDO extends DurableObject {
@@ -56,29 +74,57 @@ export class RoomDO extends DurableObject {
   // RPC（api-worker からのみ呼ばれる）
   // ------------------------------------------------------------
 
-  // 冪等: 既にメンバーでも何も起きない。
-  join(userId: string, isHost = false): void {
+  // 参加処理。name は表示用（メンバー一覧で使う）。
+  // 冪等: 既存メンバーなら name だけを最新に同期して終わる。
+  // 進行中のルームでも新規メンバーの参加は可能（途中参加OK）。
+  //
+  // 新規メンバーの場合のみ、既存メンバー全員の WS に member_joined を
+  // broadcast する（Realtime 反映）。新規メンバー本人には
+  // snapshot.members が届くので送らない（本人除外）。
+  async upsertMember(userId: string, name: string | undefined): Promise<void> {
+    const safeName = name ?? "";
+    const existed = this.isMember(userId);
     this.ctx.storage.sql.exec(
-      "INSERT OR IGNORE INTO members (user_id) VALUES (?1)",
+      `INSERT INTO members (user_id, name) VALUES (?1, ?2)
+       ON CONFLICT (user_id) DO UPDATE SET name = ?2`,
       userId,
+      safeName,
     );
-
-    if (isHost) {
-      const existing = this.ctx.storage.sql
-        .exec("SELECT host_id FROM room_owner WHERE id = 1")
-        .toArray()[0];
-
-      if (!existing?.host_id) {
-        this.ctx.storage.sql.exec(
-          `
-          UPDATE room_owner
-          SET host_id = ?1
-          WHERE id = 1
-          `,
-          userId,
-        );
-      }
+    if (!existed) {
+      this.broadcastToAllExcept(
+        { type: "member_joined", member: { userId, name: safeName } },
+        userId,
+      );
     }
+  }
+
+  // 新規ルーム作成直後にロビー状態へ。
+  async initializeNewRoom(
+    hostId: string,
+    hostName: string | undefined,
+  ): Promise<void> {
+    await this.upsertMember(hostId, hostName);
+    this.ensureHost(hostId);
+    this.savePhase("lobby");
+  }
+
+  private ensureHost(userId: string): void {
+    const existing = this.ctx.storage.sql
+      .exec("SELECT host_id FROM room_owner WHERE id = 1")
+      .toArray()[0] as { host_id: string | null } | undefined;
+    if (!existing?.host_id) {
+      this.ctx.storage.sql.exec(
+        "UPDATE room_owner SET host_id = ?1 WHERE id = 1",
+        userId,
+      );
+    }
+  }
+
+  private isHostUser(userId: string): boolean {
+    const row = this.ctx.storage.sql
+      .exec("SELECT host_id FROM room_owner WHERE id = 1")
+      .toArray()[0] as { host_id: string | null } | undefined;
+    return row?.host_id === userId;
   }
 
   isMember(userId: string): boolean {
@@ -89,21 +135,107 @@ export class RoomDO extends DurableObject {
     return cursor.toArray().length > 0;
   }
 
-  private isHost(userId: string): boolean {
-    const row = this.ctx.storage.sql
-      .exec("SELECT host_id FROM room_owner WHERE id = 1")
-      .toArray()[0];
+  // 退出処理。
+  async leave(userId: string): Promise<void> {
+    if (!this.isMember(userId)) {
+      return;
+    }
+    for (const socket of this.ctx.getWebSockets()) {
+      const attachment =
+        socket.deserializeAttachment() as SocketAttachment | null;
+      if (attachment?.userId === userId) {
+        try {
+          socket.close(WS_CLOSE_LEFT_ROOM, WS_CLOSE_LEFT_ROOM_REASON);
+        } catch {
+          // 既に閉じている等のエラーは握りつぶす
+        }
+      }
+    }
+    this.ctx.storage.sql.exec("DELETE FROM members WHERE user_id = ?1", userId);
+    this.broadcastToAllExcept({ type: "member_left", userId }, userId);
+  }
 
-    return row?.host_id === userId;
+  // ルーム解散（ホスト操作）。全 WS を閉じ、ストレージを完全に空にする。
+  // deleteAll しないと room_state / room_owner / schema_version が残り、
+  // Durable Object が GC 対象にならない。次回起床時は constructor の
+  // マイグレーションがスキーマを再構築する。
+  async disband(): Promise<void> {
+    for (const socket of this.ctx.getWebSockets()) {
+      try {
+        socket.close(WS_CLOSE_ROOM_DISBANDED, WS_CLOSE_ROOM_DISBANDED_REASON);
+      } catch {
+        // 既に閉じている等のエラーは握りつぶす
+      }
+    }
+    await this.ctx.storage.deleteAll();
+  }
+
+  // メンバー一覧を参加順（joined_at 昇順）で返す。snapshot 構築に使う。
+  listMembers(): { userId: string; name: string }[] {
+    const rows = this.ctx.storage.sql
+      .exec("SELECT user_id, name FROM members ORDER BY joined_at")
+      .toArray();
+    return rows.map((row) => {
+      const member = row as unknown as MemberRow;
+      return { userId: member.user_id, name: member.name };
+    });
+  }
+
+  getPhase(): Phase {
+    const rows = this.ctx.storage.sql
+      .exec("SELECT phase FROM room_state WHERE id = 1")
+      .toArray();
+    const row = rows[0] as { phase: string } | undefined;
+    const phase = row?.phase ?? "lobby";
+    if (
+      phase === "lobby" ||
+      phase === "phase1" ||
+      phase === "phase2" ||
+      phase === "phase3"
+    ) {
+      return phase;
+    }
+    // 旧 "writing" は phase1 扱い
+    if (phase === "writing") return "phase1";
+    return "lobby";
+  }
+
+  private savePhase(phase: Phase): void {
+    this.ctx.storage.sql.exec(
+      "UPDATE room_state SET phase = ?1 WHERE id = 1",
+      phase,
+    );
+  }
+
+  async setPhase(
+    phase: Phase,
+    byUserId: string,
+    expectedHostId: string,
+  ): Promise<void> {
+    if (byUserId !== expectedHostId && !this.isHostUser(byUserId)) {
+      throw new Error("進行状態を変更する権限がありません。");
+    }
+    this.savePhase(phase);
+  }
+
+  private nextSprintPhase(): Phase {
+    const current = this.getPhase();
+    switch (current) {
+      case "lobby":
+        return "phase1";
+      case "phase1":
+        return "phase2";
+      case "phase2":
+        return "phase3";
+      case "phase3":
+        return "phase3";
+    }
   }
 
   // ------------------------------------------------------------
   // WebSocket 接続
   // ------------------------------------------------------------
 
-  // 認可（セッション検証・メンバー確認）は api-worker 側で完了しているため、
-  // ここではヘッダーを信頼して接続を受け入れる。ヘッダーが無い到達は
-  // api-worker を経由していない不正経路なので拒否する（深層防御）。
   override async fetch(request: Request): Promise<Response> {
     if (request.headers.get("Upgrade") !== "websocket") {
       return new Response("expected websocket", { status: 426 });
@@ -114,13 +246,16 @@ export class RoomDO extends DurableObject {
       return new Response("forbidden", { status: 403 });
     }
 
+    const hostId = request.headers.get(HOST_ID_HEADER);
+    if (!hostId) {
+      return new Response("forbidden", { status: 403 });
+    }
+
     const pair = new WebSocketPair();
     const client = pair[0];
     const server = pair[1];
-    // Hibernation API で受け入れ、接続にユーザーIDを添付する。
-    // ハイバネーション復帰後も deserializeAttachment で取り出せる。
     this.ctx.acceptWebSocket(server);
-    const attachment: SocketAttachment = { userId };
+    const attachment: SocketAttachment = { userId, hostId };
     server.serializeAttachment(attachment);
 
     this.sendSnapshot(server, userId);
@@ -148,7 +283,7 @@ export class RoomDO extends DurableObject {
       return;
     }
 
-    this.handleClientMessage(ws, attachment.userId, message);
+    await this.handleClientMessage(ws, attachment, message);
   }
 
   override async webSocketClose(
@@ -157,7 +292,7 @@ export class RoomDO extends DurableObject {
     _reason: string,
     _wasClean: boolean,
   ): Promise<void> {
-    // プレゼンス（在室表示）の導入時に退室通知をここへ実装する。
+    // 退室の正式経路は leave RPC。切断時の自動 member_left はプレゼンス導入時に検討。
   }
 
   override async webSocketError(ws: WebSocket, _error: unknown): Promise<void> {
@@ -168,11 +303,12 @@ export class RoomDO extends DurableObject {
   // プロトコル処理
   // ------------------------------------------------------------
 
-  private handleClientMessage(
+  private async handleClientMessage(
     ws: WebSocket,
-    userId: string,
+    attachment: SocketAttachment,
     message: ClientMessage,
-  ): void {
+  ): Promise<void> {
+    const { userId, hostId } = attachment;
     switch (message.type) {
       case "note:create": {
         const now = new Date().toISOString();
@@ -180,7 +316,6 @@ export class RoomDO extends DurableObject {
           id: crypto.randomUUID(),
           author_id: userId,
           content: "",
-          // 新規付箋はボード中央付近に少しずつずらして配置する。
           x: NOTE_SPAWN_X_MIN + Math.random() * NOTE_SPAWN_JITTER,
           y: NOTE_SPAWN_Y_MIN + Math.random() * NOTE_SPAWN_JITTER,
           created_at: now,
@@ -204,8 +339,6 @@ export class RoomDO extends DurableObject {
       case "note:update-content": {
         const row = this.requireNote(ws, message.noteId);
         if (!row) return;
-        // 共同編集: メンバーなら誰でも本文を更新できる。
-        // authorId はメッセージに存在しないため書き換えは構造的に不可能。
         const updatedAt = new Date().toISOString();
         this.ctx.storage.sql.exec(
           "UPDATE notes SET content = ?2, updated_at = ?3 WHERE id = ?1",
@@ -244,12 +377,8 @@ export class RoomDO extends DurableObject {
       case "note:drag": {
         const row = this.findNote(message.noteId);
         if (!row) {
-          // ドラッグは高頻度なためエラー往復はせず黙って捨てる
-          // （直後に削除された付箋のドラッグ等、正常系でも起こりうる）。
           return;
         }
-        // 永続化しない。送信者自身へはエコーしない（クライアントは自分の
-        // ドラッグをローカル反映済みのため、エコーは巻き戻りの原因になる）。
         this.broadcast(
           {
             type: "note:drag",
@@ -266,7 +395,6 @@ export class RoomDO extends DurableObject {
       case "note:delete": {
         const row = this.requireNote(ws, message.noteId);
         if (!row) return;
-        // 削除は author のみ。
         if (row.author_id !== userId) {
           this.sendTo(ws, {
             type: "error",
@@ -277,6 +405,10 @@ export class RoomDO extends DurableObject {
         }
         this.ctx.storage.sql.exec(
           "DELETE FROM notes WHERE id = ?1",
+          message.noteId,
+        );
+        this.ctx.storage.sql.exec(
+          "DELETE FROM note_votes WHERE note_id = ?1",
           message.noteId,
         );
         this.broadcast(
@@ -366,8 +498,32 @@ export class RoomDO extends DurableObject {
         return;
       }
 
+      case "start_phase": {
+        // ロビー → phase1（ボード開始）。ホストのみ。
+        if (userId !== hostId && !this.isHostUser(userId)) {
+          this.sendTo(ws, {
+            type: "error",
+            code: "forbidden",
+            message: "進行状態を変更する権限がありません。",
+          });
+          return;
+        }
+        if (this.getPhase() !== "lobby") {
+          this.sendTo(ws, {
+            type: "error",
+            code: "forbidden",
+            message: "すでに開始済みです。",
+          });
+          return;
+        }
+        await this.setPhase("phase1", userId, hostId);
+        this.broadcastToAll({ type: "phase:updated", phase: "phase1" });
+        return;
+      }
+
       case "phase:next": {
-        if (!this.isHost(userId)) {
+        // phase1 → phase2 → phase3。ホストのみ。lobby では不可。
+        if (userId !== hostId && !this.isHostUser(userId)) {
           this.sendTo(ws, {
             type: "error",
             code: "forbidden",
@@ -375,18 +531,22 @@ export class RoomDO extends DurableObject {
           });
           return;
         }
-
-        const nextPhase = this.nextPhase();
-
-        this.savePhase(nextPhase);
-
-        this.broadcastPhase(nextPhase);
-
+        const current = this.getPhase();
+        if (current === "lobby") {
+          this.sendTo(ws, {
+            type: "error",
+            code: "forbidden",
+            message: "ロビー中は次フェーズに進めません。",
+          });
+          return;
+        }
+        const next = this.nextSprintPhase();
+        this.savePhase(next);
+        this.broadcastToAll({ type: "phase:updated", phase: next });
         return;
       }
 
       default: {
-        // メッセージ型の網羅性チェック（コンパイル時のみ意味を持つ）
         const _exhaustive: never = message;
         void _exhaustive;
         return;
@@ -395,7 +555,7 @@ export class RoomDO extends DurableObject {
   }
 
   // ------------------------------------------------------------
-  // 配信（必ず visibleTo を通す）
+  // 配信（ノートは visibleTo、メンバー/phase は全員）
   // ------------------------------------------------------------
 
   private sendSnapshot(ws: WebSocket, userId: string): void {
@@ -403,8 +563,9 @@ export class RoomDO extends DurableObject {
     this.sendTo(ws, {
       type: "snapshot",
       notes: filterVisible({ viewerId: userId }, notes),
+      members: this.listMembers().map((m) => this.toProtocolMember(m)),
       phase: this.getPhase(),
-      isHost: this.isHost(userId),
+      isHost: this.isHostUser(userId),
     });
   }
 
@@ -433,11 +594,10 @@ export class RoomDO extends DurableObject {
       if (!attachment) continue;
       const message = buildMessage(attachment.userId);
       if (!visibleTo({ viewerId: attachment.userId }, message.note)) continue;
-      socket.send(JSON.stringify(message));
+      this.trySend(socket, JSON.stringify(message));
     }
   }
 
-  // subject の可視性を受信者ごとに判定して配信する。except は送信者除外用。
   private broadcast(
     message: ServerMessage,
     subject: ProtocolNote,
@@ -450,23 +610,42 @@ export class RoomDO extends DurableObject {
         socket.deserializeAttachment() as SocketAttachment | null;
       if (!attachment) continue;
       if (!visibleTo({ viewerId: attachment.userId }, subject)) continue;
-      socket.send(payload);
+      this.trySend(socket, payload);
     }
   }
 
-  private broadcastPhase(phase: Phase): void {
-    const payload = JSON.stringify({
-      type: "phase:updated",
-      phase,
-    });
-
+  // ノート以外の共有情報（member / phase）を全員に送る。
+  private broadcastToAll(message: ServerMessage): void {
+    const payload = JSON.stringify(message);
     for (const socket of this.ctx.getWebSockets()) {
-      socket.send(payload);
+      this.trySend(socket, payload);
+    }
+  }
+
+  private broadcastToAllExcept(
+    message: ServerMessage,
+    exceptUserId: string,
+  ): void {
+    const payload = JSON.stringify(message);
+    for (const socket of this.ctx.getWebSockets()) {
+      const attachment =
+        socket.deserializeAttachment() as SocketAttachment | null;
+      if (!attachment || attachment.userId === exceptUserId) continue;
+      this.trySend(socket, payload);
+    }
+  }
+
+  // 閉じかけのソケットで send が throw しても、他接続への配信を止めない。
+  private trySend(ws: WebSocket, payload: string): void {
+    try {
+      ws.send(payload);
+    } catch {
+      // 切断済み等はスキップ
     }
   }
 
   private sendTo(ws: WebSocket, message: ServerMessage): void {
-    ws.send(JSON.stringify(message));
+    this.trySend(ws, JSON.stringify(message));
   }
 
   private sendNotFound(ws: WebSocket): void {
@@ -488,9 +667,6 @@ export class RoomDO extends DurableObject {
     return rows.length > 0 ? (rows[0] as unknown as NoteRow) : null;
   }
 
-  // note:update-content / note:move / note:delete で共通の
-  // 「見つからなければ not-found を返して打ち切る」を1箇所にまとめる。
-  // note:drag は高頻度なため意図的にこのヘルパーを使わず黙って捨てる。
   private requireNote(ws: WebSocket, noteId: string): NoteRow | null {
     const row = this.findNote(noteId);
     if (!row) {
@@ -574,33 +750,10 @@ export class RoomDO extends DurableObject {
     };
   }
 
-  private getPhase(): Phase {
-    const row = this.ctx.storage.sql
-      .exec("SELECT phase FROM room_state WHERE id = 1")
-      .toArray()[0];
-
-    return (row?.phase ?? "phase1") as Phase;
-  }
-
-  private nextPhase(): Phase {
-    const current = this.getPhase();
-
-    switch (current) {
-      case "phase1":
-        return "phase2";
-
-      case "phase2":
-        return "phase3";
-
-      case "phase3":
-        return "phase3";
-    }
-  }
-
-  private savePhase(phase: Phase): void {
-    this.ctx.storage.sql.exec(
-      "UPDATE room_state SET phase = ?1 WHERE id = 1",
-      phase,
-    );
+  private toProtocolMember(member: {
+    userId: string;
+    name: string;
+  }): ProtocolMember {
+    return { userId: member.userId, name: member.name };
   }
 }
