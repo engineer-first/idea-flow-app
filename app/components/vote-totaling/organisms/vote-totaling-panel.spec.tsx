@@ -29,7 +29,9 @@ describe("calculateVoteTotaling", () => {
 
     expect(result.isComplete).toBe(true);
     expect(result.rows.map((row) => row.score)).toEqual([11, 5, 0]);
-    expect(result.selectedChallenge?.noteId).toBe("note-1");
+    expect(result.selectedChallenges.map((row) => row.noteId)).toEqual([
+      "note-1",
+    ]);
   });
 
   it("全員分の投票が終わるまでは結果を確定しない", () => {
@@ -40,7 +42,35 @@ describe("calculateVoteTotaling", () => {
     });
 
     expect(result.isComplete).toBe(false);
-    expect(result.selectedChallenge).toBeNull();
+    expect(result.selectedChallenges).toEqual([]);
+  });
+
+  it("総ポイント同率なら主観票を優先し、同率首位をすべて選ぶ", () => {
+    const votes = [
+      [2, 3],
+      [2, 3],
+      [2, 3],
+      [1, 8],
+      [0, 13],
+      [1, 0],
+      [1, 0],
+      [1, 0],
+    ];
+    const notes = buildNotes(8).map((note, index) =>
+      withVotes(note, votes[index][0], votes[index][1]),
+    );
+
+    const result = calculateVoteTotaling({ notes, memberCount: 10 });
+
+    expect(result.isComplete).toBe(true);
+    expect(result.rows.slice(0, 5).map((row) => row.score)).toEqual([
+      13, 13, 13, 13, 13,
+    ]);
+    expect(result.selectedChallenges.map((row) => row.noteId)).toEqual([
+      "note-1",
+      "note-2",
+      "note-3",
+    ]);
   });
 });
 
@@ -61,5 +91,29 @@ describe("VoteTotalingPanel", () => {
     expect(
       within(screen.getByTestId("vote-totaling-row-note-1")).getByText("11点"),
     ).toBeInTheDocument();
+  });
+
+  it("同率首位をすべて取り組む課題として列挙し、ランキングも同率1位にする", () => {
+    const votes = [
+      [2, 3],
+      [2, 3],
+      [2, 3],
+      [1, 8],
+      [0, 13],
+      [1, 0],
+      [1, 0],
+      [1, 0],
+    ];
+    const notes = buildNotes(8).map((note, index) =>
+      withVotes(note, votes[index][0], votes[index][1]),
+    );
+
+    render(<VoteTotalingPanel members={buildMembers(10, ME)} notes={notes} />);
+
+    expect(screen.getAllByText("1位")).toHaveLength(3);
+    expect(screen.getAllByText("付箋 1")).toHaveLength(2);
+    expect(screen.getAllByText("付箋 2")).toHaveLength(2);
+    expect(screen.getAllByText("付箋 3")).toHaveLength(2);
+    expect(screen.queryByText("付箋 4")).not.toBeInTheDocument();
   });
 });

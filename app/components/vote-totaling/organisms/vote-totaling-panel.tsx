@@ -11,7 +11,7 @@ const RANKING_LIMIT = 3;
 export type VoteTotalingResult = {
   isComplete: boolean;
   rows: VoteTotalingRowViewModel[];
-  selectedChallenge: VoteTotalingRowViewModel | null;
+  selectedChallenges: VoteTotalingRowViewModel[];
 };
 
 export function calculateVoteTotaling({
@@ -44,19 +44,28 @@ export function calculateVoteTotaling({
         note.dotVotes.objective.count * OBJECTIVE_POINT,
       isSelectedChallenge: false,
     }))
-    .sort((a, b) => b.score - a.score);
-  const selectedChallenge = isComplete
-    ? (rows.find((row) => row.subjectiveCount > 0) ?? null)
-    : null;
+    .sort((a, b) => b.score - a.score || b.subjectiveCount - a.subjectiveCount);
+  const leadingRow = rows[0];
+  const selectedChallenges =
+    isComplete && leadingRow && leadingRow.subjectiveCount > 0
+      ? rows.filter(
+          (row) =>
+            row.score === leadingRow.score &&
+            row.subjectiveCount === leadingRow.subjectiveCount,
+        )
+      : [];
   return {
     isComplete,
     rows: rows.map((row) => ({
       ...row,
-      isSelectedChallenge: row.noteId === selectedChallenge?.noteId,
+      isSelectedChallenge: selectedChallenges.some(
+        (selected) => selected.noteId === row.noteId,
+      ),
     })),
-    selectedChallenge: selectedChallenge
-      ? { ...selectedChallenge, isSelectedChallenge: true }
-      : null,
+    selectedChallenges: selectedChallenges.map((row) => ({
+      ...row,
+      isSelectedChallenge: true,
+    })),
   };
 }
 
@@ -94,18 +103,28 @@ export function VoteTotalingPanel({
           主観5点・客観1点で集計
         </p>
       </div>
-      {result.selectedChallenge ? (
+      {result.selectedChallenges.length > 0 ? (
         <div className="mt-6 rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-center">
           <p className="text-xs font-semibold text-emerald-800">取り組む課題</p>
-          <p className="mt-1 font-semibold text-emerald-950">
-            {result.selectedChallenge.content || "無題の付箋"}
-          </p>
+          <ul className="mt-1 grid gap-1 font-semibold text-emerald-950">
+            {result.selectedChallenges.map((challenge) => (
+              <li key={challenge.noteId}>
+                {challenge.content || "無題の付箋"}
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
       <ol className="mt-6 grid gap-3">
-        {result.rows.slice(0, RANKING_LIMIT).map((row, index) => (
-          <VoteTotalingRow key={row.noteId} row={row} rank={index + 1} />
-        ))}
+        {result.rows.slice(0, RANKING_LIMIT).map((row, _index, ranking) => {
+          const rank =
+            ranking.findIndex(
+              (candidate) =>
+                candidate.score === row.score &&
+                candidate.subjectiveCount === row.subjectiveCount,
+            ) + 1;
+          return <VoteTotalingRow key={row.noteId} row={row} rank={rank} />;
+        })}
       </ol>
     </section>
   );
