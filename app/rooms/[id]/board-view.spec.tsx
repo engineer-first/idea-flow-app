@@ -121,7 +121,7 @@ describe("BoardView", () => {
     ).not.toBeDisabled();
   });
 
-  it("phase4 では中央の投票結果ランキングだけを表示する", () => {
+  it("phase4 では投票結果をダイアログ表示し、閉じると元のボードで話し合える", () => {
     setup({
       phase: "phase4",
       members: buildMembers(2, ME),
@@ -143,13 +143,18 @@ describe("BoardView", () => {
       })),
     });
 
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByTestId("vote-result-ranking")).toBeInTheDocument();
-    expect(screen.queryByTestId("board-canvas")).not.toBeInTheDocument();
-    expect(screen.getByText("TOP 3")).toBeInTheDocument();
+    expect(screen.getByTestId("board-canvas")).toBeInTheDocument();
+    expect(screen.getByText("投票数が多い順")).toBeInTheDocument();
     expect(screen.getByText("1位")).toBeInTheDocument();
     expect(screen.getByText("2位")).toBeInTheDocument();
-    expect(screen.getByText("3位")).toBeInTheDocument();
-    expect(screen.getAllByText("課題A")).toHaveLength(2);
+    expect(screen.queryByText("TOP 3")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByTestId("board-canvas")).toBeInTheDocument();
   });
 
   it("付箋のドット投票ボタンでonNoteVoteを呼ぶ", () => {

@@ -3,12 +3,7 @@ set -uo pipefail
 
 PAYLOAD=$(cat)
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-FILE=$(node -e '
-  const fs = require("node:fs");
-  try {
-    console.log(JSON.parse(fs.readFileSync(0, "utf8")).tool_input?.file_path ?? "");
-  } catch {}
-' <<<"$PAYLOAD")
+FILE=$(jq -r '.tool_input.file_path // empty' <<<"$PAYLOAD")
 
 [[ -z "$FILE" ]] && exit 0
 

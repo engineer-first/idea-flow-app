@@ -22,6 +22,13 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 // ルームボードの表示用コンポーネント。データ層には一切依存せず、
 // 付箋の配列と各種コールバックをpropsで受け取る。
 // WebSocket接続・スロットル・プロトコル送信はroom-board.tsx（コンテナ）の責務。
@@ -116,11 +123,18 @@ export function BoardView({
 }: BoardViewProps) {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const [voteTotalingDialogOpen, setVoteTotalingDialogOpen] = useState(
+    phase === "phase4",
+  );
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    setVoteTotalingDialogOpen(phase === "phase4");
+  }, [phase]);
 
   // ハイドレーション直後の高速接続確立によるMismatchedを防ぐため、マウント完了までは接続中（非活性）扱いにする
   const isDisconnected = isMounted ? connectionStatus !== "open" : true;
@@ -273,67 +287,74 @@ export function BoardView({
         </div>
       </div>
 
-      {phase === "phase4" ? (
-        <div className="flex flex-1 items-center">
-          <VoteTotalingPanel members={members} notes={notes} />
-        </div>
-      ) : (
-        <div className="relative overflow-auto rounded-md border border-border bg-muted/30">
-          <div
-            data-testid="board-canvas"
-            className="relative"
-            style={{ width: BOARD_WIDTH, height: BOARD_HEIGHT }}
-            onPointerDown={handleBoardPointerDown}
-          >
-            {notes.length === 0 ? (
-              <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-                付箋がまだありません
-              </p>
-            ) : null}
+      <div className="relative overflow-auto rounded-md border border-border bg-muted/30">
+        <div
+          data-testid="board-canvas"
+          className="relative"
+          style={{ width: BOARD_WIDTH, height: BOARD_HEIGHT }}
+          onPointerDown={handleBoardPointerDown}
+        >
+          {notes.length === 0 ? (
+            <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
+              付箋がまだありません
+            </p>
+          ) : null}
 
-            {renderGroups.map((renderGroup) => {
-              const handleUpdateName = (newName: string) => {
-                if (renderGroup.isTemp && renderGroup.representativeNoteId) {
-                  const noteIds = renderGroup.id
-                    .replace("temp-", "")
-                    .split(",");
-                  onGroupCreate?.(newName, noteIds);
-                } else if (renderGroup.persistentGroupId) {
-                  onGroupUpdateName?.(renderGroup.persistentGroupId, newName);
-                }
-              };
+          {renderGroups.map((renderGroup) => {
+            const handleUpdateName = (newName: string) => {
+              if (renderGroup.isTemp && renderGroup.representativeNoteId) {
+                const noteIds = renderGroup.id.replace("temp-", "").split(",");
+                onGroupCreate?.(newName, noteIds);
+              } else if (renderGroup.persistentGroupId) {
+                onGroupUpdateName?.(renderGroup.persistentGroupId, newName);
+              }
+            };
 
-              return (
-                <NoteGroupCard
-                  key={renderGroup.id}
-                  group={renderGroup}
-                  name={renderGroup.name}
-                  onUpdateName={handleUpdateName}
-                />
-              );
-            })}
-
-            {notes.map((note) => (
-              <NoteCard
-                key={note.id}
-                note={note}
-                isOwnDrag={draggingNoteId === note.id}
-                isSelected={selectedNoteId === note.id}
-                disabled={isDisconnected}
-                onSelect={setSelectedNoteId}
-                onDragStart={onNoteDragStart}
-                onDragMove={onNoteDragMove}
-                onDragEnd={onNoteDragEnd}
-                onContentChange={onNoteContentChange}
-                onDelete={handleNoteDelete}
-                voteRemaining={voteRemaining}
-                onVote={onNoteVote}
-                onVoteReset={onNoteVoteReset}
+            return (
+              <NoteGroupCard
+                key={renderGroup.id}
+                group={renderGroup}
+                name={renderGroup.name}
+                onUpdateName={handleUpdateName}
               />
-            ))}
-          </div>
+            );
+          })}
+
+          {notes.map((note) => (
+            <NoteCard
+              key={note.id}
+              note={note}
+              isOwnDrag={draggingNoteId === note.id}
+              isSelected={selectedNoteId === note.id}
+              disabled={isDisconnected}
+              onSelect={setSelectedNoteId}
+              onDragStart={onNoteDragStart}
+              onDragMove={onNoteDragMove}
+              onDragEnd={onNoteDragEnd}
+              onContentChange={onNoteContentChange}
+              onDelete={handleNoteDelete}
+              voteRemaining={voteRemaining}
+              onVote={onNoteVote}
+              onVoteReset={onNoteVoteReset}
+            />
+          ))}
         </div>
-      )}
+      </div>
+
+      <Dialog
+        open={voteTotalingDialogOpen}
+        onOpenChange={setVoteTotalingDialogOpen}
+      >
+        <DialogContent className="max-h-[80vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>投票結果</DialogTitle>
+            <DialogDescription>
+              投票が入った付箋を確認し、ボードに戻って話し合います。
+            </DialogDescription>
+          </DialogHeader>
+          <VoteTotalingPanel members={members} notes={notes} />
+        </DialogContent>
+      </Dialog>
 
       <LeaveConfirmDialog
         open={leaveDialogOpen}

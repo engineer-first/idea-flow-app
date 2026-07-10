@@ -2,14 +2,7 @@
 set -uo pipefail
 
 PAYLOAD=$(cat)
-STOP_HOOK_ACTIVE=$(node -e '
-  const fs = require("node:fs");
-  try {
-    console.log(JSON.parse(fs.readFileSync(0, "utf8")).stop_hook_active ?? false);
-  } catch {
-    console.log(false);
-  }
-' <<<"$PAYLOAD")
+STOP_HOOK_ACTIVE=$(jq -r '.stop_hook_active // false' <<<"$PAYLOAD")
 
 # Stop フック起因の継続中に再実行すると無限ループになるためスキップする
 [[ "$STOP_HOOK_ACTIVE" == "true" ]] && exit 0
