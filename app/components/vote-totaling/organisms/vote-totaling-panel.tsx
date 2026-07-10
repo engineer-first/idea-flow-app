@@ -16,9 +16,11 @@ export type VoteTotalingResult = {
 export function calculateVoteTotaling({
   notes,
   memberCount,
+  isVotingComplete,
 }: {
   notes: Note[];
   memberCount: number;
+  isVotingComplete?: boolean;
 }): VoteTotalingResult {
   const subjective = notes.reduce(
     (total, note) => total + note.dotVotes.subjective.count,
@@ -28,10 +30,11 @@ export function calculateVoteTotaling({
     (total, note) => total + note.dotVotes.objective.count,
     0,
   );
-  const isComplete =
+  const allMembersCompletedVoting =
     memberCount > 0 &&
     subjective === memberCount * DOT_VOTE_LIMITS.subjective &&
     objective === memberCount * DOT_VOTE_LIMITS.objective;
+  const isComplete = isVotingComplete ?? allMembersCompletedVoting;
   const rows = notes
     .map((note) => ({
       noteId: note.id,
@@ -49,9 +52,9 @@ export function calculateVoteTotaling({
         b.subjectiveCount - a.subjectiveCount ||
         a.noteId.localeCompare(b.noteId),
     );
-  const leadingRow = rows[0];
+  const leadingRow = rows.find((row) => row.subjectiveCount > 0);
   const selectedChallenges =
-    isComplete && leadingRow && leadingRow.subjectiveCount > 0
+    isComplete && leadingRow
       ? rows.filter(
           (row) =>
             row.score === leadingRow.score &&
@@ -76,11 +79,19 @@ export function calculateVoteTotaling({
 export function VoteTotalingPanel({
   notes,
   members,
+  isVotingComplete,
 }: {
   notes: Note[];
   members: Member[];
+  // phase4 への遷移時に RoomDO が投票完了を保証する。以後にメンバーが
+  // 退出しても、確定済み結果を待機状態へ戻さないための明示的な状態。
+  isVotingComplete?: boolean;
 }) {
-  const result = calculateVoteTotaling({ notes, memberCount: members.length });
+  const result = calculateVoteTotaling({
+    notes,
+    memberCount: members.length,
+    isVotingComplete,
+  });
   if (!result.isComplete) {
     return (
       <section

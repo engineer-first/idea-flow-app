@@ -359,7 +359,11 @@ export function BoardView({
               付箋ごとの投票結果を確認し、ボードに戻って話し合います。
             </DialogDescription>
           </DialogHeader>
-          <VoteTotalingPanel members={members} notes={notes} />
+          <VoteTotalingPanel
+            isVotingComplete={phase === "phase4"}
+            members={members}
+            notes={notes}
+          />
         </DialogContent>
       </Dialog>
 

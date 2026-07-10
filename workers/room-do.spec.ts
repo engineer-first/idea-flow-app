@@ -417,3 +417,54 @@ describe("RoomDO phase:next", () => {
     member.close();
   });
 });
+
+describe("RoomDO phase4 のボード凍結", () => {
+  it("phase4 では WebSocket からの付箋本文更新を拒否し、付箋内容を維持する", async () => {
+    const stub = roomStub("room-phase4-freeze");
+    await stub.initializeNewRoom(USER_A, "Host");
+
+    const res = await stub.fetch("https://do/ws", {
+      headers: {
+        Upgrade: "websocket",
+        [USER_ID_HEADER]: USER_A,
+        [HOST_ID_HEADER]: USER_A,
+      },
+    });
+    expect(res.status).toBe(101);
+    const ws = res.webSocket;
+    if (!ws) throw new Error("WebSocket 接続を確立できませんでした。");
+    ws.accept();
+    await new Promise<MessageEvent>((resolve) => {
+      ws.addEventListener("message", resolve, { once: true });
+    });
+
+    ws.send(JSON.stringify({ type: "note:create" }));
+    const insertedEvent = await new Promise<MessageEvent>((resolve) => {
+      ws.addEventListener("message", resolve, { once: true });
+    });
+    const inserted = JSON.parse(String(insertedEvent.data)) as {
+      type: string;
+      note: { id: string; content: string };
+    };
+    expect(inserted.type).toBe("note:inserted");
+
+    await stub.setPhase("phase4", USER_A, USER_A);
+    ws.send(
+      JSON.stringify({
+        type: "note:update-content",
+        noteId: inserted.note.id,
+        content: "phase4 中の書き換え",
+      }),
+    );
+
+    const errorEvent = await new Promise<MessageEvent>((resolve) => {
+      ws.addEventListener("message", resolve, { once: true });
+    });
+    expect(JSON.parse(String(errorEvent.data))).toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+
+    ws.close();
+  });
+});

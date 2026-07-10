@@ -314,6 +314,17 @@ export class RoomDO extends DurableObject {
     message: ClientMessage,
   ): Promise<void> {
     const { userId, hostId } = attachment;
+    // phase4 は投票結果を確認しながら既存ボードで話し合う工程。
+    // WebSocket を直接送っても投票結果や付箋配置を変えられないよう、
+    // 変更系メッセージを境界で一元的に拒否する。
+    if (this.getPhase() === "phase4" && this.isBoardMutation(message)) {
+      this.sendTo(ws, {
+        type: "error",
+        code: "forbidden",
+        message: "投票結果の確認中はボードを変更できません。",
+      });
+      return;
+    }
     switch (message.type) {
       case "note:create": {
         const now = new Date().toISOString();
@@ -638,6 +649,24 @@ export class RoomDO extends DurableObject {
         void _exhaustive;
         return;
       }
+    }
+  }
+
+  private isBoardMutation(message: ClientMessage): boolean {
+    switch (message.type) {
+      case "note:create":
+      case "note:update-content":
+      case "note:move":
+      case "note:drag":
+      case "note:delete":
+      case "note:vote":
+      case "note:vote-reset":
+      case "group:create":
+      case "group:update-name":
+        return true;
+      case "start_phase":
+      case "phase:next":
+        return false;
     }
   }
 

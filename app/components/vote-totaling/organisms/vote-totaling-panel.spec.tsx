@@ -59,6 +59,33 @@ describe("calculateVoteTotaling", () => {
     expect(result.selectedChallenges).toEqual([]);
   });
 
+  it("主観票なしの首位があっても、主観票ありの最上位を取り組む課題にする", () => {
+    const votes = [
+      [0, 20],
+      [2, 3],
+      [2, 0],
+      [2, 0],
+      [2, 0],
+      [2, 0],
+      [0, 7],
+    ];
+    const notes = buildNotes(7).map((note, index) =>
+      withVotes(note, votes[index][0], votes[index][1]),
+    );
+
+    const result = calculateVoteTotaling({ notes, memberCount: 10 });
+
+    expect(result.isComplete).toBe(true);
+    expect(result.rows[0]).toMatchObject({
+      noteId: "note-1",
+      subjectiveCount: 0,
+      score: 20,
+    });
+    expect(result.selectedChallenges.map((row) => row.noteId)).toEqual([
+      "note-2",
+    ]);
+  });
+
   it("無投票の付箋も総合ポイント0としてランキングに含める", () => {
     const votes = [
       [2, 0],
@@ -86,6 +113,20 @@ describe("calculateVoteTotaling", () => {
 });
 
 describe("VoteTotalingPanel", () => {
+  it("phase4 で確定済みなら、参加者が離脱しても結果を表示し続ける", () => {
+    const [note] = buildNotes(1);
+
+    render(
+      <VoteTotalingPanel
+        isVotingComplete
+        members={[]}
+        notes={[withVotes(note, 1, 3)]}
+      />,
+    );
+
+    expect(screen.getByTestId("vote-result-ranking")).toBeInTheDocument();
+  });
+
   it("すべての付箋を総合ポイント順に表示し、無投票の付箋も含める", () => {
     const notes = buildNotes(5).map((note, index) =>
       withVotes(note, [2, 0, 0, 0, 0][index], [0, 3, 2, 1, 0][index]),
