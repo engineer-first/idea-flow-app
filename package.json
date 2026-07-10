@@ -23,6 +23,7 @@
     "db:schema:diagrams": "npm run db:schema:d1 && npm run db:schema:room-do && tbls doc --config .tbls/d1.yml --rm-dist && tbls doc --config .tbls/room-do.yml --rm-dist",
     "build:cf": "opennextjs-cloudflare build",
     "preview:cf": "opennextjs-cloudflare build && wrangler dev -c wrangler.jsonc -c workers/wrangler.jsonc",
+    "smoke": "bash scripts/smoke-test.sh",
     "storybook": "npm run db:schema:diagrams && storybook dev -p 6006",
     "build-storybook": "npm run db:schema:diagrams && storybook build"
   },

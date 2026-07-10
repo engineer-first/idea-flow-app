@@ -270,6 +270,18 @@ async function handleRoomWebSocket(
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+    const { pathname } = url;
+    const method = request.method;
+
+    // 疎通確認専用。認可・SESSION_SECRET の設定状態に関わらず、
+    // この Worker が起動してリクエストを処理できているかだけを見る
+    // （スモークテストが Next.js -> サービスバインディング -> ここまでの
+    // 経路が繋がっているかを確認するために叩く）。
+    if (method === "GET" && pathname === "/api/health") {
+      return json({ ok: true });
+    }
+
     // 設定漏れ（本番で secret 未設定）を既知鍵での fail-open にせず、
     // 明示的に落とす。認証を扱う前に必ず検証する。
     try {
@@ -277,10 +289,6 @@ export default {
     } catch {
       return error(503, "サーバーの認証設定が未完了です。");
     }
-
-    const url = new URL(request.url);
-    const { pathname } = url;
-    const method = request.method;
 
     if (method === "POST" && pathname === "/api/auth/sync") {
       return handleAuthSync(request, env);
