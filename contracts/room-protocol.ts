@@ -29,10 +29,22 @@ const DotVoteSummarySchema = z.object({
   ownCount: z.number().int().min(0),
 });
 
+export const NoteColorSchema = z.enum([
+  "yellow",
+  "green",
+  "blue",
+  "pink",
+  "orange",
+  "purple",
+]);
+export type NoteColor = z.infer<typeof NoteColorSchema>;
+
 export const NoteSchema = z.object({
   id: z.string().uuid(),
   authorId: z.string().uuid(),
   content: z.string(),
+  visibility: z.enum(["private", "shared"]),
+  color: NoteColorSchema,
   x: z.number(),
   y: z.number(),
   createdAt: z.string(),
@@ -69,6 +81,7 @@ export type Phase = z.infer<typeof PhaseSchema>;
 export const MemberSchema = z.object({
   userId: z.string().uuid(),
   name: z.string(),
+  color: NoteColorSchema,
 });
 export type ProtocolMember = z.infer<typeof MemberSchema>;
 
@@ -83,6 +96,15 @@ const NotePositionSchema = {
 
 export const ClientMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("note:create") }),
+  z.object({
+    type: z.literal("note:publish"),
+    noteId: z.string().uuid(),
+    ...NotePositionSchema,
+  }),
+  z.object({
+    type: z.literal("note:unpublish"),
+    noteId: z.string().uuid(),
+  }),
   z.object({
     type: z.literal("note:update-content"),
     noteId: z.string().uuid(),

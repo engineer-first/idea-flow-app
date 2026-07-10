@@ -19,6 +19,7 @@ import {
   type ClientMessage,
   DOT_VOTE_LIMITS,
   type DotVoteKind,
+  type NoteColor,
   type Phase,
   type ProtocolGroup,
   type ProtocolMember,
@@ -50,6 +51,8 @@ type NoteRow = {
   id: string;
   author_id: string;
   content: string;
+  visibility: "private" | "shared";
+  color: NoteColor;
   x: number;
   y: number;
   created_at: string;
@@ -59,7 +62,17 @@ type NoteRow = {
 type MemberRow = {
   user_id: string;
   name: string;
+  color: NoteColor;
 };
+
+const COLOR_PALETTE: readonly NoteColor[] = [
+  "yellow",
+  "green",
+  "blue",
+  "pink",
+  "orange",
+  "purple",
+];
 
 export class RoomDO extends DurableObject {
   constructor(ctx: DurableObjectState, env: Env) {
@@ -86,15 +99,44 @@ export class RoomDO extends DurableObject {
   async upsertMember(userId: string, name: string | undefined): Promise<void> {
     const safeName = name ?? "";
     const existed = this.isMember(userId);
+
+    // すでに使われている色を取得
+    const usedColors = this.ctx.storage.sql
+      .exec("SELECT DISTINCT color FROM members")
+      .toArray()
+      .map((row) => String(row.color));
+
+    const availableColors = COLOR_PALETTE.filter(
+      (c) => !usedColors.includes(c),
+    );
+
+    let color: NoteColor;
+    if (availableColors.length > 0) {
+      color =
+        availableColors[Math.floor(Math.random() * availableColors.length)];
+    } else {
+      color = COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)];
+    }
+
     this.ctx.storage.sql.exec(
-      `INSERT INTO members (user_id, name) VALUES (?1, ?2)
+      `INSERT INTO members (user_id, name, color) VALUES (?1, ?2, ?3)
        ON CONFLICT (user_id) DO UPDATE SET name = ?2`,
       userId,
       safeName,
+      color,
     );
+
+    const assignedColor = this.ctx.storage.sql
+      .exec("SELECT color FROM members WHERE user_id = ?1", userId)
+      .toArray()[0] as { color: NoteColor } | undefined;
+    const colorToSend = assignedColor?.color ?? "yellow";
+
     if (!existed) {
       this.broadcastToAllExcept(
-        { type: "member_joined", member: { userId, name: safeName } },
+        {
+          type: "member_joined",
+          member: { userId, name: safeName, color: colorToSend },
+        },
         userId,
       );
     }
@@ -173,13 +215,13 @@ export class RoomDO extends DurableObject {
   }
 
   // メンバー一覧を参加順（joined_at 昇順）で返す。snapshot 構築に使う。
-  listMembers(): { userId: string; name: string }[] {
+  listMembers(): { userId: string; name: string; color: NoteColor }[] {
     const rows = this.ctx.storage.sql
-      .exec("SELECT user_id, name FROM members ORDER BY joined_at")
+      .exec("SELECT user_id, name, color FROM members ORDER BY joined_at")
       .toArray();
     return rows.map((row) => {
       const member = row as unknown as MemberRow;
-      return { userId: member.user_id, name: member.name };
+      return { userId: member.user_id, name: member.name, color: member.color };
     });
   }
 
@@ -328,21 +370,30 @@ export class RoomDO extends DurableObject {
     switch (message.type) {
       case "note:create": {
         const now = new Date().toISOString();
+        const memberRow = this.ctx.storage.sql
+          .exec("SELECT color FROM members WHERE user_id = ?1", userId)
+          .toArray()[0] as { color: NoteColor } | undefined;
+        const color = memberRow?.color ?? "yellow";
+
         const note: NoteRow = {
           id: crypto.randomUUID(),
           author_id: userId,
           content: "",
+          visibility: "private",
+          color: color,
           x: NOTE_SPAWN_X_MIN + Math.random() * NOTE_SPAWN_JITTER,
           y: NOTE_SPAWN_Y_MIN + Math.random() * NOTE_SPAWN_JITTER,
           created_at: now,
           updated_at: now,
         };
         this.ctx.storage.sql.exec(
-          `INSERT INTO notes (id, author_id, content, x, y, created_at, updated_at)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
+          `INSERT INTO notes (id, author_id, content, visibility, color, x, y, created_at, updated_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`,
           note.id,
           note.author_id,
           note.content,
+          note.visibility,
+          note.color,
           note.x,
           note.y,
           note.created_at,
@@ -352,9 +403,70 @@ export class RoomDO extends DurableObject {
         return;
       }
 
+      case "note:publish": {
+        const row = this.requireNote(ws, message.noteId);
+        if (!row) return;
+        if (row.author_id !== userId || row.visibility !== "private") {
+          this.sendForbidden(ws);
+          return;
+        }
+        const updatedAt = new Date().toISOString();
+        this.ctx.storage.sql.exec(
+          `UPDATE notes
+           SET visibility = 'shared', x = ?2, y = ?3, updated_at = ?4
+           WHERE id = ?1`,
+          message.noteId,
+          message.x,
+          message.y,
+          updatedAt,
+        );
+        this.broadcastNoteInserted({
+          ...row,
+          visibility: "shared",
+          x: message.x,
+          y: message.y,
+          updated_at: updatedAt,
+        });
+        return;
+      }
+
+      case "note:unpublish": {
+        const row = this.requireNote(ws, message.noteId);
+        if (!row) return;
+        if (row.author_id !== userId || row.visibility !== "shared") {
+          this.sendForbidden(ws);
+          return;
+        }
+        // shared の行を消す通知は、可視性を変える前に全メンバーへ送る。
+        this.broadcast(
+          { type: "note:deleted", noteId: message.noteId },
+          this.toProtocolNote(row, userId),
+        );
+        const updatedAt = new Date().toISOString();
+        this.ctx.storage.sql.exec(
+          `UPDATE notes
+           SET visibility = 'private', updated_at = ?2
+           WHERE id = ?1`,
+          message.noteId,
+          updatedAt,
+        );
+        // private 化後は作者だけに同じIDの付箋を復帰させる。
+        this.broadcastNoteInserted({
+          ...row,
+          visibility: "private",
+          updated_at: updatedAt,
+        });
+        this.autoReorganize(this.listSharedNotes());
+        return;
+      }
+
       case "note:update-content": {
         const row = this.requireNote(ws, message.noteId);
         if (!row) return;
+        if (!this.canEdit(row, userId)) {
+          this.sendForbidden(ws);
+          return;
+        }
         const updatedAt = new Date().toISOString();
         this.ctx.storage.sql.exec(
           "UPDATE notes SET content = ?2, updated_at = ?3 WHERE id = ?1",
@@ -373,6 +485,10 @@ export class RoomDO extends DurableObject {
       case "note:move": {
         const row = this.requireNote(ws, message.noteId);
         if (!row) return;
+        if (!this.canEdit(row, userId)) {
+          this.sendForbidden(ws);
+          return;
+        }
         const updatedAt = new Date().toISOString();
         this.ctx.storage.sql.exec(
           "UPDATE notes SET x = ?2, y = ?3, updated_at = ?4 WHERE id = ?1",
@@ -389,13 +505,20 @@ export class RoomDO extends DurableObject {
         });
 
         // 位置が変わったので自動再編成を実行
-        this.autoReorganize(this.listNotes(userId));
+        this.autoReorganize(this.listSharedNotes());
         return;
       }
 
       case "note:drag": {
         const row = this.findNote(message.noteId);
         if (!row) {
+          return;
+        }
+        if (!this.canEdit(row, userId)) {
+          this.sendForbidden(ws);
+          return;
+        }
+        if (row.visibility === "private") {
           return;
         }
         this.broadcast(
@@ -415,11 +538,7 @@ export class RoomDO extends DurableObject {
         const row = this.requireNote(ws, message.noteId);
         if (!row) return;
         if (row.author_id !== userId) {
-          this.sendTo(ws, {
-            type: "error",
-            code: "forbidden",
-            message: "この操作を行う権限がありません。",
-          });
+          this.sendForbidden(ws);
           return;
         }
         this.ctx.storage.sql.exec(
@@ -436,12 +555,16 @@ export class RoomDO extends DurableObject {
         );
 
         // 付箋が削除されたので自動再編成を実行
-        this.autoReorganize(this.listNotes(userId));
+        this.autoReorganize(this.listSharedNotes());
         return;
       }
 
       case "group:create": {
         const g = message.group;
+        if (!this.hasOnlySharedNotes(g.noteIds)) {
+          this.sendForbidden(ws);
+          return;
+        }
         const now = new Date().toISOString();
         this.ctx.storage.sql.exec(
           `INSERT INTO groups (id, name, note_ids, created_at, updated_at)
@@ -481,6 +604,11 @@ export class RoomDO extends DurableObject {
         }
 
         const row = rows[0];
+        const noteIds = JSON.parse(row.note_ids as string) as string[];
+        if (!this.hasOnlySharedNotes(noteIds)) {
+          this.sendForbidden(ws);
+          return;
+        }
         const now = new Date().toISOString();
         this.ctx.storage.sql.exec(
           "UPDATE groups SET name = ?2, updated_at = ?3 WHERE id = ?1",
@@ -489,7 +617,6 @@ export class RoomDO extends DurableObject {
           now,
         );
 
-        const noteIds = JSON.parse(row.note_ids as string) as string[];
         const group: ProtocolGroup = {
           id: message.groupId,
           name: message.name,
@@ -511,6 +638,10 @@ export class RoomDO extends DurableObject {
       case "note:vote": {
         const row = this.requireNote(ws, message.noteId);
         if (!row) return;
+        if (!this.isVisibleTo(row, userId)) {
+          this.sendForbidden(ws);
+          return;
+        }
 
         const ownCount = this.countUserNoteVotes(
           message.noteId,
@@ -569,6 +700,10 @@ export class RoomDO extends DurableObject {
       case "note:vote-reset": {
         const row = this.requireNote(ws, message.noteId);
         if (!row) return;
+        if (!this.isVisibleTo(row, userId)) {
+          this.sendForbidden(ws);
+          return;
+        }
 
         this.ctx.storage.sql.exec(
           `DELETE FROM note_votes
@@ -655,6 +790,8 @@ export class RoomDO extends DurableObject {
   private isBoardMutation(message: ClientMessage): boolean {
     switch (message.type) {
       case "note:create":
+      case "note:publish":
+      case "note:unpublish":
       case "note:update-content":
       case "note:move":
       case "note:drag":
@@ -676,11 +813,10 @@ export class RoomDO extends DurableObject {
 
   private sendSnapshot(ws: WebSocket, userId: string): void {
     const notes = this.listNotes(userId);
-    const groups = this.listGroups();
     this.sendTo(ws, {
       type: "snapshot",
       notes: filterVisible({ viewerId: userId }, notes),
-      groups,
+      groups: this.listVisibleGroups(userId),
       members: this.listMembers().map((m) => this.toProtocolMember(m)),
       phase: this.getPhase(),
       isHost: this.isHostUser(userId),
@@ -774,6 +910,14 @@ export class RoomDO extends DurableObject {
     });
   }
 
+  private sendForbidden(ws: WebSocket): void {
+    this.sendTo(ws, {
+      type: "error",
+      code: "forbidden",
+      message: "この操作を行う権限がありません。",
+    });
+  }
+
   // ------------------------------------------------------------
   // ストレージアクセス
   // ------------------------------------------------------------
@@ -830,31 +974,7 @@ export class RoomDO extends DurableObject {
     // 1. 削除されたグループをブロードキャスト
     for (const prevGroup of currentGroups) {
       if (!nextIds.has(prevGroup.id)) {
-        // 代表となる付箋を1つ解決（配信フィルタリング用）
-        const representativeId = prevGroup.noteIds[0];
-        const noteRow = representativeId
-          ? this.findNote(representativeId)
-          : null;
-        const subject = noteRow
-          ? this.toProtocolNote(noteRow, "00000000-0000-0000-0000-000000000000")
-          : {
-              id: crypto.randomUUID(),
-              authorId: "00000000-0000-0000-0000-000000000000",
-              content: "",
-              x: 0,
-              y: 0,
-              createdAt: "",
-              updatedAt: "",
-              dotVotes: {
-                subjective: { count: 0, votedByMe: false, ownCount: 0 },
-                objective: { count: 0, votedByMe: false, ownCount: 0 },
-              },
-            };
-
-        this.broadcast(
-          { type: "group:deleted", groupId: prevGroup.id },
-          subject,
-        );
+        this.broadcastToAll({ type: "group:deleted", groupId: prevGroup.id });
       }
     }
 
@@ -899,11 +1019,41 @@ export class RoomDO extends DurableObject {
     return row;
   }
 
+  // shared の付箋は既存仕様どおり共同編集、private は作者だけが操作できる。
+  private canEdit(row: NoteRow, userId: string): boolean {
+    return row.visibility === "shared" || row.author_id === userId;
+  }
+
   private listNotes(viewerId: string): ProtocolNote[] {
     return this.ctx.storage.sql
       .exec("SELECT * FROM notes ORDER BY created_at")
       .toArray()
       .map((row) => this.toProtocolNote(row as unknown as NoteRow, viewerId));
+  }
+
+  private listSharedNotes(): ProtocolNote[] {
+    return this.listNotes("00000000-0000-0000-0000-000000000000").filter(
+      (note) => note.visibility === "shared",
+    );
+  }
+
+  private listVisibleGroups(viewerId: string): ProtocolGroup[] {
+    return this.listGroups().filter((group) =>
+      group.noteIds.every((noteId) => {
+        const row = this.findNote(noteId);
+        return row !== null && this.isVisibleTo(row, viewerId);
+      }),
+    );
+  }
+
+  private hasOnlySharedNotes(noteIds: readonly string[]): boolean {
+    return noteIds.every(
+      (noteId) => this.findNote(noteId)?.visibility === "shared",
+    );
+  }
+
+  private isVisibleTo(row: NoteRow, viewerId: string): boolean {
+    return visibleTo({ viewerId }, this.toProtocolNote(row, viewerId));
   }
 
   private hasVote(noteId: string, userId: string, kind: DotVoteKind): boolean {
@@ -970,6 +1120,8 @@ export class RoomDO extends DurableObject {
       id: row.id,
       authorId: row.author_id,
       content: row.content,
+      visibility: row.visibility,
+      color: row.color,
       x: row.x,
       y: row.y,
       createdAt: row.created_at,
@@ -989,10 +1141,11 @@ export class RoomDO extends DurableObject {
     };
   }
 
-  private toProtocolMember(member: {
-    userId: string;
-    name: string;
-  }): ProtocolMember {
-    return { userId: member.userId, name: member.name };
+  private toProtocolMember(member: ProtocolMember): ProtocolMember {
+    return {
+      userId: member.userId,
+      name: member.name,
+      color: member.color,
+    };
   }
 }

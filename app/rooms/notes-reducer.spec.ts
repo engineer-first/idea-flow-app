@@ -12,6 +12,8 @@ const note: Note = {
   id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
   authorId: USER_ID,
   content: "hello",
+  visibility: "shared",
+  color: "yellow",
   x: 10,
   y: 20,
   createdAt: "2026-07-03T00:00:00.000Z",

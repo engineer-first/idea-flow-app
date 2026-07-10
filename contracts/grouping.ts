@@ -54,8 +54,12 @@ export function calculateClusters(notes: Note[]): string[][] {
       const noteA = notes[i];
       const noteB = notes[j];
       if (isClose(noteA, noteB)) {
-        adj.get(noteA.id)!.push(noteB.id);
-        adj.get(noteB.id)!.push(noteA.id);
+        const neighborsA = adj.get(noteA.id);
+        const neighborsB = adj.get(noteB.id);
+        if (neighborsA && neighborsB) {
+          neighborsA.push(noteB.id);
+          neighborsB.push(noteA.id);
+        }
       }
     }
   }
@@ -74,7 +78,10 @@ export function calculateClusters(notes: Note[]): string[][] {
     visited.add(note.id);
 
     while (stack.length > 0) {
-      const currId = stack.pop()!;
+      const currId = stack.pop();
+      if (!currId) {
+        continue;
+      }
       cluster.push(currId);
 
       const neighbors = adj.get(currId) || [];
@@ -138,7 +145,10 @@ export function reorganizeGroups(
     }
 
     for (const groupId of presentGroupIds) {
-      const originalGroup = currentGroups.find((g) => g.id === groupId)!;
+      const originalGroup = currentGroups.find((g) => g.id === groupId);
+      if (!originalGroup) {
+        continue;
+      }
       processedGroupIds.add(groupId);
 
       const newNoteIds: string[] = [];

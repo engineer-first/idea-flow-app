@@ -3,10 +3,7 @@
 // （push 型の可視性制御は「送らないコード」の正しさが全てなので、
 // 判定ロジックの分散を構造的に禁止する）。
 //
-// 現時点の仕様: ルームメンバーは全付箋を見られる（PoC と同じ共有ボード）。
-// 個人ワーク（自分の付箋のみ見える）やステルス投票のフェーズを導入するときは、
-// ここにフェーズ・ロールに応じた分岐を追加し、visibility.spec.ts の
-// テーブルに必ず対応する行を足すこと。
+// private の付箋は作者だけ、shared の付箋はルームメンバー全員に配信する。
 import type { ProtocolNote } from "../contracts/room-protocol";
 
 export type VisibilityContext = {
@@ -17,11 +14,7 @@ export function visibleTo(
   context: VisibilityContext,
   note: ProtocolNote,
 ): boolean {
-  // 共有ボードフェーズ: メンバー全員がすべての付箋を見られる。
-  // viewerId と note は将来の分岐（author 限定表示など）で使う。
-  void context;
-  void note;
-  return true;
+  return note.visibility === "shared" || note.authorId === context.viewerId;
 }
 
 export function filterVisible(

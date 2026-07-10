@@ -73,6 +73,14 @@ export const ROOM_DO_MIGRATIONS: readonly string[] = [
 
   // v4: メンバー表示名（ロビー UI）
   `ALTER TABLE members ADD COLUMN name TEXT NOT NULL DEFAULT '';`,
+
+  // v5: 個人ツールバー用の非公開付箋。既存の付箋は共有済みとして維持する。
+  `ALTER TABLE notes ADD COLUMN visibility TEXT NOT NULL DEFAULT 'shared'
+     CHECK (visibility IN ('private', 'shared'));`,
+
+  // v6: メンバーのランダム色割り当て、および付箋の個別色保持対応
+  `ALTER TABLE members ADD COLUMN color TEXT NOT NULL DEFAULT 'yellow';
+   ALTER TABLE notes ADD COLUMN color TEXT NOT NULL DEFAULT 'yellow';`,
 ];
 
 export function migrateRoomStorage(

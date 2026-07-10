@@ -186,11 +186,11 @@ describe("RoomDO constructor の配線", () => {
 
       migrateRoomStorage(state.storage);
 
-      // v4 適用後もメンバー行が残り、name は空文字
+      // v4/v6 適用後もメンバー行が残り、name は空文字、color は yellow
       const rows = state.storage.sql
-        .exec("SELECT user_id, name FROM members")
+        .exec("SELECT user_id, name, color FROM members")
         .toArray();
-      expect(rows).toEqual([{ user_id: USER_A, name: "" }]);
+      expect(rows).toEqual([{ user_id: USER_A, name: "", color: "yellow" }]);
 
       // room_state 既定は phase1（新規ルームは initializeNewRoom で lobby へ）
       const stateRows = state.storage.sql
@@ -200,6 +200,24 @@ describe("RoomDO constructor の配線", () => {
 
       expect(tableNames(state.storage)).toContain("room_owner");
       expect(tableNames(state.storage)).toContain("note_votes");
+    });
+  });
+
+  it("v4 → 最新: 既存の付箋は shared として可視性を持つ", async () => {
+    await runInRoomDO("mig-note-visibility", (_instance, state) => {
+      dropAllTables(state.storage);
+      migrateRoomStorage(state.storage, ROOM_DO_MIGRATIONS.slice(0, 4));
+      state.storage.sql.exec(
+        `INSERT INTO notes (id, author_id, content, x, y, created_at, updated_at)
+         VALUES ('note-1', ?1, '既存付箋', 0, 0, '2026-07-10T00:00:00.000Z', '2026-07-10T00:00:00.000Z')`,
+        USER_A,
+      );
+
+      migrateRoomStorage(state.storage);
+
+      expect(
+        state.storage.sql.exec("SELECT visibility FROM notes").toArray(),
+      ).toEqual([{ visibility: "shared" }]);
     });
   });
 });

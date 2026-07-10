@@ -1,6 +1,16 @@
 // RoomMembers の spec / stories で共有するテストデータ。
 // 実際の name は英語のファースト/ラスト形式（Google ログインの表示名を想定）。
 import type { Member } from "@/app/rooms/room-reducer";
+import type { NoteColor } from "@/contracts/room-protocol";
+
+const COLORS: NoteColor[] = [
+  "yellow",
+  "green",
+  "blue",
+  "pink",
+  "orange",
+  "purple",
+];
 
 const NAMES = [
   "Yuki Tanaka",
@@ -21,7 +31,11 @@ export function buildMembers(count: number, currentUserId?: string): Member[] {
       currentUserId && index === 0
         ? currentUserId
         : makeUuid(index, currentUserId);
-    return { userId, name: NAMES[index] ?? `Member ${index + 1}` };
+    return {
+      userId,
+      name: NAMES[index] ?? `Member ${index + 1}`,
+      color: COLORS[index % COLORS.length],
+    };
   });
 }
 

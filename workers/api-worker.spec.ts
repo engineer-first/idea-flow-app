@@ -135,8 +135,20 @@ describe("メンバー一覧（GET /api/rooms/:id/members）", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       members: [
-        { userId: OWNER.sub, name: OWNER.name },
-        { userId: MEMBER.sub, name: MEMBER.name },
+        {
+          userId: OWNER.sub,
+          name: OWNER.name,
+          color: expect.stringMatching(
+            /^(yellow|green|blue|pink|orange|purple)$/,
+          ),
+        },
+        {
+          userId: MEMBER.sub,
+          name: MEMBER.name,
+          color: expect.stringMatching(
+            /^(yellow|green|blue|pink|orange|purple)$/,
+          ),
+        },
       ],
     });
   });

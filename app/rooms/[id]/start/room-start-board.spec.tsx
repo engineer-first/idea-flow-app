@@ -169,8 +169,8 @@ describe("サーバーメッセージ → 画面反映", () => {
         type: "snapshot",
         notes: [],
         members: [
-          { userId: HOST_ID, name: "Host" },
-          { userId: MEMBER_ID, name: "Member" },
+          { userId: HOST_ID, name: "Host", color: "yellow" },
+          { userId: MEMBER_ID, name: "Member", color: "green" },
         ],
         phase: "lobby",
         isHost: true,
@@ -184,7 +184,7 @@ describe("サーバーメッセージ → 画面反映", () => {
     act(() =>
       socket.simulateServerMessage({
         type: "member_joined",
-        member: { userId: MEMBER_ID, name: "Member" },
+        member: { userId: MEMBER_ID, name: "Member", color: "yellow" },
       }),
     );
     expect(screen.getAllByTestId("avatar")).toHaveLength(1);
@@ -195,7 +195,7 @@ describe("サーバーメッセージ → 画面反映", () => {
     act(() =>
       socket.simulateServerMessage({
         type: "member_joined",
-        member: { userId: MEMBER_ID, name: "Taro" },
+        member: { userId: MEMBER_ID, name: "Taro", color: "yellow" },
       }),
     );
     expect(notifyMocks.memberJoined).toHaveBeenCalledTimes(1);
@@ -205,8 +205,8 @@ describe("サーバーメッセージ → 画面反映", () => {
   it("member_left を受信すると members から名前を引き、notify.memberLeft を呼ぶ", () => {
     const { socket } = renderStart({
       initialMembers: [
-        { userId: HOST_ID, name: "Host" },
-        { userId: MEMBER_ID, name: "Taro" },
+        { userId: HOST_ID, name: "Host", color: "yellow" },
+        { userId: MEMBER_ID, name: "Taro", color: "green" },
       ],
     });
     act(() =>
@@ -238,7 +238,7 @@ describe("サーバーメッセージ → 画面反映", () => {
       socket.simulateServerMessage({
         type: "snapshot",
         notes: [],
-        members: [{ userId: HOST_ID, name: "Host" }],
+        members: [{ userId: HOST_ID, name: "Host", color: "yellow" }],
         phase: "lobby",
         isHost: true,
       }),

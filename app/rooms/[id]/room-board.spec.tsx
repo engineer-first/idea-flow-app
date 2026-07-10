@@ -2,7 +2,7 @@
 // フェイク WebSocket を注入し、「サーバーメッセージ → 画面反映」と
 // 「ユーザー操作 → プロトコルメッセージ送信」の両方向の配線を検証する。
 // BoardView / NoteCard / notes-reducer 自体の仕様は各ファイルの spec が担う。
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // useRouter の戻り値は毎レンダー同じ参照にする（effect の再実行ループ防止）。
@@ -111,6 +111,8 @@ function protocolNote(overrides?: Partial<ProtocolNote>): ProtocolNote {
     id: NOTE_ID,
     authorId: USER_ID,
     content: "最初の付箋",
+    visibility: "shared",
+    color: "yellow",
     x: 100,
     y: 100,
     createdAt: "2026-07-07T00:00:00.000Z",
@@ -185,7 +187,7 @@ describe("メンバー参加・退出の通知", () => {
     act(() =>
       socket.simulateServerMessage({
         type: "member_joined",
-        member: { userId: OTHER_USER_ID, name: "Taro" },
+        member: { userId: OTHER_USER_ID, name: "Taro", color: "yellow" },
       }),
     );
     expect(notifyMocks.memberJoined).toHaveBeenCalledTimes(1);
@@ -199,8 +201,8 @@ describe("メンバー参加・退出の通知", () => {
         type: "snapshot",
         notes: [],
         members: [
-          { userId: USER_ID, name: "Host" },
-          { userId: OTHER_USER_ID, name: "Taro" },
+          { userId: USER_ID, name: "Host", color: "yellow" },
+          { userId: OTHER_USER_ID, name: "Taro", color: "green" },
         ],
         phase: "phase1",
         isHost: true,
@@ -248,6 +250,384 @@ describe("サーバーメッセージ → 画面反映", () => {
       }),
     );
     expect(screen.getByDisplayValue("あとから届いた付箋")).toBeInTheDocument();
+  });
+
+  it("個人付箋をボードへドラッグすると侵入時に公開し、ドロップで位置を確定する", () => {
+    const privateNote = protocolNote({
+      visibility: "private",
+      content: "公開前のメモ",
+    });
+    const { socket } = connectWithSnapshot([privateNote]);
+    const canvas = screen.getByTestId("board-canvas");
+    const scroller = canvas.parentElement;
+    if (!scroller) throw new Error("ボードスクローラーがありません");
+    Object.defineProperty(scroller, "getBoundingClientRect", {
+      value: () => ({ left: 0, top: 0, right: 500, bottom: 400 }),
+    });
+
+    const toolbar = screen.getByTestId("private-notes-toolbar");
+    const handle = within(toolbar).getByRole("button", { name: "付箋" });
+    fireEvent.pointerDown(handle, { pointerId: 1, clientX: 600, clientY: 20 });
+    fireEvent.pointerMove(handle, { pointerId: 1, clientX: 605, clientY: 25 });
+    expect(
+      within(toolbar).queryByRole("button", { name: "付箋" }),
+    ).toBeInTheDocument();
+    const root = screen.getByTestId("board-view-root");
+    fireEvent.pointerMove(root, { pointerId: 1, clientX: 120, clientY: 140 });
+    expect(within(toolbar).queryByRole("button", { name: "付箋" })).toBeNull();
+    fireEvent.pointerUp(root, { pointerId: 1, clientX: 140, clientY: 160 });
+
+    expect(socket.sent).toContain(
+      JSON.stringify({ type: "note:publish", noteId: NOTE_ID, x: 120, y: 140 }),
+    );
+    expect(socket.sent).toContain(
+      JSON.stringify({ type: "note:move", noteId: NOTE_ID, x: 140, y: 160 }),
+    );
+  });
+
+  it("共有応答でマイ付箋が消えても、同じポインター操作で移動・ドロップできる", () => {
+    const privateNote = protocolNote({ visibility: "private" });
+    const { socket } = connectWithSnapshot([privateNote]);
+    const canvas = screen.getByTestId("board-canvas");
+    const scroller = canvas.parentElement;
+    if (!scroller) throw new Error("ボードスクローラーがありません");
+    Object.defineProperty(scroller, "getBoundingClientRect", {
+      value: () => ({ left: 0, top: 0, right: 500, bottom: 400 }),
+    });
+
+    const toolbar = screen.getByTestId("private-notes-toolbar");
+    const handle = within(toolbar).getByRole("button", { name: "付箋" });
+    fireEvent.pointerDown(handle, { pointerId: 1, clientX: 600, clientY: 20 });
+    fireEvent.pointerMove(handle, { pointerId: 1, clientX: 605, clientY: 25 });
+    const root = screen.getByTestId("board-view-root");
+    fireEvent.pointerMove(root, { pointerId: 1, clientX: 100, clientY: 120 });
+
+    act(() =>
+      socket.simulateServerMessage({
+        type: "note:inserted",
+        note: protocolNote({ visibility: "shared", x: 100, y: 120 }),
+      }),
+    );
+
+    fireEvent.pointerMove(root, { pointerId: 1, clientX: 180, clientY: 200 });
+    fireEvent.pointerUp(root, { pointerId: 1, clientX: 200, clientY: 220 });
+
+    expect(socket.sent).toContain(
+      JSON.stringify({ type: "note:drag", noteId: NOTE_ID, x: 100, y: 120 }),
+    );
+    expect(socket.sent).toContain(
+      JSON.stringify({ type: "note:move", noteId: NOTE_ID, x: 200, y: 220 }),
+    );
+  });
+
+  it("マイ付箋からボードへ公開した同じポインター操作で、マイ付箋へ戻せる", () => {
+    const privateNote = protocolNote({ visibility: "private" });
+    const { socket } = connectWithSnapshot([privateNote]);
+    const canvas = screen.getByTestId("board-canvas");
+    const scroller = canvas.parentElement;
+    if (!scroller) throw new Error("ボードスクローラーがありません");
+    Object.defineProperty(scroller, "getBoundingClientRect", {
+      value: () => ({ left: 0, top: 0, right: 500, bottom: 400 }),
+    });
+    const toolbar = screen.getByTestId("private-notes-toolbar");
+    Object.defineProperty(toolbar, "getBoundingClientRect", {
+      value: () => ({ left: 600, top: 0, right: 900, bottom: 600 }),
+    });
+
+    const handle = within(toolbar).getByRole("button", { name: "付箋" });
+    fireEvent.pointerDown(handle, { pointerId: 1, clientX: 700, clientY: 100 });
+    fireEvent.pointerMove(handle, { pointerId: 1, clientX: 705, clientY: 105 });
+    const root = screen.getByTestId("board-view-root");
+    fireEvent.pointerMove(root, { pointerId: 1, clientX: 120, clientY: 140 });
+
+    act(() =>
+      socket.simulateServerMessage({
+        type: "note:inserted",
+        note: protocolNote({ visibility: "shared", x: 120, y: 140 }),
+      }),
+    );
+
+    fireEvent.pointerMove(root, { pointerId: 1, clientX: 650, clientY: 120 });
+    fireEvent.pointerUp(root, { pointerId: 1, clientX: 650, clientY: 120 });
+
+    expect(socket.sent).toContain(
+      JSON.stringify({ type: "note:publish", noteId: NOTE_ID, x: 120, y: 140 }),
+    );
+    expect(socket.sent).toContain(
+      JSON.stringify({ type: "note:unpublish", noteId: NOTE_ID }),
+    );
+    expect(socket.sent).not.toContain(
+      expect.stringContaining('"type":"note:move"'),
+    );
+  });
+
+  it("マイ付箋からボード→マイ付箋→再びボードへ、一回のドラッグで往復できる", () => {
+    const privateNote = protocolNote({ visibility: "private" });
+    const { socket } = connectWithSnapshot([privateNote]);
+    const canvas = screen.getByTestId("board-canvas");
+    const scroller = canvas.parentElement;
+    if (!scroller) throw new Error("ボードスクローラーがありません");
+    Object.defineProperty(scroller, "getBoundingClientRect", {
+      value: () => ({ left: 0, top: 0, right: 500, bottom: 400 }),
+    });
+    const toolbar = screen.getByTestId("private-notes-toolbar");
+    Object.defineProperty(toolbar, "getBoundingClientRect", {
+      value: () => ({ left: 600, top: 0, right: 900, bottom: 600 }),
+    });
+
+    // 1) ツールバーからドラッグ開始
+    const handle = within(toolbar).getByRole("button", { name: "付箋" });
+    fireEvent.pointerDown(handle, { pointerId: 1, clientX: 700, clientY: 100 });
+    fireEvent.pointerMove(handle, { pointerId: 1, clientX: 705, clientY: 105 });
+
+    // 2) ボードへ入る → publish
+    const root = screen.getByTestId("board-view-root");
+    fireEvent.pointerMove(root, { pointerId: 1, clientX: 120, clientY: 140 });
+
+    // サーバー応答: shared として追加
+    act(() =>
+      socket.simulateServerMessage({
+        type: "note:inserted",
+        note: protocolNote({ visibility: "shared", x: 120, y: 140 }),
+      }),
+    );
+
+    // 3) ツールバーへ戻す → unpublish
+    fireEvent.pointerMove(root, { pointerId: 1, clientX: 650, clientY: 120 });
+
+    // サーバー応答: 削除 → private として戻る
+    act(() =>
+      socket.simulateServerMessage({ type: "note:deleted", noteId: NOTE_ID }),
+    );
+    act(() =>
+      socket.simulateServerMessage({
+        type: "note:inserted",
+        note: protocolNote({ visibility: "private" }),
+      }),
+    );
+
+    // 4) 再びボードへ入る → 2回目の publish
+    fireEvent.pointerMove(root, { pointerId: 1, clientX: 200, clientY: 200 });
+
+    // 5) ボード上でドロップ
+    fireEvent.pointerUp(root, { pointerId: 1, clientX: 200, clientY: 200 });
+
+    // publish が2回送信されていること
+    const publishMessages = socket.sent.filter((message) =>
+      message.includes('"type":"note:publish"'),
+    );
+    expect(publishMessages).toHaveLength(2);
+
+    // unpublish が1回送信されていること
+    const unpublishMessages = socket.sent.filter((message) =>
+      message.includes('"type":"note:unpublish"'),
+    );
+    expect(unpublishMessages).toHaveLength(1);
+
+    // 最終的に note:move でドロップ位置を確定していること
+    expect(socket.sent).toContain(
+      JSON.stringify({ type: "note:move", noteId: NOTE_ID, x: 200, y: 200 }),
+    );
+  });
+
+  it("ボード外でpointercancelされたマイ付箋は公開せず、後続イベントも無視する", () => {
+    const privateNote = protocolNote({ visibility: "private" });
+    const { socket } = connectWithSnapshot([privateNote]);
+    const canvas = screen.getByTestId("board-canvas");
+    const scroller = canvas.parentElement;
+    if (!scroller) throw new Error("ボードスクローラーがありません");
+    Object.defineProperty(scroller, "getBoundingClientRect", {
+      value: () => ({ left: 0, top: 0, right: 500, bottom: 400 }),
+    });
+
+    const toolbar = screen.getByTestId("private-notes-toolbar");
+    const handle = within(toolbar).getByRole("button", { name: "付箋" });
+    const root = screen.getByTestId("board-view-root");
+    fireEvent.pointerDown(handle, { pointerId: 1, clientX: 600, clientY: 20 });
+    fireEvent.pointerMove(handle, { pointerId: 1, clientX: 605, clientY: 25 });
+    fireEvent.pointerCancel(root, { pointerId: 1, clientX: 600, clientY: 20 });
+    fireEvent.pointerMove(root, { pointerId: 1, clientX: 100, clientY: 120 });
+
+    expect(socket.sent).not.toContain(
+      expect.stringContaining('"type":"note:publish"'),
+    );
+  });
+
+  it("自分の共有付箋をマイ付箋領域へドラッグすると非公開に戻し、note:moveを送らない", () => {
+    const { socket } = connectWithSnapshot([protocolNote()]);
+    const toolbar = screen.getByTestId("private-notes-toolbar");
+    Object.defineProperty(toolbar, "getBoundingClientRect", {
+      value: () => ({ left: 600, top: 0, right: 900, bottom: 600 }),
+    });
+
+    const note = screen.getByTestId("note-card");
+    const surface = within(note).getByRole("button", { name: "付箋" });
+    fireEvent.pointerDown(surface, {
+      pointerId: 1,
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.pointerMove(surface, {
+      pointerId: 1,
+      clientX: 110,
+      clientY: 110,
+    });
+    const root = screen.getByTestId("board-view-root");
+    fireEvent.pointerMove(root, {
+      pointerId: 1,
+      clientX: 620,
+      clientY: 120,
+    });
+    fireEvent.pointerUp(root, { pointerId: 1, clientX: 620, clientY: 120 });
+
+    expect(socket.sent).toContain(
+      JSON.stringify({ type: "note:unpublish", noteId: NOTE_ID }),
+    );
+    expect(socket.sent).not.toContain(
+      expect.stringContaining('"type":"note:move"'),
+    );
+  });
+
+  it("共有付箋をマイ付箋領域へ入れた瞬間に、サーバー応答を待たずリストへ表示を切り替える", () => {
+    connectWithSnapshot([protocolNote()]);
+    const toolbar = screen.getByTestId("private-notes-toolbar");
+    Object.defineProperty(toolbar, "getBoundingClientRect", {
+      value: () => ({ left: 600, top: 0, right: 900, bottom: 600 }),
+    });
+
+    const canvas = screen.getByTestId("board-canvas");
+    const note = within(canvas).getByTestId("note-card");
+    const surface = within(note).getByRole("button", { name: "付箋" });
+    fireEvent.pointerDown(surface, {
+      pointerId: 1,
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.pointerMove(surface, {
+      pointerId: 1,
+      clientX: 110,
+      clientY: 110,
+    });
+    fireEvent.pointerMove(screen.getByTestId("board-view-root"), {
+      pointerId: 1,
+      clientX: 620,
+      clientY: 120,
+    });
+
+    expect(within(toolbar).getByTestId("note-card")).toBeInTheDocument();
+    expect(within(canvas).queryByTestId("note-card")).not.toBeInTheDocument();
+  });
+
+  it("自分の共有付箋をマイ付箋領域へドラッグして非公開に戻し、さらに再びボードへドラッグして公開しドロップ位置を確定できる", () => {
+    const { socket } = connectWithSnapshot([protocolNote()]);
+    const toolbar = screen.getByTestId("private-notes-toolbar");
+    Object.defineProperty(toolbar, "getBoundingClientRect", {
+      value: () => ({ left: 600, top: 0, right: 900, bottom: 600 }),
+    });
+    const canvas = screen.getByTestId("board-canvas");
+    const scroller = canvas.parentElement;
+    if (!scroller) throw new Error("ボードスクローラーがありません");
+    Object.defineProperty(scroller, "getBoundingClientRect", {
+      value: () => ({ left: 0, top: 0, right: 500, bottom: 400 }),
+    });
+
+    // 1) ボードからドラッグ開始し、ツールバーへ持っていく
+    const note = screen.getByTestId("note-card");
+    const surface = within(note).getByRole("button", { name: "付箋" });
+    fireEvent.pointerDown(surface, {
+      pointerId: 1,
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.pointerMove(surface, {
+      pointerId: 1,
+      clientX: 110,
+      clientY: 110,
+    });
+    const root = screen.getByTestId("board-view-root");
+    fireEvent.pointerMove(root, {
+      pointerId: 1,
+      clientX: 620,
+      clientY: 120,
+    });
+
+    // サーバー応答: 削除 → private として戻る
+    act(() =>
+      socket.simulateServerMessage({ type: "note:deleted", noteId: NOTE_ID }),
+    );
+    act(() =>
+      socket.simulateServerMessage({
+        type: "note:inserted",
+        note: protocolNote({ visibility: "private" }),
+      }),
+    );
+
+    // 2) もう一度ボードへ持っていく
+    fireEvent.pointerMove(root, {
+      pointerId: 1,
+      clientX: 150,
+      clientY: 150,
+    });
+
+    // サーバー応答: shared として追加
+    act(() =>
+      socket.simulateServerMessage({
+        type: "note:inserted",
+        note: protocolNote({ visibility: "shared", x: 150, y: 150 }),
+      }),
+    );
+
+    // 3) ドロップして確定する
+    fireEvent.pointerUp(root, { pointerId: 1, clientX: 160, clientY: 160 });
+
+    // unpublish が送られたこと
+    expect(socket.sent).toContain(
+      JSON.stringify({ type: "note:unpublish", noteId: NOTE_ID }),
+    );
+
+    // 2回目の publish が送られたこと
+    expect(socket.sent).toContain(
+      JSON.stringify({ type: "note:publish", noteId: NOTE_ID, x: 150, y: 150 }),
+    );
+
+    // 最終的に note:move で確定すること
+    expect(socket.sent).toContain(
+      JSON.stringify({ type: "note:move", noteId: NOTE_ID, x: 160, y: 160 }),
+    );
+  });
+
+  it("他メンバーの付箋をマイ付箋領域へドラッグしても非公開に戻せない", () => {
+    const { socket } = connectWithSnapshot([
+      protocolNote({ authorId: OTHER_USER_ID }),
+    ]);
+    const toolbar = screen.getByTestId("private-notes-toolbar");
+    Object.defineProperty(toolbar, "getBoundingClientRect", {
+      value: () => ({ left: 600, top: 0, right: 900, bottom: 600 }),
+    });
+
+    const note = screen.getByTestId("note-card");
+    const surface = within(note).getByRole("button", { name: "付箋" });
+    fireEvent.pointerDown(surface, {
+      pointerId: 1,
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.pointerMove(surface, {
+      pointerId: 1,
+      clientX: 110,
+      clientY: 110,
+    });
+    expect(toolbar).not.toHaveAttribute("data-return-drop-target");
+    const root = screen.getByTestId("board-view-root");
+    fireEvent.pointerMove(root, {
+      pointerId: 1,
+      clientX: 620,
+      clientY: 120,
+    });
+
+    expect(socket.sent).not.toContain(
+      expect.stringContaining('"type":"note:unpublish"'),
+    );
   });
 
   it("note:updated で本文が置き換わる", () => {

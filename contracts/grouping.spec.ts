@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildNote } from "@/app/rooms/[id]/note-card.fixture";
+import { buildNote } from "@/components/room-board/molecules/note-card.fixture";
 import {
   calculateRenderGroups,
   type PersistentGroup,

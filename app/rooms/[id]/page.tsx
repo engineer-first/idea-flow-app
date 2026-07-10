@@ -6,6 +6,7 @@ import {
   RoomMembersResponseSchema,
 } from "@/contracts/api";
 import { isUuid } from "@/contracts/ids";
+import type { ProtocolMember } from "@/contracts/room-protocol";
 import { apiFetch } from "@/lib/api-client";
 import { getCurrentUser } from "@/lib/session/current-user";
 import { getBaseUrl } from "@/lib/session/env";
@@ -48,7 +49,7 @@ export default async function RoomPage({ params }: RoomPageProps) {
 
   // メンバー一覧を SSR で取得して初回描画時の flicker を抑える。
   // 非 2xx・不正ボディ・ネットワーク障害でも snapshot で復元できるので空配列へ。
-  let initialMembers: { userId: string; name: string }[] = [];
+  let initialMembers: ProtocolMember[] = [];
   try {
     const membersRes = await apiFetch(`/api/rooms/${id}/members`);
     const membersParsed = membersRes.ok
