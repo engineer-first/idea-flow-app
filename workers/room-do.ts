@@ -427,6 +427,7 @@ export class RoomDO extends DurableObject {
           y: message.y,
           updated_at: updatedAt,
         });
+        this.autoReorganize(this.listSharedNotes());
         return;
       }
 
@@ -1021,7 +1022,14 @@ export class RoomDO extends DurableObject {
 
   // shared の付箋は既存仕様どおり共同編集、private は作者だけが操作できる。
   private canEdit(row: NoteRow, userId: string): boolean {
-    return row.visibility === "shared" || row.author_id === userId;
+    return this.canAccessNote(row, userId);
+  }
+
+  private canAccessNote(
+    row: Pick<NoteRow, "visibility" | "author_id">,
+    viewerId: string,
+  ): boolean {
+    return row.visibility === "shared" || row.author_id === viewerId;
   }
 
   private listNotes(viewerId: string): ProtocolNote[] {
@@ -1053,7 +1061,7 @@ export class RoomDO extends DurableObject {
   }
 
   private isVisibleTo(row: NoteRow, viewerId: string): boolean {
-    return visibleTo({ viewerId }, this.toProtocolNote(row, viewerId));
+    return this.canAccessNote(row, viewerId);
   }
 
   private hasVote(noteId: string, userId: string, kind: DotVoteKind): boolean {

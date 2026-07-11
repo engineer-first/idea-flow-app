@@ -212,7 +212,7 @@ describe("メンバー色と付箋色", () => {
     const memberSnapshot = await expectType(member, "snapshot");
     const colors = memberSnapshot.members.map((item) => item.color);
     expect(colors).toHaveLength(6);
-    expect(new Set(colors)).toHaveLength(6);
+    expect(new Set(colors).size).toBe(6);
 
     const memberColor = memberSnapshot.members.find(
       (item) => item.userId === MEMBER.sub,
@@ -576,6 +576,55 @@ describe("note:create", () => {
 });
 
 describe("note:publish", () => {
+  it("公開した付箋が既存グループに近ければ自動で加入する", async () => {
+    const { owner, member } = await setupRoom();
+    const firstNoteId = await createNote({ owner, member });
+    const secondNoteId = await createNote({ owner, member });
+    const groupId = "55555555-5555-4555-8555-555555555555";
+
+    send(owner, {
+      type: "group:create",
+      group: {
+        id: groupId,
+        name: "既存グループ",
+        noteIds: [firstNoteId, secondNoteId],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    });
+    await expectType(owner, "group:updated");
+    await expectType(member, "group:updated");
+
+    send(owner, { type: "note:create" });
+    const drafted = await expectType(owner, "note:inserted");
+
+    send(owner, {
+      type: "note:publish",
+      noteId: drafted.note.id,
+      x: 100,
+      y: 100,
+    });
+    await expectType(owner, "note:inserted");
+    await expectType(member, "note:inserted");
+    const ownerGroupUpdate = await expectType(owner, "group:updated");
+    const memberGroupUpdate = await expectType(member, "group:updated");
+
+    expect(ownerGroupUpdate.group).toMatchObject({
+      id: groupId,
+      noteIds: expect.arrayContaining([
+        firstNoteId,
+        secondNoteId,
+        drafted.note.id,
+      ]),
+    });
+    expect(memberGroupUpdate.group.noteIds).toEqual(
+      ownerGroupUpdate.group.noteIds,
+    );
+
+    owner.close();
+    member.close();
+  });
+
   it("作者以外は非公開付箋を公開・編集できない", async () => {
     const { owner, member } = await setupRoom();
     send(owner, { type: "note:create" });
