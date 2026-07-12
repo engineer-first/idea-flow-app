@@ -132,33 +132,28 @@ export function RoomTimer({
 
   if (!isHost && timer.status === "idle") return null;
 
-  const chip = (
-    <Button
-      type="button"
-      data-testid="room-timer"
-      data-ended={String(isEnded)}
-      data-status={isEnded ? "ended" : timer.status}
-      aria-label={
-        timer.status === "idle"
-          ? "タイマー設定を開く"
-          : `タイマー${timer.status === "paused" ? " 一時停止中" : isEnded ? " 終了" : ""} ${formatDuration(remainingMs ?? 0)}${isHost ? "。設定を開く" : ""}`
-      }
-      aria-expanded={isHost ? panelOpen : false}
-      disabled={disabled || !isHost}
-      variant="outline"
-      className={cn(
-        "h-10 w-28 shrink-0 justify-center rounded-full px-3 shadow-sm",
-        "font-mono font-bold tabular-nums",
-        timer.status === "paused" &&
-          "border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-300",
-        isEnded &&
-          "animate-pulse border-destructive bg-destructive/15 text-destructive",
-      )}
-    >
+  const chipClassName = cn(
+    "h-10 w-28 shrink-0 justify-center rounded-full px-3 shadow-sm",
+    "font-mono font-bold tabular-nums",
+    timer.status === "paused" &&
+      "border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    isEnded &&
+      "animate-pulse border-destructive bg-destructive/15 text-destructive",
+  );
+  const chipLabel =
+    timer.status === "idle"
+      ? "タイマー設定を開く"
+      : `タイマー${timer.status === "paused" ? " 一時停止中" : isEnded ? " 終了" : ""} ${formatDuration(remainingMs ?? 0)}${isHost ? "。設定を開く" : ""}`;
+  const chipContent = (
+    <>
       {timer.status === "idle" ? (
         <span className="font-sans text-sm">タイマー</span>
       ) : (
-        <span role="timer" className="text-base">
+        <span
+          role="timer"
+          aria-label={isHost ? undefined : chipLabel}
+          className="text-base"
+        >
           {formatDuration(remainingMs ?? 0)}
         </span>
       )}
@@ -167,7 +162,35 @@ export function RoomTimer({
           Ⅱ
         </span>
       ) : null}
+    </>
+  );
+  const hostChip = (
+    <Button
+      type="button"
+      data-testid="room-timer"
+      data-ended={String(isEnded)}
+      data-status={isEnded ? "ended" : timer.status}
+      aria-label={chipLabel}
+      aria-expanded={panelOpen}
+      disabled={disabled}
+      variant="outline"
+      className={chipClassName}
+    >
+      {chipContent}
     </Button>
+  );
+  const memberChip = (
+    <span
+      data-testid="room-timer"
+      data-ended={String(isEnded)}
+      data-status={isEnded ? "ended" : timer.status}
+      className={cn(
+        "inline-flex items-center border border-border bg-background",
+        chipClassName,
+      )}
+    >
+      {chipContent}
+    </span>
   );
 
   const panel = (
@@ -306,11 +329,11 @@ export function RoomTimer({
     <div className="shrink-0">
       {isHost ? (
         <Popover open={panelOpen} onOpenChange={setPanelOpen}>
-          <PopoverTrigger asChild>{chip}</PopoverTrigger>
+          <PopoverTrigger asChild>{hostChip}</PopoverTrigger>
           {panel}
         </Popover>
       ) : (
-        chip
+        memberChip
       )}
       <span aria-live="polite" className="sr-only">
         {isEnded ? "タイマーが終了しました。" : null}

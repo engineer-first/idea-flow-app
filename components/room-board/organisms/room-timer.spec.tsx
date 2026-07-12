@@ -184,8 +184,12 @@ describe("RoomTimer", () => {
 
     const chip = screen.getByTestId("room-timer");
     expect(screen.getByRole("timer")).toHaveTextContent("00:30");
-    expect(chip).toBeDisabled();
-    expect(chip).toHaveAttribute("aria-expanded", "false");
+    expect(chip.tagName).toBe("SPAN");
+    expect(chip).not.toHaveClass("disabled:opacity-50");
+    expect(screen.getByRole("timer")).toHaveAttribute(
+      "aria-label",
+      "タイマー 一時停止中 00:30",
+    );
     fireEvent.click(chip);
     expect(screen.queryByTestId("room-timer-panel")).not.toBeInTheDocument();
     expect(
