@@ -18,6 +18,8 @@ jobs:
         with:
           # 後続ステップに git push/fetch はないため、トークンを workspace に残さない
           persist-credentials: false
+          # RoomDO migration の変更・削除をベースコミットとの差分で検査する。
+          fetch-depth: 0
 
       - uses: jdx/mise-action@v3
         with:
@@ -41,6 +43,9 @@ jobs:
 
       - name: Check RoomDO migrations index is up to date
         run: npm run gen:room-do-migrations:check
+
+      - name: Check existing RoomDO migrations are immutable
+        run: npm run check:room-do-migrations:immutable -- "${{ github.event.pull_request.base.sha }}"
 
   test:
     runs-on: ubuntu-latest

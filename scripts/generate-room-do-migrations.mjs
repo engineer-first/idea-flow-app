@@ -74,7 +74,8 @@ function escapeForTemplateLiteral(sql) {
 export function renderIndexFile(migrations) {
   const header = `// このファイルは generate-room-do-migrations.mjs による自動生成です。
 // 手で編集しないでください。変更するときは workers/room-do-migrations/ に
-// *.sql を追加・削除してから、以下を実行してください。
+// 新しい *.sql を追加してから、以下を実行してください。既存の .sql は変更・削除しない
+// でください（適用済みIDの内容が変わると、DO間でスキーマが分岐するため）。
 //
 //   npm run gen:room-do-migrations
 //
@@ -111,7 +112,7 @@ import type { RoomDoMigration } from "./apply";
       ? `export const ROOM_DO_MIGRATIONS: readonly RoomDoMigration[] = [\n${body}\n];\n`
       : "export const ROOM_DO_MIGRATIONS: readonly RoomDoMigration[] = [];\n";
 
-  return `${header}\n${arrayBlock}\nexport { migrateRoomStorage } from "./apply";\n`;
+  return `${header}\n${arrayBlock}\nexport { LEGACY_ROOM_DO_MIGRATION_IDS, migrateRoomStorage } from "./apply";\n`;
 }
 
 function main() {

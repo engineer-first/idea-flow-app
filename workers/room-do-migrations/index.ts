@@ -1,6 +1,7 @@
 // このファイルは generate-room-do-migrations.mjs による自動生成です。
 // 手で編集しないでください。変更するときは workers/room-do-migrations/ に
-// *.sql を追加・削除してから、以下を実行してください。
+// 新しい *.sql を追加してから、以下を実行してください。既存の .sql は変更・削除しない
+// でください（適用済みIDの内容が変わると、DO間でスキーマが分岐するため）。
 //
 //   npm run gen:room-do-migrations
 //
@@ -140,4 +141,4 @@ SELECT user_id, color FROM members;`,
   },
 ];
 
-export { migrateRoomStorage } from "./apply";
+export { LEGACY_ROOM_DO_MIGRATION_IDS, migrateRoomStorage } from "./apply";

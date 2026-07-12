@@ -4,7 +4,11 @@
 // （未適用IDのみ適用・原子性・fail-closed）は ./apply.spec.ts を参照。
 import { describe, expect, it } from "vitest";
 import { runInRoomDO } from "../test-helpers";
-import { migrateRoomStorage, ROOM_DO_MIGRATIONS } from "./index";
+import {
+  LEGACY_ROOM_DO_MIGRATION_IDS,
+  migrateRoomStorage,
+  ROOM_DO_MIGRATIONS,
+} from "./index";
 import { appliedMigrationIds, dropAllTables, tableNames } from "./test-helpers";
 
 const USER_A = "11111111-1111-4111-8111-111111111111";
@@ -26,7 +30,11 @@ describe("ROOM_DO_MIGRATIONS", () => {
   it("空のストレージに全マイグレーションを適用し、適用済みIDを記録する", async () => {
     await runInRoomDO("mig-fresh", (_instance, state) => {
       dropAllTables(state.storage);
-      migrateRoomStorage(state.storage, ROOM_DO_MIGRATIONS);
+      migrateRoomStorage(
+        state.storage,
+        ROOM_DO_MIGRATIONS,
+        LEGACY_ROOM_DO_MIGRATION_IDS,
+      );
       expect(tableNames(state.storage)).toEqual(ALL_TABLES);
       expect(appliedMigrationIds(state.storage)).toEqual(ALL_MIGRATION_IDS);
     });
@@ -35,8 +43,16 @@ describe("ROOM_DO_MIGRATIONS", () => {
   it("再実行しても失敗せず、適用記録も変わらない（冪等）", async () => {
     await runInRoomDO("mig-idempotent", (_instance, state) => {
       dropAllTables(state.storage);
-      migrateRoomStorage(state.storage, ROOM_DO_MIGRATIONS);
-      migrateRoomStorage(state.storage, ROOM_DO_MIGRATIONS);
+      migrateRoomStorage(
+        state.storage,
+        ROOM_DO_MIGRATIONS,
+        LEGACY_ROOM_DO_MIGRATION_IDS,
+      );
+      migrateRoomStorage(
+        state.storage,
+        ROOM_DO_MIGRATIONS,
+        LEGACY_ROOM_DO_MIGRATION_IDS,
+      );
       expect(appliedMigrationIds(state.storage)).toEqual(ALL_MIGRATION_IDS);
     });
   });
@@ -66,7 +82,11 @@ describe("ROOM_DO_MIGRATIONS", () => {
         USER_A,
       );
 
-      migrateRoomStorage(state.storage, ROOM_DO_MIGRATIONS);
+      migrateRoomStorage(
+        state.storage,
+        ROOM_DO_MIGRATIONS,
+        LEGACY_ROOM_DO_MIGRATION_IDS,
+      );
 
       expect(appliedMigrationIds(state.storage)).toEqual(ALL_MIGRATION_IDS);
       // 既存データは破壊されない。
@@ -83,7 +103,11 @@ describe("ROOM_DO_MIGRATIONS", () => {
   it("v1 → 最新: members.name と room_state / room_owner が追加され、既存行は保持される", async () => {
     await runInRoomDO("mig-v2-alter", (_instance, state) => {
       dropAllTables(state.storage);
-      migrateRoomStorage(state.storage, ROOM_DO_MIGRATIONS.slice(0, 1));
+      migrateRoomStorage(
+        state.storage,
+        ROOM_DO_MIGRATIONS.slice(0, 1),
+        LEGACY_ROOM_DO_MIGRATION_IDS,
+      );
 
       // v1 時点でメンバーを追加（name カラムがまだ無い）
       state.storage.sql.exec(
@@ -94,7 +118,11 @@ describe("ROOM_DO_MIGRATIONS", () => {
         state.storage.sql.exec("SELECT user_id FROM members").toArray(),
       ).toEqual([{ user_id: USER_A }]);
 
-      migrateRoomStorage(state.storage, ROOM_DO_MIGRATIONS);
+      migrateRoomStorage(
+        state.storage,
+        ROOM_DO_MIGRATIONS,
+        LEGACY_ROOM_DO_MIGRATION_IDS,
+      );
 
       // v4/v6 適用後もメンバー行が残り、name は空文字、color は yellow
       const rows = state.storage.sql
@@ -121,14 +149,22 @@ describe("ROOM_DO_MIGRATIONS", () => {
   it("v4 → 最新: 既存の付箋は shared として可視性を持つ", async () => {
     await runInRoomDO("mig-note-visibility", (_instance, state) => {
       dropAllTables(state.storage);
-      migrateRoomStorage(state.storage, ROOM_DO_MIGRATIONS.slice(0, 4));
+      migrateRoomStorage(
+        state.storage,
+        ROOM_DO_MIGRATIONS.slice(0, 4),
+        LEGACY_ROOM_DO_MIGRATION_IDS,
+      );
       state.storage.sql.exec(
         `INSERT INTO notes (id, author_id, content, x, y, created_at, updated_at)
          VALUES ('note-1', ?1, '既存付箋', 0, 0, '2026-07-10T00:00:00.000Z', '2026-07-10T00:00:00.000Z')`,
         USER_A,
       );
 
-      migrateRoomStorage(state.storage, ROOM_DO_MIGRATIONS);
+      migrateRoomStorage(
+        state.storage,
+        ROOM_DO_MIGRATIONS,
+        LEGACY_ROOM_DO_MIGRATION_IDS,
+      );
 
       expect(
         state.storage.sql.exec("SELECT visibility FROM notes").toArray(),

@@ -19,12 +19,13 @@ const C = {
   id: "20260101000003",
   sql: "CREATE TABLE t_c (id INTEGER PRIMARY KEY)",
 };
+const LEGACY_IDS = [A.id, B.id, C.id];
 
 describe("migrateRoomStorage", () => {
   it("適用済みIDはスキップし、未適用のマイグレーションだけを実行する", async () => {
     await runInRoomDO("mig-pending-only", (_instance, state) => {
       dropAllTables(state.storage);
-      migrateRoomStorage(state.storage, [A]);
+      migrateRoomStorage(state.storage, [A], LEGACY_IDS);
 
       // 適用済みIDの SQL を書き換えて再実行しても、再実行されない
       // （実行されたら t_rewritten が生えるので検出できる）。
@@ -32,7 +33,7 @@ describe("migrateRoomStorage", () => {
         id: A.id,
         sql: "CREATE TABLE t_rewritten (id INTEGER PRIMARY KEY)",
       };
-      migrateRoomStorage(state.storage, [rewritten, B]);
+      migrateRoomStorage(state.storage, [rewritten, B], LEGACY_IDS);
 
       const tables = tableNames(state.storage);
       expect(tables).toContain("t_a");
@@ -49,9 +50,9 @@ describe("migrateRoomStorage", () => {
     // （C の再適用は CREATE TABLE の重複エラーとしても検出される。）
     await runInRoomDO("mig-interleaved", (_instance, state) => {
       dropAllTables(state.storage);
-      migrateRoomStorage(state.storage, [A, C]);
+      migrateRoomStorage(state.storage, [A, C], LEGACY_IDS);
 
-      migrateRoomStorage(state.storage, [A, B, C]);
+      migrateRoomStorage(state.storage, [A, B, C], LEGACY_IDS);
 
       const tables = tableNames(state.storage);
       expect(tables).toContain("t_a");
@@ -64,10 +65,12 @@ describe("migrateRoomStorage", () => {
   it("途中で失敗したら適用記録も部分適用も残らない（原子性）", async () => {
     await runInRoomDO("mig-atomic", (_instance, state) => {
       dropAllTables(state.storage);
-      migrateRoomStorage(state.storage, [A]);
+      migrateRoomStorage(state.storage, [A], LEGACY_IDS);
 
       const broken = { id: B.id, sql: "THIS IS NOT VALID SQL" };
-      expect(() => migrateRoomStorage(state.storage, [A, broken, C])).toThrow();
+      expect(() =>
+        migrateRoomStorage(state.storage, [A, broken, C], LEGACY_IDS),
+      ).toThrow();
 
       // 失敗したバッチの効果は残らず、適用記録も進まない。
       expect(appliedMigrationIds(state.storage)).toEqual([A.id]);
@@ -79,11 +82,13 @@ describe("migrateRoomStorage", () => {
   it("ストレージに、コードが知らない適用済みIDがあると明示的に失敗する（fail-closed）", async () => {
     await runInRoomDO("mig-future", (_instance, state) => {
       dropAllTables(state.storage);
-      migrateRoomStorage(state.storage, [A, B]);
+      migrateRoomStorage(state.storage, [A, B], LEGACY_IDS);
 
       // ロールバックされた古いコード（A までしか知らない）が起きた状況。
       // 未来のスキーマを黙って触って壊すより、明示的に落とす。
-      expect(() => migrateRoomStorage(state.storage, [A])).toThrow();
+      expect(() =>
+        migrateRoomStorage(state.storage, [A], LEGACY_IDS),
+      ).toThrow();
     });
   });
 });
@@ -105,7 +110,7 @@ describe("旧・件数方式（schema_version）からの変換", () => {
         id: A.id,
         sql: "CREATE TABLE t_rewritten (id INTEGER PRIMARY KEY)",
       };
-      migrateRoomStorage(state.storage, [rewritten, B]);
+      migrateRoomStorage(state.storage, [rewritten, B], LEGACY_IDS);
 
       const tables = tableNames(state.storage);
       expect(tables).not.toContain("t_rewritten");
@@ -124,7 +129,28 @@ describe("旧・件数方式（schema_version）からの変換", () => {
       );
       state.storage.sql.exec("INSERT INTO schema_version (version) VALUES (5)");
 
-      expect(() => migrateRoomStorage(state.storage, [A])).toThrow();
+      expect(() =>
+        migrateRoomStorage(state.storage, [A], LEGACY_IDS),
+      ).toThrow();
+    });
+  });
+
+  it("現在の配列に古いIDが割り込んでも、旧版番号を当時のIDへ変換する", async () => {
+    await runInRoomDO("mig-legacy-interleaved", (_instance, state) => {
+      dropAllTables(state.storage);
+      // 旧方式では A, C の2件がこの順で適用済みだったものとする。
+      state.storage.sql.exec(A.sql);
+      state.storage.sql.exec(C.sql);
+      state.storage.sql.exec(
+        "CREATE TABLE schema_version (version INTEGER NOT NULL)",
+      );
+      state.storage.sql.exec("INSERT INTO schema_version (version) VALUES (2)");
+
+      // ID方式への切替後、古いIDの B が A と C の間へ割り込んだ。
+      migrateRoomStorage(state.storage, [A, B, C], [A.id, C.id]);
+
+      expect(tableNames(state.storage)).toContain("t_b");
+      expect(appliedMigrationIds(state.storage)).toEqual([A.id, B.id, C.id]);
     });
   });
 });

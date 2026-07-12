@@ -24,9 +24,23 @@ export type RoomDoMigration = {
   readonly sql: string;
 };
 
+// schema_version 方式で公開済みだった配列の順序。現在の timestamp ソート済み
+// 配列から導出すると、古いIDが後から割り込んだ際に旧版番号の意味が変わるため、
+// ID方式への変換が完了するまで不変の対応表として保持する。
+export const LEGACY_ROOM_DO_MIGRATION_IDS: readonly string[] = [
+  "20260708092459",
+  "20260709094433",
+  "20260709094434",
+  "20260710134136",
+  "20260711011916",
+  "20260712113052",
+  "20260712113053",
+];
+
 export function migrateRoomStorage(
   storage: DurableObjectStorage,
   migrations: readonly RoomDoMigration[],
+  legacyMigrationIds: readonly string[],
 ): void {
   storage.transactionSync(() => {
     storage.sql.exec(
@@ -36,7 +50,7 @@ export function migrateRoomStorage(
        )`,
     );
 
-    convertLegacySchemaVersion(storage, migrations);
+    convertLegacySchemaVersion(storage, legacyMigrationIds);
 
     const applied = new Set(
       storage.sql
@@ -70,7 +84,7 @@ export function migrateRoomStorage(
 // schema_migrations に一本化する。
 function convertLegacySchemaVersion(
   storage: DurableObjectStorage,
-  migrations: readonly RoomDoMigration[],
+  legacyMigrationIds: readonly string[],
 ): void {
   const legacyTable = storage.sql
     .exec(
@@ -82,13 +96,13 @@ function convertLegacySchemaVersion(
   const rows = storage.sql.exec("SELECT version FROM schema_version").toArray();
   const count = rows.length > 0 ? Number(rows[0]?.version) : 0;
 
-  if (count > migrations.length) {
+  if (count > legacyMigrationIds.length) {
     throw new Error(
-      `RoomDO のスキーマ版 v${count} はこのコードが知る v${migrations.length} より新しい`,
+      `RoomDO の旧スキーマ版 v${count} はこのコードが知る v${legacyMigrationIds.length} より新しい`,
     );
   }
 
-  for (const { id } of migrations.slice(0, count)) {
+  for (const id of legacyMigrationIds.slice(0, count)) {
     storage.sql.exec(
       "INSERT OR IGNORE INTO schema_migrations (id) VALUES (?1)",
       id,

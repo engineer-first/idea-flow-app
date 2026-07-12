@@ -106,7 +106,9 @@ describe("renderIndexFile", () => {
     expect(output).toContain(
       "export const ROOM_DO_MIGRATIONS: readonly RoomDoMigration[] = [",
     );
-    expect(output).toContain('export { migrateRoomStorage } from "./apply";');
+    expect(output).toContain(
+      'export { LEGACY_ROOM_DO_MIGRATION_IDS, migrateRoomStorage } from "./apply";',
+    );
     // 適用済み管理に使うIDとして、ファイル名の timestamp が埋め込まれること。
     expect(output).toContain('id: "20260708092459"');
     expect(output).toContain('id: "20260709094433"');
@@ -134,6 +136,7 @@ describe("renderIndexFile", () => {
     const output = renderIndexFile([]);
     expect(output).toContain("自動生成");
     expect(output).toContain("gen:room-do-migrations");
+    expect(output).toContain("既存の .sql は変更・削除しない");
   });
 });
 
