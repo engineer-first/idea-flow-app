@@ -21,7 +21,11 @@ export function applyMemberServerMessage(
 ): Member[] {
   switch (message.type) {
     case "snapshot": {
-      return message.members.map((m) => ({ userId: m.userId, name: m.name }));
+      return message.members.map((m) => ({
+        userId: m.userId,
+        name: m.name,
+        color: m.color,
+      }));
     }
     case "member_joined": {
       const exists = members.some((m) => m.userId === message.member.userId);

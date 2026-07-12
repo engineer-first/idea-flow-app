@@ -17,7 +17,6 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { notify } from "@/app/_lib/notify";
-import { BoardView } from "@/app/rooms/[id]/board-view";
 import { leaveRoom } from "@/app/rooms/actions";
 import {
   applyServerMessage,
@@ -32,6 +31,7 @@ import {
   type Member,
 } from "@/app/rooms/room-reducer";
 import { createThrottled } from "@/app/rooms/throttle";
+import { BoardView } from "@/components/room-board/templates/board-view";
 import { DRAG_BROADCAST_THROTTLE_MS } from "@/contracts/board";
 import type { PersistentGroup } from "@/contracts/grouping";
 import type {
@@ -228,9 +228,20 @@ export function RoomBoard({
   }, [roomId, handleServerMessage, handleStatusChange, webSocketFactory]);
 
   const handleAddNote = useCallback(() => {
-    // 楽観挿入はしない: note:inserted の配信を待つ（RoomDO は同 colo の
-    // 単一オブジェクトなので往復は短く、ID 生成をサーバーに一本化できる）。
+    // 新規付箋は個人ツールバーへだけ挿入される。ID生成と永続化はRoomDOに一本化する。
     clientRef.current?.send({ type: "note:create" });
+  }, []);
+
+  const handlePrivateNotePublish = useCallback(
+    (noteId: string, x: number, y: number) => {
+      clientRef.current?.send({ type: "note:publish", noteId, x, y });
+    },
+    [],
+  );
+
+  const handlePrivateNoteUnpublish = useCallback((noteId: string) => {
+    setDraggingNoteId(null);
+    clientRef.current?.send({ type: "note:unpublish", noteId });
   }, []);
 
   const handleNextPhase = useCallback(() => {
@@ -378,7 +389,8 @@ export function RoomBoard({
 
   return (
     <BoardView
-      notes={notes}
+      notes={notes.filter((note) => note.visibility === "shared")}
+      privateNotes={notes.filter((note) => note.visibility === "private")}
       groups={groups}
       inviteCode={inviteCode}
       inviteUrl={inviteUrl}
@@ -390,7 +402,11 @@ export function RoomBoard({
       currentUserId={currentUserId}
       hostUserId={hostUserId}
       isNextPhasePending={isNextPhasePending}
-      onAddNote={handleAddNote}
+      onAddPrivateNote={handleAddNote}
+      onPrivateNoteContentChange={handleNoteContentChange}
+      onPrivateNoteDelete={handleNoteDelete}
+      onPrivateNotePublish={handlePrivateNotePublish}
+      onPrivateNoteUnpublish={handlePrivateNoteUnpublish}
       onNextPhase={handleNextPhase}
       onNoteDragStart={handleNoteDragStart}
       onNoteDragMove={handleNoteDragMove}

@@ -123,8 +123,12 @@ describe("RoomMembersResponseSchema", () => {
     expect(
       RoomMembersResponseSchema.parse({
         members: [
-          { userId: UUID, name: "Owner" },
-          { userId: "22222222-2222-4222-8222-222222222222", name: "Member" },
+          { userId: UUID, name: "Owner", color: "yellow" },
+          {
+            userId: "22222222-2222-4222-8222-222222222222",
+            name: "Member",
+            color: "green",
+          },
         ],
       }).members,
     ).toHaveLength(2);

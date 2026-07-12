@@ -13,6 +13,8 @@ function note(overrides?: Partial<ProtocolNote>): ProtocolNote {
     id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     authorId: AUTHOR,
     content: "メモ",
+    visibility: "shared",
+    color: "yellow",
     x: 100,
     y: 100,
     createdAt: "2026-07-07T00:00:00.000Z",
@@ -33,15 +35,21 @@ const TABLE: Array<{
   expected: boolean;
 }> = [
   {
-    name: "共有ボード: 作者本人は自分の付箋を見られる",
+    name: "private: 作者本人は自分の付箋を見られる",
     viewerId: AUTHOR,
-    note: note(),
+    note: note({ visibility: "private" }),
     expected: true,
   },
   {
-    name: "共有ボード: 他のメンバーも付箋を見られる",
+    name: "private: 他のメンバーは付箋を見られない",
     viewerId: VIEWER,
-    note: note(),
+    note: note({ visibility: "private" }),
+    expected: false,
+  },
+  {
+    name: "shared: 他のメンバーも付箋を見られる",
+    viewerId: VIEWER,
+    note: note({ visibility: "shared" }),
     expected: true,
   },
 ];

@@ -1,0 +1,123 @@
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { buildNote } from "@/components/room-board/molecules/note-card.fixture";
+import { NOTE_COLOR_STYLES } from "@/components/room-board/molecules/note-color";
+import { PrivateNotesToolbar } from "@/components/room-board/organisms/private-notes-toolbar";
+
+function setup(disabled = false) {
+  const props = {
+    notes: [buildNote({ visibility: "private", content: "非公開の考え" })],
+    disabled,
+    selectedNoteId: null,
+    onSelect: vi.fn(),
+    onAdd: vi.fn(),
+    onContentChange: vi.fn(),
+    onDelete: vi.fn(),
+    onDragStart: vi.fn(),
+  };
+  render(<PrivateNotesToolbar {...props} />);
+  return props;
+}
+
+describe("PrivateNotesToolbar", () => {
+  it("個人付箋を表示し、追加と削除を操作できる", () => {
+    const props = setup();
+    expect(screen.getByDisplayValue("非公開の考え")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "付箋を追加" }));
+
+    const surface = screen.getByRole("button", { name: "付箋" });
+    fireEvent.keyDown(surface, { key: "Backspace" });
+
+    expect(props.onAdd).toHaveBeenCalledOnce();
+    expect(props.onDelete).toHaveBeenCalledWith("note-1");
+  });
+
+  it("ボード付箋と同じ付箋スタイルで表示し、投票UIは表示しない", () => {
+    setup();
+
+    const note = screen.getByTestId("note-card");
+    expect(note).toHaveAttribute("data-slot", "sticky-note");
+    expect(note).toHaveStyle({
+      backgroundColor: NOTE_COLOR_STYLES.yellow.backgroundColor,
+    });
+    expect(
+      screen.queryByRole("button", { name: "主観ドットを投票" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("下部ドック用に付箋を横並び・横スクロールで表示する", () => {
+    const props = {
+      notes: [
+        buildNote({ id: "note-1", visibility: "private" }),
+        buildNote({ id: "note-2", visibility: "private" }),
+      ],
+      disabled: false,
+      selectedNoteId: null,
+      onSelect: vi.fn(),
+      onAdd: vi.fn(),
+      onContentChange: vi.fn(),
+      onDelete: vi.fn(),
+      onDragStart: vi.fn(),
+    };
+    render(<PrivateNotesToolbar {...props} />);
+
+    const toolbar = screen.getByTestId("private-notes-toolbar");
+    expect(toolbar).toHaveClass("flex-row");
+    expect(within(toolbar).getByTestId("private-notes-scroll")).toHaveClass(
+      "overflow-x-auto",
+    );
+    expect(within(toolbar).getByTestId("private-notes-list")).toHaveClass(
+      "flex",
+      "flex-nowrap",
+    );
+    expect(within(toolbar).getAllByTestId("note-card")[0]).toHaveClass(
+      "shrink-0",
+    );
+  });
+
+  it("本文はフォーカスを外した時に保存する", () => {
+    const props = {
+      notes: [buildNote({ visibility: "private", content: "非公開の考え" })],
+      disabled: false,
+      selectedNoteId: "note-1",
+      onSelect: vi.fn(),
+      onAdd: vi.fn(),
+      onContentChange: vi.fn(),
+      onDelete: vi.fn(),
+      onDragStart: vi.fn(),
+    };
+    render(<PrivateNotesToolbar {...props} />);
+
+    const surface = screen.getByRole("button", { name: "付箋" });
+    fireEvent.click(surface);
+
+    const textarea = screen.getByRole("textbox");
+    fireEvent.change(textarea, { target: { value: "書き換えた内容" } });
+    fireEvent.blur(textarea);
+
+    expect(props.onContentChange).toHaveBeenCalledWith(
+      "note-1",
+      "書き換えた内容",
+    );
+  });
+
+  it("切断中は追加・編集・削除を無効化する", () => {
+    const props = {
+      notes: [buildNote({ visibility: "private", content: "非公開 of考え" })],
+      disabled: true,
+      selectedNoteId: null,
+      onSelect: vi.fn(),
+      onAdd: vi.fn(),
+      onContentChange: vi.fn(),
+      onDelete: vi.fn(),
+      onDragStart: vi.fn(),
+    };
+    render(<PrivateNotesToolbar {...props} />);
+
+    expect(screen.getByRole("button", { name: "付箋を追加" })).toBeDisabled();
+
+    const surface = screen.getByRole("button", { name: "付箋" });
+    expect(surface).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("textbox")).toHaveAttribute("readonly");
+  });
+});

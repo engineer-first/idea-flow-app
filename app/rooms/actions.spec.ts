@@ -192,6 +192,15 @@ describe("joinRoom", () => {
     });
   });
 
+  it("API が 409 ならルームの参加上限エラーを返す", async () => {
+    apiFetchMock.mockResolvedValue(new Response("full", { status: 409 }));
+
+    await expect(joinRoom(joinFormData("ABC123"))).resolves.toEqual({
+      ok: false,
+      error: "このルームは20人までです。",
+    });
+  });
+
   it("API が 5xx なら一時障害として見つからないと誤案内しない", async () => {
     apiFetchMock.mockResolvedValue(new Response("error", { status: 503 }));
 

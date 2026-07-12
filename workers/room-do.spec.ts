@@ -5,11 +5,17 @@
 // room-protocol.spec.ts の E2E テスト（実 WS 接続）で検証する。
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
+import { NOTE_COLOR_PALETTE } from "../contracts/room-protocol";
 import { HOST_ID_HEADER, USER_ID_HEADER } from "./room-do";
 import { listMemberIds, runInRoomDO } from "./test-helpers";
 
 const USER_A = "11111111-1111-4111-8111-111111111111";
 const USER_B = "22222222-2222-4222-8222-222222222222";
+const NOTE_COLOR_PATTERN = new RegExp(`^(${NOTE_COLOR_PALETTE.join("|")})$`);
+
+function userIdAt(index: number): string {
+  return `${index.toString().padStart(8, "0")}-0000-4000-8000-000000000000`;
+}
 
 function roomStub(name: string) {
   return env.ROOM_DO.get(env.ROOM_DO.idFromName(name));
@@ -30,14 +36,26 @@ describe("RoomDO メンバーシップ", () => {
     await stub.upsertMember(USER_A, "新しい名前");
     await stub.upsertMember(USER_A, "新しい名前");
     const members = await stub.listMembers();
-    expect(members).toEqual([{ userId: USER_A, name: "新しい名前" }]);
+    expect(members).toEqual([
+      {
+        userId: USER_A,
+        name: "新しい名前",
+        color: expect.stringMatching(NOTE_COLOR_PATTERN),
+      },
+    ]);
   });
 
   it("upsertMember の name が undefined なら空文字で保存される", async () => {
     const stub = roomStub("room-upsert-undef");
     await stub.upsertMember(USER_A, undefined);
     const members = await stub.listMembers();
-    expect(members).toEqual([{ userId: USER_A, name: "" }]);
+    expect(members).toEqual([
+      {
+        userId: USER_A,
+        name: "",
+        color: expect.stringMatching(NOTE_COLOR_PATTERN),
+      },
+    ]);
   });
 
   it("listMembers は参加順（joined_at 昇順）で返す", async () => {
@@ -45,8 +63,16 @@ describe("RoomDO メンバーシップ", () => {
     await stub.upsertMember(USER_A, "Alpha");
     await stub.upsertMember(USER_B, "Beta");
     expect(await stub.listMembers()).toEqual([
-      { userId: USER_A, name: "Alpha" },
-      { userId: USER_B, name: "Beta" },
+      {
+        userId: USER_A,
+        name: "Alpha",
+        color: expect.stringMatching(NOTE_COLOR_PATTERN),
+      },
+      {
+        userId: USER_B,
+        name: "Beta",
+        color: expect.stringMatching(NOTE_COLOR_PATTERN),
+      },
     ]);
   });
 
@@ -62,6 +88,45 @@ describe("RoomDO メンバーシップ", () => {
     await stub.upsertMember(USER_A, "Alpha");
     await stub.upsertMember(USER_B, "Beta");
     expect(await listMemberIds("room-order")).toEqual([USER_A, USER_B]);
+  });
+
+  it("通算20名には重複しない色を割り当て、21人目は拒否する", async () => {
+    const roomId = "room-member-color-capacity";
+    const stub = roomStub(roomId);
+
+    for (let index = 1; index <= 20; index++) {
+      await expect(
+        stub.upsertMember(userIdAt(index), `Member ${index}`),
+      ).resolves.toEqual({
+        ok: true,
+      });
+    }
+
+    const members = await stub.listMembers();
+    expect(new Set(members.map((member) => member.color)).size).toBe(20);
+    await expect(stub.upsertMember(userIdAt(21), "Member 21")).resolves.toEqual(
+      {
+        ok: false,
+        reason: "room-full",
+      },
+    );
+    expect(await listMemberIds(roomId)).toHaveLength(20);
+  });
+
+  it("退出後の再参加は元の色を使い、通算上限を消費しない", async () => {
+    const roomId = "room-member-color-rejoin";
+    const stub = roomStub(roomId);
+    const firstUserId = userIdAt(1);
+
+    await expect(stub.upsertMember(firstUserId, "Member 1")).resolves.toEqual({
+      ok: true,
+    });
+    const firstColor = (await stub.listMembers())[0]?.color;
+    await stub.leave(firstUserId);
+    await expect(stub.upsertMember(firstUserId, "Member 1")).resolves.toEqual({
+      ok: true,
+    });
+    expect((await stub.listMembers())[0]?.color).toBe(firstColor);
   });
 });
 
@@ -184,7 +249,8 @@ describe("RoomDO snapshot", () => {
 
     expect(res.status).toBe(101);
 
-    const ws = res.webSocket!;
+    const ws = res.webSocket;
+    if (!ws) throw new Error("WebSocket 接続を確立できませんでした。");
     ws.accept();
 
     const message = await new Promise<MessageEvent>((resolve) => {
@@ -218,7 +284,8 @@ describe("RoomDO snapshot", () => {
 
     expect(res.status).toBe(101);
 
-    const ws = res.webSocket!;
+    const ws = res.webSocket;
+    if (!ws) throw new Error("WebSocket 接続を確立できませんでした。");
     ws.accept();
 
     const message = await new Promise<MessageEvent>((resolve) => {
@@ -286,7 +353,8 @@ describe("RoomDO phase:next", () => {
 
     expect(res.status).toBe(101);
 
-    const ws = res.webSocket!;
+    const ws = res.webSocket;
+    if (!ws) throw new Error("WebSocket 接続を確立できませんでした。");
     ws.accept();
 
     // snapshot を捨てる
@@ -324,7 +392,8 @@ describe("RoomDO phase:next", () => {
 
     expect(res.status).toBe(101);
 
-    const ws = res.webSocket!;
+    const ws = res.webSocket;
+    if (!ws) throw new Error("WebSocket 接続を確立できませんでした。");
     ws.accept();
 
     // snapshot を捨てる
@@ -372,8 +441,11 @@ describe("RoomDO phase:next", () => {
     expect(hostRes.status).toBe(101);
     expect(memberRes.status).toBe(101);
 
-    const host = hostRes.webSocket!;
-    const member = memberRes.webSocket!;
+    const host = hostRes.webSocket;
+    const member = memberRes.webSocket;
+    if (!host || !member) {
+      throw new Error("WebSocket 接続を確立できませんでした。");
+    }
 
     host.accept();
     member.accept();
@@ -419,6 +491,109 @@ describe("RoomDO phase:next", () => {
 });
 
 describe("RoomDO phase4 のボード凍結", () => {
+  it("phase4 では非公開付箋を公開できない", async () => {
+    const stub = roomStub("room-phase4-publish-freeze");
+    await stub.initializeNewRoom(USER_A, "Host");
+
+    const res = await stub.fetch("https://do/ws", {
+      headers: {
+        Upgrade: "websocket",
+        [USER_ID_HEADER]: USER_A,
+        [HOST_ID_HEADER]: USER_A,
+      },
+    });
+    expect(res.status).toBe(101);
+    const ws = res.webSocket;
+    if (!ws) throw new Error("WebSocket 接続を確立できませんでした。");
+    ws.accept();
+    await new Promise<MessageEvent>((resolve) => {
+      ws.addEventListener("message", resolve, { once: true });
+    });
+
+    ws.send(JSON.stringify({ type: "note:create" }));
+    const insertedEvent = await new Promise<MessageEvent>((resolve) => {
+      ws.addEventListener("message", resolve, { once: true });
+    });
+    const inserted = JSON.parse(String(insertedEvent.data)) as {
+      type: string;
+      note: { id: string };
+    };
+    expect(inserted.type).toBe("note:inserted");
+
+    await stub.setPhase("phase4", USER_A, USER_A);
+    ws.send(
+      JSON.stringify({
+        type: "note:publish",
+        noteId: inserted.note.id,
+        x: 100,
+        y: 100,
+      }),
+    );
+
+    const errorEvent = await new Promise<MessageEvent>((resolve) => {
+      ws.addEventListener("message", resolve, { once: true });
+    });
+    expect(JSON.parse(String(errorEvent.data))).toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+
+    ws.close();
+  });
+
+  it("phase4 では共有付箋を非公開に戻せない", async () => {
+    const stub = roomStub("room-phase4-unpublish-freeze");
+    await stub.initializeNewRoom(USER_A, "Host");
+
+    const res = await stub.fetch("https://do/ws", {
+      headers: {
+        Upgrade: "websocket",
+        [USER_ID_HEADER]: USER_A,
+        [HOST_ID_HEADER]: USER_A,
+      },
+    });
+    expect(res.status).toBe(101);
+    const ws = res.webSocket;
+    if (!ws) throw new Error("WebSocket 接続を確立できませんでした。");
+    ws.accept();
+    await new Promise<MessageEvent>((resolve) => {
+      ws.addEventListener("message", resolve, { once: true });
+    });
+
+    ws.send(JSON.stringify({ type: "note:create" }));
+    const draftEvent = await new Promise<MessageEvent>((resolve) => {
+      ws.addEventListener("message", resolve, { once: true });
+    });
+    const draft = JSON.parse(String(draftEvent.data)) as {
+      note: { id: string };
+    };
+
+    ws.send(
+      JSON.stringify({
+        type: "note:publish",
+        noteId: draft.note.id,
+        x: 100,
+        y: 100,
+      }),
+    );
+    await new Promise<MessageEvent>((resolve) => {
+      ws.addEventListener("message", resolve, { once: true });
+    });
+
+    await stub.setPhase("phase4", USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "note:unpublish", noteId: draft.note.id }));
+
+    const errorEvent = await new Promise<MessageEvent>((resolve) => {
+      ws.addEventListener("message", resolve, { once: true });
+    });
+    expect(JSON.parse(String(errorEvent.data))).toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+
+    ws.close();
+  });
+
   it("phase4 では WebSocket からの付箋本文更新を拒否し、付箋内容を維持する", async () => {
     const stub = roomStub("room-phase4-freeze");
     await stub.initializeNewRoom(USER_A, "Host");

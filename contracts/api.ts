@@ -1,7 +1,7 @@
 // api-worker の REST 境界スキーマ。Next の Server Actions（クライアント側）と
 // api-worker（サーバー側）の両方が参照するコントラクト層。
 import { z } from "zod";
-import { PhaseSchema } from "./room-protocol";
+import { NoteColorSchema, PhaseSchema } from "./room-protocol";
 
 export const SyncUserResponseSchema = z.object({
   userId: z.string().uuid(),
@@ -39,6 +39,7 @@ export const RoomInfoResponseSchema = RoomSummarySchema.extend({
 export const RoomMemberSchema = z.object({
   userId: z.string().uuid(),
   name: z.string(),
+  color: NoteColorSchema,
 });
 export const RoomMembersResponseSchema = z.object({
   members: z.array(RoomMemberSchema),

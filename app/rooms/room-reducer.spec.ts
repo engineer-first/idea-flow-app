@@ -12,10 +12,12 @@ import type {
 const A: ProtocolMember = {
   userId: "11111111-1111-4111-8111-111111111111",
   name: "Yuki Tanaka",
+  color: "yellow",
 };
 const B: ProtocolMember = {
   userId: "22222222-2222-4222-8222-222222222222",
   name: "Taro Yamada",
+  color: "green",
 };
 
 describe("applyMemberServerMessage", () => {
@@ -39,7 +41,11 @@ describe("applyMemberServerMessage", () => {
   });
 
   it("member_joined で同一 userId は name を最新化して反映（重複しない）", () => {
-    const renamed: ProtocolMember = { userId: A.userId, name: "新しい名前" };
+    const renamed: ProtocolMember = {
+      userId: A.userId,
+      name: "新しい名前",
+      color: "yellow",
+    };
     const message: ServerMessage = {
       type: "member_joined",
       member: renamed,
@@ -57,6 +63,8 @@ describe("applyMemberServerMessage", () => {
         id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         authorId: A.userId,
         content: "",
+        visibility: "shared",
+        color: "yellow",
         x: 0,
         y: 0,
         createdAt: "2026-07-07T00:00:00.000Z",
@@ -125,6 +133,8 @@ describe("applyPhaseServerMessage", () => {
         id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         authorId: A.userId,
         content: "",
+        visibility: "shared",
+        color: "yellow",
         x: 0,
         y: 0,
         createdAt: "2026-07-07T00:00:00.000Z",

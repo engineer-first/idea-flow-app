@@ -7,6 +7,9 @@ import { describe, expect, it } from "vitest";
 import {
   ClientMessageSchema,
   MemberSchema,
+  NOTE_COLOR_PALETTE,
+  NoteColorSchema,
+  NoteSchema,
   PhaseSchema,
   parseClientMessage,
   parseServerMessage,
@@ -15,6 +18,20 @@ import {
 
 const USER_A = "11111111-1111-4111-8111-111111111111";
 const USER_B = "22222222-2222-4222-8222-222222222222";
+
+describe("NoteColorSchema", () => {
+  it("固定20色のパレットを受け入れ、重複を持たない", () => {
+    expect(NOTE_COLOR_PALETTE).toHaveLength(20);
+    expect(new Set(NOTE_COLOR_PALETTE).size).toBe(20);
+    for (const color of NOTE_COLOR_PALETTE) {
+      expect(NoteColorSchema.parse(color)).toBe(color);
+    }
+  });
+
+  it("パレット外の色は拒否する", () => {
+    expect(NoteColorSchema.safeParse("black").success).toBe(false);
+  });
+});
 
 describe("PhaseSchema", () => {
   it("lobby と phase1-4 を受け入れる", () => {
@@ -37,12 +54,17 @@ describe("PhaseSchema", () => {
 
 describe("MemberSchema", () => {
   it("userId と name を受け入れる", () => {
-    expect(MemberSchema.parse({ userId: USER_A, name: "Yuki Tanaka" })).toEqual(
-      {
+    expect(
+      MemberSchema.parse({
         userId: USER_A,
         name: "Yuki Tanaka",
-      },
-    );
+        color: "yellow",
+      }),
+    ).toEqual({
+      userId: USER_A,
+      name: "Yuki Tanaka",
+      color: "yellow",
+    });
   });
 
   it("UUID でない userId は拒否する", () => {
@@ -56,19 +78,46 @@ describe("MemberSchema", () => {
   });
 });
 
+describe("NoteSchema", () => {
+  const note = {
+    id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    authorId: USER_A,
+    content: "個人メモ",
+    color: "yellow",
+    x: 100,
+    y: 200,
+    createdAt: "2026-07-10T00:00:00.000Z",
+    updatedAt: "2026-07-10T00:00:00.000Z",
+    dotVotes: {
+      subjective: { count: 0, votedByMe: false, ownCount: 0 },
+      objective: { count: 0, votedByMe: false, ownCount: 0 },
+    },
+  };
+
+  it.each(["private", "shared"])("visibility=%s を受け入れる", (visibility) => {
+    expect(NoteSchema.parse({ ...note, visibility }).visibility).toBe(
+      visibility,
+    );
+  });
+
+  it("visibility が無い付箋は拒否する", () => {
+    expect(NoteSchema.safeParse(note).success).toBe(false);
+  });
+});
+
 describe("ServerMessageSchema", () => {
   it("snapshot は notes / members / phase / isHost を必須にする", () => {
     const parsed = ServerMessageSchema.parse({
       type: "snapshot",
       notes: [],
-      members: [{ userId: USER_A, name: "Owner" }],
+      members: [{ userId: USER_A, name: "Owner", color: "yellow" }],
       phase: "lobby",
       isHost: true,
     });
     expect(parsed).toEqual({
       type: "snapshot",
       notes: [],
-      members: [{ userId: USER_A, name: "Owner" }],
+      members: [{ userId: USER_A, name: "Owner", color: "yellow" }],
       phase: "lobby",
       isHost: true,
     });
@@ -87,7 +136,7 @@ describe("ServerMessageSchema", () => {
     const result = ServerMessageSchema.safeParse({
       type: "snapshot",
       notes: [],
-      members: [{ userId: USER_A, name: "Owner" }],
+      members: [{ userId: USER_A, name: "Owner", color: "yellow" }],
       isHost: true,
     });
     expect(result.success).toBe(false);
@@ -97,7 +146,7 @@ describe("ServerMessageSchema", () => {
     const result = ServerMessageSchema.safeParse({
       type: "snapshot",
       notes: [],
-      members: [{ userId: USER_A, name: "Owner" }],
+      members: [{ userId: USER_A, name: "Owner", color: "yellow" }],
       phase: "lobby",
     });
     expect(result.success).toBe(false);
@@ -106,11 +155,11 @@ describe("ServerMessageSchema", () => {
   it("member_joined を受け入れる", () => {
     const parsed = ServerMessageSchema.parse({
       type: "member_joined",
-      member: { userId: USER_A, name: "Owner" },
+      member: { userId: USER_A, name: "Owner", color: "yellow" },
     });
     expect(parsed).toEqual({
       type: "member_joined",
-      member: { userId: USER_A, name: "Owner" },
+      member: { userId: USER_A, name: "Owner", color: "yellow" },
     });
   });
 
@@ -183,6 +232,49 @@ describe("ServerMessageSchema", () => {
 });
 
 describe("ClientMessageSchema", () => {
+  it("note:publish は付箋IDとボード座標を受け入れる", () => {
+    expect(
+      ClientMessageSchema.parse({
+        type: "note:publish",
+        noteId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        x: 400,
+        y: 300,
+      }),
+    ).toMatchObject({ type: "note:publish", x: 400, y: 300 });
+  });
+
+  it("note:publish はボード外の座標を拒否する", () => {
+    expect(
+      ClientMessageSchema.safeParse({
+        type: "note:publish",
+        noteId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        x: -1,
+        y: 0,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("note:unpublish は付箋IDを受け入れる", () => {
+    expect(
+      ClientMessageSchema.parse({
+        type: "note:unpublish",
+        noteId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      }),
+    ).toEqual({
+      type: "note:unpublish",
+      noteId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    });
+  });
+
+  it("note:unpublish はUUIDでない付箋IDを拒否する", () => {
+    expect(
+      ClientMessageSchema.safeParse({
+        type: "note:unpublish",
+        noteId: "not-a-uuid",
+      }).success,
+    ).toBe(false);
+  });
+
   it("start_phase を受け入れる", () => {
     expect(ClientMessageSchema.parse({ type: "start_phase" })).toEqual({
       type: "start_phase",
@@ -287,7 +379,7 @@ describe("プロトコル整合性", () => {
   it("ServerMessageSchema と parseServerMessage は同じ型を返す", () => {
     const json = JSON.stringify({
       type: "member_joined",
-      member: { userId: USER_A, name: "A" },
+      member: { userId: USER_A, name: "A", color: "yellow" },
     });
     const parsed = parseServerMessage(json);
     const direct = ServerMessageSchema.parse(JSON.parse(json));

@@ -140,6 +140,9 @@ export async function joinRoom(formData: FormData): Promise<JoinRoomResult> {
   if (res.status === 404 || res.status === 400) {
     return { ok: false, error: "ルームが見つかりませんでした。" };
   }
+  if (res.status === 409) {
+    return { ok: false, error: "このルームは20人までです。" };
+  }
   if (!res.ok) {
     return {
       ok: false,
