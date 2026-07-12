@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { buildNote } from "@/components/room-board/molecules/note-card.fixture";
+import { NOTE_COLOR_STYLES } from "@/components/room-board/molecules/note-color";
 import { PrivateNotesToolbar } from "@/components/room-board/organisms/private-notes-toolbar";
 
 function setup(disabled = false) {
@@ -36,7 +37,9 @@ describe("PrivateNotesToolbar", () => {
 
     const note = screen.getByTestId("note-card");
     expect(note).toHaveAttribute("data-slot", "sticky-note");
-    expect(note).toHaveClass("bg-amber-50");
+    expect(note).toHaveStyle({
+      backgroundColor: NOTE_COLOR_STYLES.yellow.backgroundColor,
+    });
     expect(
       screen.queryByRole("button", { name: "主観ドットを投票" }),
     ).not.toBeInTheDocument();

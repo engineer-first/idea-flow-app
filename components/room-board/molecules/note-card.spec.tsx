@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { NoteCard } from "@/components/room-board/molecules/note-card";
 import { buildNote } from "@/components/room-board/molecules/note-card.fixture";
+import { NOTE_COLOR_STYLES } from "@/components/room-board/molecules/note-color";
 import type { NoteColor } from "@/contracts/room-protocol";
 import { NOTE_CONTENT_MAX_LENGTH } from "@/contracts/room-protocol";
 
@@ -48,18 +49,19 @@ describe("NoteCard", () => {
     expect(screen.getByDisplayValue("こんにちは")).toBeInTheDocument();
   });
 
-  it.each<[NoteColor, string]>([
-    ["yellow", "bg-amber-50"],
-    ["green", "bg-emerald-50"],
-    ["blue", "bg-sky-50"],
-    ["pink", "bg-rose-50"],
-    ["orange", "bg-orange-50"],
-    ["purple", "bg-purple-50"],
-  ])("%s の付箋を薄いパステルカラーで表示する", (color, className) => {
+  it.each<NoteColor>([
+    "yellow",
+    "green",
+    "blue",
+    "pink",
+    "orange",
+    "purple",
+  ])("%s の付箋をFigJam風パステルカラーで表示する", (color) => {
     setup({ note: buildNote({ color }) });
 
-    expect(getCard()).toHaveClass(className);
-    expect(getCard().className).not.toContain("dark:bg-");
+    expect(getCard()).toHaveStyle({
+      backgroundColor: NOTE_COLOR_STYLES[color].backgroundColor,
+    });
   });
 
   it("薄い付箋色の上で本文を常に濃色で表示する", () => {

@@ -8,6 +8,7 @@ const meta = {
   parameters: { layout: "centered" },
   args: {
     name: "Yuki Tanaka",
+    color: "yellow",
     size: 36,
     isMe: false,
   },

@@ -5,11 +5,17 @@
 // room-protocol.spec.ts の E2E テスト（実 WS 接続）で検証する。
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
+import { NOTE_COLOR_PALETTE } from "../contracts/room-protocol";
 import { HOST_ID_HEADER, USER_ID_HEADER } from "./room-do";
 import { listMemberIds, runInRoomDO } from "./test-helpers";
 
 const USER_A = "11111111-1111-4111-8111-111111111111";
 const USER_B = "22222222-2222-4222-8222-222222222222";
+const NOTE_COLOR_PATTERN = new RegExp(`^(${NOTE_COLOR_PALETTE.join("|")})$`);
+
+function userIdAt(index: number): string {
+  return `${index.toString().padStart(8, "0")}-0000-4000-8000-000000000000`;
+}
 
 function roomStub(name: string) {
   return env.ROOM_DO.get(env.ROOM_DO.idFromName(name));
@@ -34,9 +40,7 @@ describe("RoomDO メンバーシップ", () => {
       {
         userId: USER_A,
         name: "新しい名前",
-        color: expect.stringMatching(
-          /^(yellow|green|blue|pink|orange|purple)$/,
-        ),
+        color: expect.stringMatching(NOTE_COLOR_PATTERN),
       },
     ]);
   });
@@ -49,9 +53,7 @@ describe("RoomDO メンバーシップ", () => {
       {
         userId: USER_A,
         name: "",
-        color: expect.stringMatching(
-          /^(yellow|green|blue|pink|orange|purple)$/,
-        ),
+        color: expect.stringMatching(NOTE_COLOR_PATTERN),
       },
     ]);
   });
@@ -64,16 +66,12 @@ describe("RoomDO メンバーシップ", () => {
       {
         userId: USER_A,
         name: "Alpha",
-        color: expect.stringMatching(
-          /^(yellow|green|blue|pink|orange|purple)$/,
-        ),
+        color: expect.stringMatching(NOTE_COLOR_PATTERN),
       },
       {
         userId: USER_B,
         name: "Beta",
-        color: expect.stringMatching(
-          /^(yellow|green|blue|pink|orange|purple)$/,
-        ),
+        color: expect.stringMatching(NOTE_COLOR_PATTERN),
       },
     ]);
   });
@@ -90,6 +88,45 @@ describe("RoomDO メンバーシップ", () => {
     await stub.upsertMember(USER_A, "Alpha");
     await stub.upsertMember(USER_B, "Beta");
     expect(await listMemberIds("room-order")).toEqual([USER_A, USER_B]);
+  });
+
+  it("通算20名には重複しない色を割り当て、21人目は拒否する", async () => {
+    const roomId = "room-member-color-capacity";
+    const stub = roomStub(roomId);
+
+    for (let index = 1; index <= 20; index++) {
+      await expect(
+        stub.upsertMember(userIdAt(index), `Member ${index}`),
+      ).resolves.toEqual({
+        ok: true,
+      });
+    }
+
+    const members = await stub.listMembers();
+    expect(new Set(members.map((member) => member.color)).size).toBe(20);
+    await expect(stub.upsertMember(userIdAt(21), "Member 21")).resolves.toEqual(
+      {
+        ok: false,
+        reason: "room-full",
+      },
+    );
+    expect(await listMemberIds(roomId)).toHaveLength(20);
+  });
+
+  it("退出後の再参加は元の色を使い、通算上限を消費しない", async () => {
+    const roomId = "room-member-color-rejoin";
+    const stub = roomStub(roomId);
+    const firstUserId = userIdAt(1);
+
+    await expect(stub.upsertMember(firstUserId, "Member 1")).resolves.toEqual({
+      ok: true,
+    });
+    const firstColor = (await stub.listMembers())[0]?.color;
+    await stub.leave(firstUserId);
+    await expect(stub.upsertMember(firstUserId, "Member 1")).resolves.toEqual({
+      ok: true,
+    });
+    expect((await stub.listMembers())[0]?.color).toBe(firstColor);
   });
 });
 

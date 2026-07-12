@@ -7,6 +7,8 @@ import { describe, expect, it } from "vitest";
 import {
   ClientMessageSchema,
   MemberSchema,
+  NOTE_COLOR_PALETTE,
+  NoteColorSchema,
   NoteSchema,
   PhaseSchema,
   parseClientMessage,
@@ -16,6 +18,20 @@ import {
 
 const USER_A = "11111111-1111-4111-8111-111111111111";
 const USER_B = "22222222-2222-4222-8222-222222222222";
+
+describe("NoteColorSchema", () => {
+  it("固定20色のパレットを受け入れ、重複を持たない", () => {
+    expect(NOTE_COLOR_PALETTE).toHaveLength(20);
+    expect(new Set(NOTE_COLOR_PALETTE).size).toBe(20);
+    for (const color of NOTE_COLOR_PALETTE) {
+      expect(NoteColorSchema.parse(color)).toBe(color);
+    }
+  });
+
+  it("パレット外の色は拒否する", () => {
+    expect(NoteColorSchema.safeParse("black").success).toBe(false);
+  });
+});
 
 describe("PhaseSchema", () => {
   it("lobby と phase1-4 を受け入れる", () => {

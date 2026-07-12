@@ -15,7 +15,10 @@ import {
   NOTE_SPAWN_X_MIN,
   NOTE_SPAWN_Y_MIN,
 } from "../contracts/board";
-import type { ServerMessage } from "../contracts/room-protocol";
+import {
+  NOTE_COLOR_PALETTE,
+  type ServerMessage,
+} from "../contracts/room-protocol";
 import {
   connectRoomAs,
   createRoomAs,
@@ -35,6 +38,7 @@ const MEMBER: TestUser = {
   email: "member@example.test",
   name: "Member",
 };
+const NOTE_COLOR_PATTERN = new RegExp(`^(${NOTE_COLOR_PALETTE.join("|")})$`);
 
 // 2ユーザーが同じルームに接続した状態を作る（snapshot 受信済み）。
 async function setupRoom(): Promise<{
@@ -99,9 +103,7 @@ describe("snapshot（接続・再接続の復帰パス）", () => {
       {
         userId: OWNER.sub,
         name: OWNER.name,
-        color: expect.stringMatching(
-          /^(yellow|green|blue|pink|orange|purple)$/,
-        ),
+        color: expect.stringMatching(NOTE_COLOR_PATTERN),
       },
     ]);
     expect(snapshot.phase).toBe("lobby");
@@ -140,16 +142,12 @@ describe("snapshot（接続・再接続の復帰パス）", () => {
       {
         userId: OWNER.sub,
         name: OWNER.name,
-        color: expect.stringMatching(
-          /^(yellow|green|blue|pink|orange|purple)$/,
-        ),
+        color: expect.stringMatching(NOTE_COLOR_PATTERN),
       },
       {
         userId: MEMBER.sub,
         name: MEMBER.name,
-        color: expect.stringMatching(
-          /^(yellow|green|blue|pink|orange|purple)$/,
-        ),
+        color: expect.stringMatching(NOTE_COLOR_PATTERN),
       },
     ]);
     expect(snapshot.phase).toBe("lobby");
@@ -275,9 +273,7 @@ describe("member_joined（Realtime 反映）", () => {
       member: {
         userId: newcomer.sub,
         name: newcomer.name,
-        color: expect.stringMatching(
-          /^(yellow|green|blue|pink|orange|purple)$/,
-        ),
+        color: expect.stringMatching(NOTE_COLOR_PATTERN),
       },
     });
     expect(toMember).toEqual({
@@ -285,9 +281,7 @@ describe("member_joined（Realtime 反映）", () => {
       member: {
         userId: newcomer.sub,
         name: newcomer.name,
-        color: expect.stringMatching(
-          /^(yellow|green|blue|pink|orange|purple)$/,
-        ),
+        color: expect.stringMatching(NOTE_COLOR_PATTERN),
       },
     });
 
@@ -318,23 +312,17 @@ describe("member_joined（Realtime 反映）", () => {
       {
         userId: OWNER.sub,
         name: OWNER.name,
-        color: expect.stringMatching(
-          /^(yellow|green|blue|pink|orange|purple)$/,
-        ),
+        color: expect.stringMatching(NOTE_COLOR_PATTERN),
       },
       {
         userId: MEMBER.sub,
         name: MEMBER.name,
-        color: expect.stringMatching(
-          /^(yellow|green|blue|pink|orange|purple)$/,
-        ),
+        color: expect.stringMatching(NOTE_COLOR_PATTERN),
       },
       {
         userId: newcomer.sub,
         name: newcomer.name,
-        color: expect.stringMatching(
-          /^(yellow|green|blue|pink|orange|purple)$/,
-        ),
+        color: expect.stringMatching(NOTE_COLOR_PATTERN),
       },
     ]);
 
@@ -359,7 +347,7 @@ describe("member_joined（Realtime 反映）", () => {
     expect(joined.member).toEqual({
       userId: newcomer.sub,
       name: newcomer.name,
-      color: expect.stringMatching(/^(yellow|green|blue|pink|orange|purple)$/),
+      color: expect.stringMatching(NOTE_COLOR_PATTERN),
     });
     // 2 回目: 既存なので broadcast されない（member への到着も無し）
     await joinRoomAs(newcomer, await getInviteCode(roomId, OWNER));
@@ -430,6 +418,18 @@ describe("member_left（退出の Realtime 反映）", () => {
     // （member_left と member_joined が両方届くことで「リアルタイム反映が
     // 生きている」ことを示す）
     const { roomId, owner, member } = await setupRoom();
+    const membersBeforeLeave = await SELF.fetch(
+      `https://api.test/api/rooms/${roomId}/members`,
+      { headers: { Cookie: await sessionCookieFor(OWNER) } },
+    );
+    expect(membersBeforeLeave.status).toBe(200);
+    const beforeLeaveBody = (await membersBeforeLeave.json()) as {
+      members: Array<{ userId: string; color: string }>;
+    };
+    const colorBeforeLeave = beforeLeaveBody.members.find(
+      (memberInfo) => memberInfo.userId === MEMBER.sub,
+    )?.color;
+    expect(colorBeforeLeave).toEqual(expect.stringMatching(NOTE_COLOR_PATTERN));
 
     // member 退出
     await SELF.fetch(`https://api.test/api/rooms/${roomId}/leave`, {
@@ -455,7 +455,7 @@ describe("member_left（退出の Realtime 反映）", () => {
     expect(reJoined.member).toEqual({
       userId: MEMBER.sub,
       name: MEMBER.name,
-      color: expect.stringMatching(/^(yellow|green|blue|pink|orange|purple)$/),
+      color: colorBeforeLeave,
     });
     owner.close();
   });

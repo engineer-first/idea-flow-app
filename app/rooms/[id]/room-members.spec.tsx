@@ -9,6 +9,7 @@ import {
   RoomMembers,
 } from "@/app/rooms/[id]/room-members";
 import { buildMembers } from "@/app/rooms/[id]/room-members.fixture";
+import { NOTE_COLOR_STYLES } from "@/components/room-board/molecules/note-color";
 
 const ME = "11111111-1111-4111-8111-111111111111";
 
@@ -22,6 +23,16 @@ describe("RoomMembers", () => {
   it("メンバー数ぶんアバターが描画される", () => {
     render(<RoomMembers members={buildMembers(3)} currentUserId={ME} />);
     expect(screen.getAllByTestId("avatar")).toHaveLength(3);
+  });
+
+  it("メンバーの color と同じ背景色でアバターを描画する", () => {
+    render(<RoomMembers members={buildMembers(2)} currentUserId={ME} />);
+    expect(screen.getByLabelText("Yuki Tanaka")).toHaveStyle({
+      backgroundColor: NOTE_COLOR_STYLES.yellow.backgroundColor,
+    });
+    expect(screen.getByLabelText("Taro Yamada")).toHaveStyle({
+      backgroundColor: NOTE_COLOR_STYLES.green.backgroundColor,
+    });
   });
 
   it("一覧は 4 列グリッドで並ぶ", () => {
@@ -150,6 +161,9 @@ describe("RoomMembers", () => {
     ).toBeInTheDocument();
     // 隠れ: Hanako Sato, Jiro Suzuki, Saburo Kato
     expect(within(dialog).getByLabelText("Hanako Sato")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Hanako Sato")).toHaveStyle({
+      backgroundColor: NOTE_COLOR_STYLES.blue.backgroundColor,
+    });
     expect(within(dialog).getByText("Hanako Sato")).toBeInTheDocument();
     expect(within(dialog).getByLabelText("Jiro Suzuki")).toBeInTheDocument();
     expect(within(dialog).getByLabelText("Saburo Kato")).toBeInTheDocument();

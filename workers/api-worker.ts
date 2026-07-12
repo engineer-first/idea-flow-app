@@ -112,7 +112,10 @@ async function handleJoinRoom(
   }
 
   const stub = roomStub(env, room.roomId);
-  await stub.upsertMember(session.sub, session.name);
+  const joined = await stub.upsertMember(session.sub, session.name);
+  if (!joined.ok) {
+    return error(409, "このルームは20人までです。");
+  }
   return json({ roomId: room.roomId });
 }
 

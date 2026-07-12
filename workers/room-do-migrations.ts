@@ -81,6 +81,15 @@ export const ROOM_DO_MIGRATIONS: readonly string[] = [
   // v6: メンバーのランダム色割り当て、および付箋の個別色保持対応
   `ALTER TABLE members ADD COLUMN color TEXT NOT NULL DEFAULT 'yellow';
    ALTER TABLE notes ADD COLUMN color TEXT NOT NULL DEFAULT 'yellow';`,
+
+  // v7: 退出後も色を保持し、付箋の作者色を通算で一意にする。
+  `CREATE TABLE member_color_assignments (
+     user_id TEXT PRIMARY KEY,
+     color TEXT NOT NULL UNIQUE,
+     assigned_at TEXT NOT NULL DEFAULT (datetime('now'))
+   );
+   INSERT OR IGNORE INTO member_color_assignments (user_id, color)
+   SELECT user_id, color FROM members;`,
 ];
 
 export function migrateRoomStorage(

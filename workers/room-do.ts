@@ -19,6 +19,7 @@ import {
   type ClientMessage,
   DOT_VOTE_LIMITS,
   type DotVoteKind,
+  NOTE_COLOR_PALETTE,
   type NoteColor,
   type Phase,
   type ProtocolGroup,
@@ -65,14 +66,7 @@ type MemberRow = {
   color: NoteColor;
 };
 
-const COLOR_PALETTE: readonly NoteColor[] = [
-  "yellow",
-  "green",
-  "blue",
-  "pink",
-  "orange",
-  "purple",
-];
+type UpsertMemberResult = { ok: true } | { ok: false; reason: "room-full" };
 
 export class RoomDO extends DurableObject {
   constructor(ctx: DurableObjectState, env: Env) {
@@ -96,50 +90,61 @@ export class RoomDO extends DurableObject {
   // 新規メンバーの場合のみ、既存メンバー全員の WS に member_joined を
   // broadcast する（Realtime 反映）。新規メンバー本人には
   // snapshot.members が届くので送らない（本人除外）。
-  async upsertMember(userId: string, name: string | undefined): Promise<void> {
+  async upsertMember(
+    userId: string,
+    name: string | undefined,
+  ): Promise<UpsertMemberResult> {
     const safeName = name ?? "";
     const existed = this.isMember(userId);
+    const assigned = this.ctx.storage.sql
+      .exec(
+        "SELECT color FROM member_color_assignments WHERE user_id = ?1",
+        userId,
+      )
+      .toArray()[0] as { color: NoteColor } | undefined;
 
-    // すでに使われている色を取得
-    const usedColors = this.ctx.storage.sql
-      .exec("SELECT DISTINCT color FROM members")
-      .toArray()
-      .map((row) => String(row.color));
+    let color = assigned?.color;
+    if (!color) {
+      const assignments = this.ctx.storage.sql
+        .exec("SELECT color FROM member_color_assignments")
+        .toArray()
+        .map((row) => String(row.color));
+      if (assignments.length >= NOTE_COLOR_PALETTE.length) {
+        return { ok: false, reason: "room-full" };
+      }
 
-    const availableColors = COLOR_PALETTE.filter(
-      (c) => !usedColors.includes(c),
-    );
-
-    let color: NoteColor;
-    if (availableColors.length > 0) {
+      const availableColors = NOTE_COLOR_PALETTE.filter(
+        (candidate) => !assignments.includes(candidate),
+      );
       color =
-        availableColors[Math.floor(Math.random() * availableColors.length)];
-    } else {
-      color = COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)];
+        availableColors[Math.floor(Math.random() * availableColors.length)] ??
+        "yellow";
+      this.ctx.storage.sql.exec(
+        `INSERT INTO member_color_assignments (user_id, color)
+         VALUES (?1, ?2)`,
+        userId,
+        color,
+      );
     }
 
     this.ctx.storage.sql.exec(
       `INSERT INTO members (user_id, name, color) VALUES (?1, ?2, ?3)
-       ON CONFLICT (user_id) DO UPDATE SET name = ?2`,
+       ON CONFLICT (user_id) DO UPDATE SET name = ?2, color = ?3`,
       userId,
       safeName,
       color,
     );
 
-    const assignedColor = this.ctx.storage.sql
-      .exec("SELECT color FROM members WHERE user_id = ?1", userId)
-      .toArray()[0] as { color: NoteColor } | undefined;
-    const colorToSend = assignedColor?.color ?? "yellow";
-
     if (!existed) {
       this.broadcastToAllExcept(
         {
           type: "member_joined",
-          member: { userId, name: safeName, color: colorToSend },
+          member: { userId, name: safeName, color },
         },
         userId,
       );
     }
+    return { ok: true };
   }
 
   // 新規ルーム作成直後にロビー状態へ。

@@ -65,7 +65,7 @@ export function RoomMembers({
               data-host={isHostMember ? "true" : undefined}
               className="flex min-w-0 flex-col items-center gap-1 text-center"
             >
-              <Avatar name={member.name} isMe={isMe} />
+              <Avatar name={member.name} color={member.color} isMe={isMe} />
               <span className="flex min-w-0 flex-col items-center">
                 <span
                   className={cn(
@@ -122,6 +122,7 @@ export function RoomMembers({
               >
                 <Avatar
                   name={member.name}
+                  color={member.color}
                   isMe={member.userId === currentUserId}
                 />
                 <span className="truncate text-sm text-foreground">

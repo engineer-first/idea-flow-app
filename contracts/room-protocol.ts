@@ -29,14 +29,30 @@ const DotVoteSummarySchema = z.object({
   ownCount: z.number().int().min(0),
 });
 
-export const NoteColorSchema = z.enum([
+export const NOTE_COLOR_PALETTE = [
   "yellow",
   "green",
   "blue",
   "pink",
   "orange",
   "purple",
-]);
+  "red",
+  "lime",
+  "teal",
+  "cyan",
+  "indigo",
+  "violet",
+  "fuchsia",
+  "rose",
+  "amber",
+  "emerald",
+  "sky",
+  "slate",
+  "stone",
+  "zinc",
+] as const;
+
+export const NoteColorSchema = z.enum(NOTE_COLOR_PALETTE);
 export type NoteColor = z.infer<typeof NoteColorSchema>;
 
 export const NoteSchema = z.object({

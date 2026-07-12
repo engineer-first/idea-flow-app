@@ -5,6 +5,7 @@
 // - join は冪等（複数回呼んでもメンバーは重複しない）
 import { env, SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
+import { NOTE_COLOR_PALETTE } from "../contracts/room-protocol";
 import { TOKEN_AUDIENCE } from "../contracts/session";
 import { signToken } from "../lib/session/token";
 import { joinRoomAs, listMemberIds } from "./test-helpers";
@@ -24,6 +25,7 @@ const OUTSIDER = {
   email: "viewer@example.test",
   name: "Outsider",
 };
+const NOTE_COLOR_PATTERN = new RegExp(`^(${NOTE_COLOR_PALETTE.join("|")})$`);
 
 async function sessionCookie(user: typeof OWNER): Promise<string> {
   const token = await signToken(user, {
@@ -138,16 +140,12 @@ describe("メンバー一覧（GET /api/rooms/:id/members）", () => {
         {
           userId: OWNER.sub,
           name: OWNER.name,
-          color: expect.stringMatching(
-            /^(yellow|green|blue|pink|orange|purple)$/,
-          ),
+          color: expect.stringMatching(NOTE_COLOR_PATTERN),
         },
         {
           userId: MEMBER.sub,
           name: MEMBER.name,
-          color: expect.stringMatching(
-            /^(yellow|green|blue|pink|orange|purple)$/,
-          ),
+          color: expect.stringMatching(NOTE_COLOR_PATTERN),
         },
       ],
     });
@@ -232,6 +230,47 @@ describe("ルーム参加（pgTAP: join_room）", () => {
 
     const memberIds = await listMemberIds(roomId);
     expect(memberIds.sort()).toEqual([OWNER.sub, MEMBER.sub].sort());
+  });
+
+  it("通算20名に達したルームへの新規参加は409で拒否する", async () => {
+    const { roomId, inviteCode } = await createRoomAs(OWNER);
+
+    for (let index = 1; index <= 19; index++) {
+      const user = {
+        sub: `${index.toString().padStart(8, "0")}-0000-4000-8000-000000000000`,
+        email: `member-${index}@example.test`,
+        name: `Member ${index}`,
+      };
+      const joined = await SELF.fetch("https://api.test/api/rooms/join", {
+        method: "POST",
+        headers: {
+          Cookie: await sessionCookie(user),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ code: inviteCode }),
+      });
+      expect(joined.status).toBe(200);
+    }
+
+    const overflowUser = {
+      sub: "00000020-0000-4000-8000-000000000000",
+      email: "member-20@example.test",
+      name: "Member 20",
+    };
+    const rejected = await SELF.fetch("https://api.test/api/rooms/join", {
+      method: "POST",
+      headers: {
+        Cookie: await sessionCookie(overflowUser),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ code: inviteCode }),
+    });
+
+    expect(rejected.status).toBe(409);
+    expect(await rejected.json()).toEqual({
+      error: "このルームは20人までです。",
+    });
+    expect(await listMemberIds(roomId)).toHaveLength(20);
   });
 
   it("小文字や空白まじりの招待コードも補正して受け付ける", async () => {

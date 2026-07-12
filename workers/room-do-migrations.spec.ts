@@ -45,6 +45,7 @@ describe("migrateRoomStorage", () => {
       migrateRoomStorage(state.storage);
       expect(tableNames(state.storage)).toEqual([
         "groups",
+        "member_color_assignments",
         "members",
         "note_votes",
         "notes",
@@ -159,6 +160,7 @@ describe("RoomDO constructor の配線", () => {
       expect(schemaVersion(state.storage)).toBe(ROOM_DO_MIGRATIONS.length);
       expect(tableNames(state.storage)).toEqual([
         "groups",
+        "member_color_assignments",
         "members",
         "note_votes",
         "notes",
@@ -191,6 +193,11 @@ describe("RoomDO constructor の配線", () => {
         .exec("SELECT user_id, name, color FROM members")
         .toArray();
       expect(rows).toEqual([{ user_id: USER_A, name: "", color: "yellow" }]);
+      expect(
+        state.storage.sql
+          .exec("SELECT user_id, color FROM member_color_assignments")
+          .toArray(),
+      ).toEqual([{ user_id: USER_A, color: "yellow" }]);
 
       // room_state 既定は phase1（新規ルームは initializeNewRoom で lobby へ）
       const stateRows = state.storage.sql
