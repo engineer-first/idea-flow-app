@@ -1,7 +1,7 @@
 // @vitest-environment node
 // createRoom / joinRoom の Server Actions 境界のテスト。
 // api-worker の応答が「非 2xx」「2xx だが不正 JSON」のどちらでも、未処理例外に
-// せず ok: false で返すこと（create/join）。leave は従来どおり redirect。
+// せず ok: false で返すこと。
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
@@ -26,12 +26,7 @@ vi.mock("@/lib/session/current-user", () => ({
 }));
 vi.mock("next/navigation", () => ({ redirect: redirectMock }));
 
-import {
-  createRoom,
-  joinRoom,
-  leaveRoom,
-  lookupInviteRoom,
-} from "@/app/rooms/actions";
+import { createRoom, joinRoom, lookupInviteRoom } from "@/app/rooms/actions";
 
 // 実物の redirect() は例外を投げて以降の処理を打ち切る。同じ制御フローを再現する。
 class RedirectSignal extends Error {
@@ -232,57 +227,3 @@ describe("joinRoom", () => {
     expect(redirectMock).not.toHaveBeenCalled();
   });
 });
-
-describe("leaveRoom", () => {
-  function leaveFormData(roomId: string): FormData {
-    const formData = new FormData();
-    formData.set("roomId", roomId);
-    return formData;
-  }
-
-  it("未認証なら /login へリダイレクトする", async () => {
-    getCurrentUserMock.mockResolvedValue(null);
-
-    expect(
-      await callAndGetRedirect(() => leaveRoom(leaveFormData(VALID_ROOM_ID))),
-    ).toBe("/login");
-    expect(apiFetchMock).not.toHaveBeenCalled();
-  });
-
-  it("roomId が UUID 形式でなければ /home へリダイレクトする", async () => {
-    expect(
-      await callAndGetRedirect(() => leaveRoom(leaveFormData("not-uuid"))),
-    ).toBe("/home");
-    expect(apiFetchMock).not.toHaveBeenCalled();
-  });
-
-  it("退出に成功したら /home へリダイレクトする", async () => {
-    apiFetchMock.mockResolvedValue(new Response(null, { status: 204 }));
-
-    expect(
-      await callAndGetRedirect(() => leaveRoom(leaveFormData(VALID_ROOM_ID))),
-    ).toBe("/home");
-    expect(apiFetchMock).toHaveBeenCalledWith(
-      `/api/rooms/${VALID_ROOM_ID}/leave`,
-      { method: "POST" },
-    );
-  });
-
-  it("404（既に退出済み・非メンバー）は /home へリダイレクトする", async () => {
-    apiFetchMock.mockResolvedValue(new Response("not found", { status: 404 }));
-
-    expect(
-      await callAndGetRedirect(() => leaveRoom(leaveFormData(VALID_ROOM_ID))),
-    ).toBe("/home");
-  });
-
-  it("5xx は例外を投げて error boundary 行き", async () => {
-    apiFetchMock.mockResolvedValue(new Response("oops", { status: 503 }));
-
-    await expect(
-      callAndGetRedirect(() => leaveRoom(leaveFormData(VALID_ROOM_ID))),
-    ).rejects.toThrow();
-  });
-});
-
-const VALID_ROOM_ID = "123e4567-e89b-42d3-a456-426614174000";

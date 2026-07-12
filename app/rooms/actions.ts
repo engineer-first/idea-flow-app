@@ -1,9 +1,10 @@
 "use server";
 
-// ルーム作成/参加/退出の Server Actions 境界。
+// ルーム作成/参加の Server Actions 境界。
 // 実体は api-worker（D1 + RoomDO）へ委譲し、ここでは
 // 「認証されているか」「入力形式が正しいか」だけを検証する。
-// 付箋の操作は Server Actions ではなく、ルーム内 WebSocket プロトコル
+// 退出はルーム内のフロー（features/room/actions.ts）。付箋の操作は
+// Server Actions ではなく、ルーム内 WebSocket プロトコル
 // （contracts/room-protocol.ts + lib/room-client）で行う。
 
 import { redirect } from "next/navigation";
@@ -12,7 +13,6 @@ import {
   CreateRoomResponseSchema,
   JoinRoomResponseSchema,
 } from "@/contracts/api";
-import { isUuid } from "@/contracts/ids";
 import {
   isValidInviteCode,
   normalizeInviteCode,
@@ -165,38 +165,4 @@ export async function joinRoom(formData: FormData): Promise<JoinRoomResult> {
   // 参加したらボードではなくスタート画面へ遷移する。
   // 遷移と「ルームに参加しました」toast は呼び出し側クライアントが行う。
   return { ok: true, roomId: parsed.data.roomId };
-}
-
-// 退室機能。
-// roomId を hidden フィールド経由で受け取る（Server Action のフォーム送信）。
-// 未ログインは /login へ、ルーム未存在は / へリダイレクト。
-// 実処理は api-worker の POST /api/rooms/:id/leave へ委譲する。
-export async function leaveRoom(formData: FormData): Promise<void> {
-  const roomId = String(formData.get("roomId") ?? "");
-
-  if (!isUuid(roomId)) {
-    redirect("/home");
-  }
-
-  const user = await getCurrentUser();
-  if (!user) {
-    redirect("/login");
-  }
-
-  // 404（既に退出済み / 存在しない / 非メンバー / 解散済み）は成功相当でホームへ。
-  // ホストの leave はサーバ側でルーム解散になる。
-  // 5xx は呼び出し側でリカバリする。
-  const res = await apiFetch(`/api/rooms/${roomId}/leave`, {
-    method: "POST",
-  });
-
-  if (res.status === 404) {
-    // 既に退出済み（または解散済み）— ホームに戻す
-    redirect("/home");
-  }
-  if (!res.ok) {
-    throw new Error(`ルーム退出 API が失敗しました: ${res.status}`);
-  }
-
-  redirect("/home");
 }

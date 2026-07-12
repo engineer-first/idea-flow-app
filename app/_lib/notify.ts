@@ -5,34 +5,14 @@
 import { toast } from "sonner";
 
 // 通知の種類を文字列で指定する。各キーは表示文言に解決される。
-// 新しい通知を追加するときはここに関数として生やす（→ テストもしやすい）。
+// ルーム内イベントの通知は features/room/room-notify.ts へ移設済み。
+// 残りの作成・参加系も room-lifecycle feature の移設時に解体する予定。
 export const notify = {
   roomCreated(): void {
     toast.success("ルームを作成しました");
   },
-  memberJoined(name: string): void {
-    toast(`${name} さんが参加しました`);
-  },
-  memberLeft(name: string): void {
-    toast(`${name} さんが退出しました`);
-  },
-  joinedAsHost(): void {
-    toast.success("ルームに参加しました");
-  },
   joinedAsGuest(): void {
     toast.success("ルームに参加しました");
-  },
-  // 自分からルームを退出したとき。
-  roomLeft(): void {
-    toast("ルームから退出しました");
-  },
-  // ホストがルームを解散したとき（他メンバー向け）。
-  roomDisbanded(): void {
-    toast("ルームが解散されました");
-  },
-  // ホスト自身がルームを解散したとき。
-  roomDisbandedBySelf(): void {
-    toast("ルームを解散しました");
   },
   // エラー系は Server Action 側でリダイレクトや throw されるため、
   // クライアントから呼ばれる場面は限定的。必要になったら追加。

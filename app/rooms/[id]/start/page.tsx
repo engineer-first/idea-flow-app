@@ -1,5 +1,4 @@
 import { notFound, redirect } from "next/navigation";
-import { RoomStartBoard } from "@/app/rooms/[id]/start/room-start-board";
 import {
   RoomInfoResponseSchema,
   RoomMembersResponseSchema,
@@ -7,6 +6,7 @@ import {
 import { isUuid } from "@/contracts/ids";
 import type { ProtocolMember } from "@/contracts/room-protocol";
 import { buildInviteUrl } from "@/features/invite";
+import { RoomLobby } from "@/features/room";
 import { apiFetch } from "@/lib/api-client";
 import { getCurrentUser } from "@/lib/session/current-user";
 import { getBaseUrl } from "@/lib/session/env";
@@ -68,7 +68,7 @@ export default async function StartPage({ params }: StartPageProps) {
   return (
     <main className="flex h-full min-h-0 flex-1 flex-col gap-6 overflow-hidden p-4">
       <div className="min-h-0 flex-1 overflow-hidden">
-        <RoomStartBoard
+        <RoomLobby
           key={parsed.data.roomId}
           roomId={parsed.data.roomId}
           inviteCode={parsed.data.inviteCode}
