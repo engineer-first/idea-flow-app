@@ -1,32 +1,38 @@
 # エージェント指示
 
-- このファイルをリポジトリ全体の真実として扱う。
-- 指示は短く、最新に保ち、重複させない。
+- このファイルをエージェント運用ルールの真実として扱う
+  （`CLAUDE.md` は本ファイルへの symlink）。
+- 指示は短く、最新に保ち、重複させない。静的検査で強制できるルールは
+  ここに書かず、biome / ast-grep（`rules/ast-grep/`）に追加する。
 - 公開境界では明示的な型を優先する。
 - コンパイラ、lint、テスト設定を緩めて通そうとしない。
 - コードレビューのコメント、説明、提案、要約は日本語で書く。
-- 振る舞いを変更するときはTDD に従う。
+- 振る舞いを変更するときは TDD に従う。
 - テストは Vitest を使う。Worker / Durable Object のテストは
   `@cloudflare/vitest-pool-workers`（`npm run test:workers`）で行う。
 - Next.js の作業では、実装前に `node_modules/next/dist/docs/` の関連ガイドを読む。
+- プロダクト要求の真実は [`docs/prd.md`](docs/prd.md)。
 
 ## リポジトリ構成
 
-- `app/` — Next.js App Router + React + TypeScript の UI 層。
+- `app/` — Next.js App Router の UI 層。ルーティング、状態・副作用を持つ
+  コンテナ、Server Actions（認可と入力検証を必須にする）。
+  `app/mocks/` に MSW ハンドラ。
 - `contracts/` — 境界スキーマ（zod）。WS プロトコル・REST・セッション・ボード定数。
   クライアントとサーバーの両方がここを import する。実装より先にここを変える。
 - `workers/` — Cloudflare Workers 側。`api-worker.ts`（D1 + RoomDO への唯一の入口）、
   `room-do.ts`（1ルーム = 1 Durable Object の権威サーバー）、`migrations/`（D1）。
+- `lib/api-client.ts` — Next サーバーから api-worker を呼ぶ唯一のクライアント。
 - `lib/session/` — セッション（HS256 JWT Cookie）の発行・検証。
 - `lib/room-client/` — ルーム WebSocket クライアント（自動再接続つき）。
-- Server Actions — UI 近傍に置けるサーバー処理。認可と入力検証を必須にする。
-- `node_modules/next/dist/docs/` — Next.js の挙動を変更する前に読む必須ドキュメント。
+- `rules/ast-grep/` — app/workers の import 境界の機械検査ルール。
 
 ## 命名規則
 
 | 対象 | 規則 | 例 |
 | --- | --- | --- |
-| ファイル名 | `kebab-case` | `idea-card.tsx`, `use-idea-list.ts`, `format-date.ts` |
+| ファイル名 | `kebab-case` | `idea-card.tsx`, `use-idea-list.ts` |
+| テスト / ストーリー | `*.spec.ts(x)` / `*.stories.tsx` | `note-card.spec.tsx` |
 | 関数名 | `camelCase` | `getUserName` |
 | スキーマ名（型・zod） | `PascalCase` | `User`, `Idea`, `IdeaStatus` |
 
@@ -44,18 +50,14 @@
 - 失敗するテストが存在する前に本番コードを変更しない。
 - リファクタリングはテストが green になってから行う。
 
-## フロントエンドと UI（Next.js + Vitest + Storybook + MSW）
+## フロントエンドと UI（Storybook + MSW）
 
-- UI 作業では Next.js App Router と React を使う。
-- Next.js の挙動を変更する前に `node_modules/next/dist/docs/` の関連ガイドを読む。
-- テストには Vitest を使う。
-- テストファイル名は `*.spec.ts` または `*.spec.tsx` にする。
-- すべての UI コンポーネントに `*.stories.tsx` を作成する。
-- Storybook を通じて component-driven に UI を構築する。
-- 外部 API 通信は MSW でモックする。WebSocket はフェイクの注入
+- すべての UI コンポーネントに `*.stories.tsx` を作成し、
+  Storybook を通じて component-driven に構築する。
+- 外部 API 通信は MSW（`app/mocks/`）でモックする。WebSocket はフェイクの注入
   （`webSocketFactory`）でモックする。
-- コンポーネント内に生のテストデータをハードコードしない。
-- fixture、handler、builder はコンポーネントファイルの外に置く。
+- コンポーネント内に生のテストデータをハードコードしない。fixture、handler、
+  builder、ガイド文言などの固定コンテンツはコンポーネントファイルの外に置く。
 - UI がデータに依存する場合は loading、empty、success、error 状態をテストする。
 
 ## API とサーバー処理（api-worker / Server Action / Route Handler）
@@ -69,7 +71,8 @@
 
 ## リアルタイムとセキュリティ（Durable Objects）
 
-- ルームの中の真実（メンバー・付箋）は RoomDO だけが持つ。D1 の rooms 行は
+- ルーム内で共有される状態（メンバー・付箋・フェーズ進行・投票・
+  グルーピングなど）の真実は RoomDO だけが持つ。D1 の rooms 行は
   「招待コード -> ルーム解決」のディレクトリにすぎない。
 - 可視性の判定は `workers/visibility.ts` の `visibleTo()` に一点集約する。
   スナップショットにも配信にも、この関数を経由しない送信経路を作らない。
@@ -92,5 +95,3 @@
 - UI、Server Actions、api-worker、RoomDO の境界を常に意識する。
 - ブラウザコードにセッション秘密鍵や特権的なデータアクセスを含めない。
 - 境界を流れるデータの形は `contracts/` が真実。実装層は再生成可能に保つ。
-- API とサーバーサイド TypeScript のテストには Vitest を使う。
-  workerd 実行が必要なもの（DO・D1・WS）は `npm run test:workers`。
