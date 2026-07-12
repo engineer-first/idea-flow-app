@@ -81,6 +81,7 @@ describe("BoardView", () => {
   it("ホストのタイマー開始操作を onTimerStart へ渡す", () => {
     const onTimerStart = vi.fn();
     setup({ isHost: true, onTimerStart });
+    fireEvent.click(screen.getByTestId("room-timer"));
     fireEvent.change(screen.getByLabelText("タイマー時間（分）"), {
       target: { value: "1" },
     });

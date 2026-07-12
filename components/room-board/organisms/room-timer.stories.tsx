@@ -31,6 +31,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const IdleHost: Story = {};
+export const IdleHostPanelOpen: Story = {
+  args: { defaultPanelOpen: true },
+};
 export const IdleHostMinimum: Story = {
   args: { initialDurationMs: ROOM_TIMER_IDLE_MIN_DURATION_MS },
 };
@@ -43,6 +46,9 @@ export const RunningHost: Story = {
     timer: buildRunningTimer(),
   },
 };
+export const RunningHostPanelOpen: Story = {
+  args: { ...RunningHost.args, defaultPanelOpen: true },
+};
 export const RunningMember: Story = {
   args: { ...RunningHost.args, isHost: false },
 };
@@ -51,6 +57,9 @@ export const PausedHost: Story = {
     timer: buildPausedTimer(),
   },
 };
+export const PausedHostPanelOpen: Story = {
+  args: { ...PausedHost.args, defaultPanelOpen: true },
+};
 export const PausedMember: Story = {
   args: { ...PausedHost.args, isHost: false },
 };
@@ -58,6 +67,9 @@ export const EndedHost: Story = {
   args: {
     timer: buildEndedTimer(),
   },
+};
+export const EndedHostPanelOpen: Story = {
+  args: { ...EndedHost.args, defaultPanelOpen: true },
 };
 export const EndedMember: Story = {
   args: { ...EndedHost.args, isHost: false },

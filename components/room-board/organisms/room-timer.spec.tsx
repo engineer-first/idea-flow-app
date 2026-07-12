@@ -25,6 +25,15 @@ describe("RoomTimer", () => {
 
   afterEach(() => vi.useRealTimers());
 
+  const openPanel = () => {
+    fireEvent.click(screen.getByTestId("room-timer"));
+    expect(screen.getByTestId("room-timer")).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    expect(screen.getByTestId("room-timer-panel")).toBeInTheDocument();
+  };
+
   it("デフォルトのセット時間は定数化された 03:00", () => {
     render(
       <RoomTimer
@@ -36,14 +45,23 @@ describe("RoomTimer", () => {
       />,
     );
     expect(TIMER_DEFAULT_DURATION_MS).toBe(180_000);
-    expect(screen.getByTestId("room-timer")).toBeInTheDocument();
+    const chip = screen.getByTestId("room-timer");
+    expect(chip).toHaveTextContent("タイマー");
+    expect(chip).toHaveAttribute("aria-expanded", "false");
+    expect(chip).toHaveClass("h-10", "w-28");
     expect(screen.queryByRole("timer")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "1分" })).toBeNull();
     expect(screen.queryByRole("button", { name: "3分" })).toBeNull();
     expect(screen.queryByRole("button", { name: "5分" })).toBeNull();
     expect(screen.queryByRole("button", { name: "10分" })).toBeNull();
+    expect(screen.queryByTestId("room-timer-panel")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("タイマー時間（分）")).toBeNull();
+    openPanel();
     expect(screen.getByLabelText("タイマー時間（分）")).toHaveValue("03");
     expect(screen.getByLabelText("タイマー時間（秒）")).toHaveValue("00");
+    fireEvent.click(chip);
+    expect(chip).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByTestId("room-timer-panel")).not.toBeInTheDocument();
   });
 
   it("00:00 は開始できない", () => {
@@ -57,6 +75,7 @@ describe("RoomTimer", () => {
         {...handlers}
       />,
     );
+    openPanel();
     expect(screen.getByLabelText("タイマー時間（分）")).toHaveValue("00");
     expect(screen.getByLabelText("タイマー時間（分）")).toHaveAttribute(
       "aria-invalid",
@@ -80,6 +99,7 @@ describe("RoomTimer", () => {
         {...handlers}
       />,
     );
+    openPanel();
     fireEvent.change(screen.getByLabelText("タイマー時間（分）"), {
       target: { value: "100" },
     });
@@ -100,6 +120,8 @@ describe("RoomTimer", () => {
         {...handlers}
       />,
     );
+
+    openPanel();
 
     fireEvent.change(screen.getByLabelText("タイマー時間（分）"), {
       target: { value: "1" },
@@ -124,6 +146,7 @@ describe("RoomTimer", () => {
         {...handlers}
       />,
     );
+    openPanel();
     fireEvent.click(screen.getByRole("button", { name: "-1分" }));
     fireEvent.click(screen.getByRole("button", { name: "-1分" }));
     expect(screen.getByLabelText("タイマー時間（分）")).toHaveValue("00");
@@ -141,6 +164,7 @@ describe("RoomTimer", () => {
         {...handlers}
       />,
     );
+    openPanel();
     fireEvent.click(screen.getByRole("button", { name: "+1分" }));
     fireEvent.click(screen.getByRole("button", { name: "+1分" }));
     expect(screen.getByLabelText("タイマー時間（分）")).toHaveValue("99");
@@ -158,8 +182,12 @@ describe("RoomTimer", () => {
       />,
     );
 
+    const chip = screen.getByTestId("room-timer");
     expect(screen.getByRole("timer")).toHaveTextContent("00:30");
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(chip).toBeDisabled();
+    expect(chip).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(chip);
+    expect(screen.queryByTestId("room-timer-panel")).not.toBeInTheDocument();
     expect(
       screen.queryByLabelText("タイマー時間（分）"),
     ).not.toBeInTheDocument();
@@ -191,6 +219,8 @@ describe("RoomTimer", () => {
     );
 
     expect(screen.getByRole("timer")).toHaveTextContent("01:00");
+    expect(screen.getByTestId("room-timer")).toHaveClass("h-10", "w-28");
+    openPanel();
     fireEvent.click(screen.getByRole("button", { name: "一時停止" }));
     fireEvent.click(screen.getByRole("button", { name: "+1分" }));
     fireEvent.click(screen.getByRole("button", { name: "停止" }));
@@ -209,6 +239,11 @@ describe("RoomTimer", () => {
         {...handlers}
       />,
     );
+    expect(screen.getByTestId("room-timer")).toHaveAttribute(
+      "data-status",
+      "paused",
+    );
+    openPanel();
     fireEvent.click(screen.getByRole("button", { name: "再開" }));
     expect(handlers.onResume).toHaveBeenCalledOnce();
   });

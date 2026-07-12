@@ -4,6 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   TIMER_MAX_DURATION_MS,
   type TimerState,
 } from "@/contracts/room-protocol";
@@ -24,6 +29,7 @@ export type RoomTimerProps = {
   onStop: () => void;
   now?: () => number;
   initialDurationMs?: number;
+  defaultPanelOpen?: boolean;
 };
 
 const systemNow = (): number => Date.now();
@@ -76,11 +82,13 @@ export function RoomTimer({
   onStop,
   now: getNow = systemNow,
   initialDurationMs = TIMER_DEFAULT_DURATION_MS,
+  defaultPanelOpen = false,
 }: RoomTimerProps) {
   const [now, setNow] = useState(() => getNow());
   const initialFields = fieldsFromDuration(initialDurationMs);
   const [minutesInput, setMinutesInput] = useState(initialFields.minutes);
   const [secondsInput, setSecondsInput] = useState(initialFields.seconds);
+  const [panelOpen, setPanelOpen] = useState(defaultPanelOpen);
 
   useEffect(() => {
     if (timer.status !== "running") return;
@@ -124,39 +132,54 @@ export function RoomTimer({
 
   if (!isHost && timer.status === "idle") return null;
 
-  return (
-    <section
+  const chip = (
+    <Button
+      type="button"
       data-testid="room-timer"
       data-ended={String(isEnded)}
-      aria-label="ルーム共有タイマー"
+      data-status={isEnded ? "ended" : timer.status}
+      aria-label={
+        timer.status === "idle"
+          ? "タイマー設定を開く"
+          : `タイマー${timer.status === "paused" ? " 一時停止中" : isEnded ? " 終了" : ""} ${formatDuration(remainingMs ?? 0)}${isHost ? "。設定を開く" : ""}`
+      }
+      aria-expanded={isHost ? panelOpen : false}
+      disabled={disabled || !isHost}
+      variant="outline"
       className={cn(
-        "flex min-w-44 flex-col gap-2 rounded-lg border border-border bg-card p-2 shadow-sm",
+        "h-10 w-28 shrink-0 justify-center rounded-full px-3 shadow-sm",
+        "font-mono font-bold tabular-nums",
+        timer.status === "paused" &&
+          "border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-300",
         isEnded &&
           "animate-pulse border-destructive bg-destructive/15 text-destructive",
       )}
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-muted-foreground">
-          タイマー
+      {timer.status === "idle" ? (
+        <span className="font-sans text-sm">タイマー</span>
+      ) : (
+        <span role="timer" className="text-base">
+          {formatDuration(remainingMs ?? 0)}
         </span>
-        {timer.status !== "idle" ? (
-          <>
-            <span
-              role="timer"
-              className="font-mono text-xl font-bold tabular-nums"
-            >
-              {formatDuration(remainingMs ?? 0)}
-            </span>
-            <span aria-live="polite" className="sr-only">
-              {isEnded ? "タイマーが終了しました。" : null}
-            </span>
-          </>
-        ) : null}
-      </div>
+      )}
+      {timer.status === "paused" ? (
+        <span aria-hidden="true" className="ml-1 font-sans text-xs">
+          Ⅱ
+        </span>
+      ) : null}
+    </Button>
+  );
 
-      {isHost && timer.status === "idle" ? (
-        <div className="flex flex-col gap-2">
-          <div className="flex gap-1">
+  const panel = (
+    <PopoverContent
+      data-testid="room-timer-panel"
+      aria-label="タイマー設定"
+      className="w-72"
+    >
+      {timer.status === "idle" ? (
+        <div className="flex flex-col gap-3">
+          <p className="text-sm font-medium">タイマー設定</p>
+          <div className="flex items-center justify-between gap-1">
             <Button
               type="button"
               variant="outline"
@@ -180,7 +203,7 @@ export function RoomTimer({
                 setMinutesInput(normalizePart(event.target.value, 99))
               }
             />
-            <span className="self-center font-mono font-bold">:</span>
+            <span className="font-mono font-bold">:</span>
             <Input
               aria-label="タイマー時間（秒）"
               aria-invalid={parsedDuration === null}
@@ -205,67 +228,93 @@ export function RoomTimer({
               +1分
             </Button>
           </div>
-          <div className="flex">
+          <Button
+            type="button"
+            size="sm"
+            className="h-8 w-full"
+            disabled={disabled || parsedDuration === null}
+            onClick={() => {
+              if (parsedDuration !== null) onStart(parsedDuration);
+            }}
+          >
+            開始
+          </Button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium">
+              {timer.status === "paused"
+                ? "一時停止中"
+                : isEnded
+                  ? "終了"
+                  : "実行中"}
+            </p>
+            <span className="font-mono text-lg font-bold tabular-nums">
+              {formatDuration(remainingMs ?? 0)}
+            </span>
+          </div>
+          <div className="flex gap-2">
+            {timer.status === "paused" ? (
+              <Button
+                type="button"
+                size="sm"
+                className="h-8 flex-1"
+                disabled={disabled}
+                onClick={onResume}
+              >
+                再開
+              </Button>
+            ) : !isEnded ? (
+              <Button
+                type="button"
+                size="sm"
+                className="h-8 flex-1"
+                disabled={disabled}
+                onClick={onPause}
+              >
+                一時停止
+              </Button>
+            ) : null}
             <Button
               type="button"
+              variant="outline"
               size="sm"
               className="h-8 flex-1"
-              disabled={disabled || parsedDuration === null}
-              onClick={() => {
-                if (parsedDuration !== null) onStart(parsedDuration);
-              }}
+              disabled={disabled}
+              onClick={onExtend}
             >
-              開始
+              +1分
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 flex-1"
+              disabled={disabled}
+              onClick={onStop}
+            >
+              停止
             </Button>
           </div>
         </div>
-      ) : null}
+      )}
+    </PopoverContent>
+  );
 
-      {isHost && timer.status !== "idle" ? (
-        <div className="flex flex-wrap gap-1">
-          {timer.status === "paused" ? (
-            <Button
-              type="button"
-              size="sm"
-              className="h-7 flex-1 px-2 text-xs"
-              disabled={disabled}
-              onClick={onResume}
-            >
-              再開
-            </Button>
-          ) : !isEnded ? (
-            <Button
-              type="button"
-              size="sm"
-              className="h-7 flex-1 px-2 text-xs"
-              disabled={disabled}
-              onClick={onPause}
-            >
-              一時停止
-            </Button>
-          ) : null}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-7 flex-1 px-2 text-xs"
-            disabled={disabled}
-            onClick={onExtend}
-          >
-            +1分
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-7 flex-1 px-2 text-xs"
-            disabled={disabled}
-            onClick={onStop}
-          >
-            停止
-          </Button>
-        </div>
-      ) : null}
-    </section>
+  return (
+    <div className="shrink-0">
+      {isHost ? (
+        <Popover open={panelOpen} onOpenChange={setPanelOpen}>
+          <PopoverTrigger asChild>{chip}</PopoverTrigger>
+          {panel}
+        </Popover>
+      ) : (
+        chip
+      )}
+      <span aria-live="polite" className="sr-only">
+        {isEnded ? "タイマーが終了しました。" : null}
+      </span>
+    </div>
   );
 }
