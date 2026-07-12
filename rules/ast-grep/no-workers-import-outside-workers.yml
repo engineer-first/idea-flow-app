@@ -9,6 +9,7 @@ files:
   - lib/**
   - components/**
   - contracts/**
+  - features/**
 message: workers/ のモジュールを app・lib・components・contracts から直接 import しない
 note: |
   データ（D1・RoomDO）への到達は必ず api-worker の HTTP / WebSocket 境界を経由する。
@@ -29,6 +30,7 @@ files:
   - lib/**
   - components/**
   - contracts/**
+  - features/**
 message: workers/ のモジュールを app・lib・components・contracts から直接 import しない
 note: |
   データ（D1・RoomDO）への到達は必ず api-worker の HTTP / WebSocket 境界を経由する。

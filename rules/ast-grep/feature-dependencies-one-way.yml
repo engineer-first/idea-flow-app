@@ -1,0 +1,129 @@
+# 境界ルール: feature 間の依存は一方向のみ。循環を作らない。
+#
+# 許可されている feature 間エッジ（これが全て）:
+#   room → dot-vote / vote-totaling / room-members / invite
+#
+# それ以外の feature（dot-vote / vote-totaling / room-members / invite /
+# room-lifecycle / auth）は他の feature を import しない「葉」。
+# 新しいエッジが必要になったら、循環にならないことを確認した上で
+# このルールを更新する（= 依存の追加をレビュー可能な明示的変更にする）。
+id: leaf-features-must-not-import-features
+language: typescript
+severity: error
+files:
+  - features/dot-vote/**
+  - features/vote-totaling/**
+  - features/room-members/**
+  - features/invite/**
+  - features/room-lifecycle/**
+  - features/auth/**
+message: この feature は他の feature に依存しない設計（葉 feature）
+note: |
+  共有したい部品・型は contracts / lib / 依存されている側の feature の
+  公開境界（index.ts）のどれが適切かを検討する。エッジを追加する場合は
+  rules/ast-grep/feature-dependencies-one-way.yml を更新し、循環がないことを示す。
+rule:
+  any:
+    - kind: import_statement
+    - kind: export_statement
+  has:
+    field: source
+    regex: "[.@]/features/"
+---
+id: leaf-features-must-not-import-features-tsx
+language: tsx
+severity: error
+files:
+  - features/dot-vote/**
+  - features/vote-totaling/**
+  - features/room-members/**
+  - features/invite/**
+  - features/room-lifecycle/**
+  - features/auth/**
+message: この feature は他の feature に依存しない設計（葉 feature）
+note: |
+  共有したい部品・型は contracts / lib / 依存されている側の feature の
+  公開境界（index.ts）のどれが適切かを検討する。エッジを追加する場合は
+  rules/ast-grep/feature-dependencies-one-way.yml を更新し、循環がないことを示す。
+rule:
+  any:
+    - kind: import_statement
+    - kind: export_statement
+  has:
+    field: source
+    regex: "[.@]/features/"
+---
+# room が依存してよいのは dot-vote / vote-totaling / room-members / invite のみ。
+# room-lifecycle・auth への依存（および自 feature への alias import）は禁止。
+id: room-feature-allowed-edges
+language: typescript
+severity: error
+files:
+  - features/room/**
+message: room から import できる feature は dot-vote・vote-totaling・room-members・invite のみ
+note: |
+  room → room-lifecycle を許すと、room-lifecycle が room の状態（reducer 等）を
+  使った時点で循環する。ルーム内で必要なロジックは features/room に置く。
+  自 feature 内は相対 import（"./xxx"）を使う。
+rule:
+  any:
+    - kind: import_statement
+    - kind: export_statement
+  has:
+    field: source
+    regex: "[.@]/features/(room|room-lifecycle|auth)[\"'/]"
+---
+id: room-feature-allowed-edges-tsx
+language: tsx
+severity: error
+files:
+  - features/room/**
+message: room から import できる feature は dot-vote・vote-totaling・room-members・invite のみ
+note: |
+  room → room-lifecycle を許すと、room-lifecycle が room の状態（reducer 等）を
+  使った時点で循環する。ルーム内で必要なロジックは features/room に置く。
+  自 feature 内は相対 import（"./xxx"）を使う。
+rule:
+  any:
+    - kind: import_statement
+    - kind: export_statement
+  has:
+    field: source
+    regex: "[.@]/features/(room|room-lifecycle|auth)[\"'/]"
+---
+# feature 内は 1 階層のフラット構成なので、"../" が必要になる合法な import は
+# 存在しない。相対 import で親をさかのぼると、alias 規約（@/features/<name>）を
+# すり抜けて他 feature / 他レイヤーの内部へ直接依存できてしまうため、形で塞ぐ。
+id: features-must-not-escape-with-relative-imports
+language: typescript
+severity: error
+files:
+  - features/**
+message: features 内で "../" import を使わない（@/ alias か同一 feature 内の "./" を使う）
+note: |
+  他 feature は @/features/<name>（公開境界）、共有インフラは @/lib、
+  境界スキーマは @/contracts を import する。
+rule:
+  any:
+    - kind: import_statement
+    - kind: export_statement
+  has:
+    field: source
+    regex: "\\.\\./"
+---
+id: features-must-not-escape-with-relative-imports-tsx
+language: tsx
+severity: error
+files:
+  - features/**
+message: features 内で "../" import を使わない（@/ alias か同一 feature 内の "./" を使う）
+note: |
+  他 feature は @/features/<name>（公開境界）、共有インフラは @/lib、
+  境界スキーマは @/contracts を import する。
+rule:
+  any:
+    - kind: import_statement
+    - kind: export_statement
+  has:
+    field: source
+    regex: "\\.\\./"
