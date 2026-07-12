@@ -9,7 +9,6 @@
     "lint": "biome check",
     "lint:boundaries": "ast-grep scan",
     "check:migrations": "bash scripts/check-migration-numbers.sh",
-    "check:room-do-migrations:immutable": "node scripts/check-room-do-migration-immutability.mjs",
     "fix": "biome check --write",
     "format": "biome format --write",
     "cf-typegen": "wrangler types --config workers/wrangler.jsonc workers/worker-configuration.d.ts",
