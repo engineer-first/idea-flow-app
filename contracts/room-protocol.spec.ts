@@ -14,6 +14,7 @@ import {
   parseClientMessage,
   parseServerMessage,
   ServerMessageSchema,
+  TimerStateSchema,
 } from "./room-protocol";
 
 const USER_A = "11111111-1111-4111-8111-111111111111";
@@ -49,6 +50,53 @@ describe("PhaseSchema", () => {
   it("未知のフェーズは拒否する", () => {
     expect(PhaseSchema.safeParse("review").success).toBe(false);
     expect(PhaseSchema.safeParse("").success).toBe(false);
+  });
+});
+
+describe("TimerStateSchema", () => {
+  it("idle / running / paused の共有状態を受け入れる", () => {
+    expect(TimerStateSchema.parse({ status: "idle" })).toEqual({
+      status: "idle",
+    });
+    expect(
+      TimerStateSchema.parse({
+        status: "running",
+        endsAt: 1_700_000_060_000,
+        durationMs: 60_000,
+      }),
+    ).toEqual({
+      status: "running",
+      endsAt: 1_700_000_060_000,
+      durationMs: 60_000,
+    });
+    expect(
+      TimerStateSchema.parse({
+        status: "paused",
+        remainingMs: 30_000,
+        durationMs: 60_000,
+      }),
+    ).toEqual({
+      status: "paused",
+      remainingMs: 30_000,
+      durationMs: 60_000,
+    });
+  });
+
+  it("負数や有限でない時刻・時間を拒否する", () => {
+    expect(
+      TimerStateSchema.safeParse({
+        status: "running",
+        endsAt: Number.POSITIVE_INFINITY,
+        durationMs: 60_000,
+      }).success,
+    ).toBe(false);
+    expect(
+      TimerStateSchema.safeParse({
+        status: "paused",
+        remainingMs: -1,
+        durationMs: 60_000,
+      }).success,
+    ).toBe(false);
   });
 });
 
@@ -113,6 +161,8 @@ describe("ServerMessageSchema", () => {
       members: [{ userId: USER_A, name: "Owner", color: "yellow" }],
       phase: "lobby",
       isHost: true,
+      timer: { status: "idle" },
+      serverNow: 1_700_000_000_000,
     });
     expect(parsed).toEqual({
       type: "snapshot",
@@ -120,6 +170,8 @@ describe("ServerMessageSchema", () => {
       members: [{ userId: USER_A, name: "Owner", color: "yellow" }],
       phase: "lobby",
       isHost: true,
+      timer: { status: "idle" },
+      serverNow: 1_700_000_000_000,
     });
   });
 
@@ -269,6 +321,33 @@ describe("ServerMessageSchema", () => {
 });
 
 describe("ClientMessageSchema", () => {
+  it("timer:start は 1ms〜99分59秒だけを受け入れる", () => {
+    expect(
+      ClientMessageSchema.parse({ type: "timer:start", durationMs: 1 }),
+    ).toEqual({ type: "timer:start", durationMs: 1 });
+    expect(
+      ClientMessageSchema.parse({
+        type: "timer:start",
+        durationMs: 5_999_000,
+      }),
+    ).toEqual({ type: "timer:start", durationMs: 5_999_000 });
+    for (const durationMs of [0, -1, 5_999_001, 1.5]) {
+      expect(
+        ClientMessageSchema.safeParse({ type: "timer:start", durationMs })
+          .success,
+      ).toBe(false);
+    }
+  });
+
+  it.each([
+    "timer:pause",
+    "timer:resume",
+    "timer:extend",
+    "timer:stop",
+  ])("%s はペイロードなしで受け入れる", (type) => {
+    expect(ClientMessageSchema.parse({ type })).toEqual({ type });
+  });
+
   it("note:publish は付箋IDとボード座標を受け入れる", () => {
     expect(
       ClientMessageSchema.parse({
@@ -351,6 +430,8 @@ describe("parseServerMessage", () => {
           members: [],
           phase: "lobby",
           isHost: false,
+          timer: { status: "idle" },
+          serverNow: 1_700_000_000_000,
         }),
       ),
     ).toEqual({
@@ -359,6 +440,8 @@ describe("parseServerMessage", () => {
       members: [],
       phase: "lobby",
       isHost: false,
+      timer: { status: "idle" },
+      serverNow: 1_700_000_000_000,
     });
   });
 

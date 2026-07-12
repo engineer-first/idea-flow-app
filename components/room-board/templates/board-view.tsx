@@ -11,6 +11,7 @@ import { DotVoteSummary } from "@/components/dotvote/organisms/dot-vote-summary"
 import { NoteCard } from "@/components/room-board/molecules/note-card";
 import { StickyNote } from "@/components/room-board/molecules/sticky-note";
 import { PrivateNotesToolbar } from "@/components/room-board/organisms/private-notes-toolbar";
+import { RoomTimer } from "@/components/room-board/organisms/room-timer";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,6 +45,7 @@ import {
   DOT_VOTE_LIMITS,
   type DotVoteKind,
   type Phase,
+  type TimerState,
 } from "@/contracts/room-protocol";
 
 // WebSocket 接続の表示用状態。値の生成は room-board（コンテナ）の責務で、
@@ -70,6 +72,8 @@ export type BoardViewProps = {
   inviteCode: string;
   inviteUrl: string;
   phase: Phase;
+  timer: TimerState;
+  timerServerOffsetMs: number;
   isHost: boolean;
   connectionStatus: BoardConnectionStatus;
   draggingNoteId: string | null;
@@ -99,6 +103,11 @@ export type BoardViewProps = {
   isLeaving: boolean;
   // 次フェーズへ。ホストのみ UI 表示。
   onNextPhase: () => void;
+  onTimerStart: (durationMs: number) => void;
+  onTimerPause: () => void;
+  onTimerResume: () => void;
+  onTimerExtend: () => void;
+  onTimerStop: () => void;
 };
 
 export function BoardView({
@@ -107,6 +116,8 @@ export function BoardView({
   inviteCode,
   inviteUrl,
   phase,
+  timer,
+  timerServerOffsetMs,
   isHost,
   connectionStatus,
   draggingNoteId,
@@ -132,6 +143,11 @@ export function BoardView({
   onLeave,
   isLeaving,
   onNextPhase,
+  onTimerStart,
+  onTimerPause,
+  onTimerResume,
+  onTimerExtend,
+  onTimerStop,
 }: BoardViewProps) {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
@@ -454,6 +470,17 @@ export function BoardView({
                 ? "退出中…"
                 : "退出する"}
           </Button>
+          <RoomTimer
+            timer={timer}
+            serverOffsetMs={timerServerOffsetMs}
+            isHost={isHost}
+            disabled={isDisconnected}
+            onStart={onTimerStart}
+            onPause={onTimerPause}
+            onResume={onTimerResume}
+            onExtend={onTimerExtend}
+            onStop={onTimerStop}
+          />
         </div>
       </div>
 

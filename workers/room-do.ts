@@ -2,8 +2,9 @@
 // - メンバーシップ（誰がこのルームに入れるか）の真実をここで持つ
 // - 付箋の確定状態（notes）の真実をここで持つ
 // - 進行状態 (lobby / phase1-4) の真実をここで持つ
+// - ルーム共有タイマーの状態と終了時刻の真実をここで持つ
 // - 配信は必ず visibleTo（workers/visibility.ts）を通す（選択的送信）
-//   メンバー参加・進行状態のように参加者全員が受け取る情報は
+//   メンバー参加・進行状態・タイマーのように参加者全員が受け取る情報は
 //   broadcastToAll という別経路で送る（visibleTo はノートにだけ適用する）
 //
 // D1 の rooms 行は「招待コード → ルーム解決」のためのディレクトリにすぎない。
@@ -27,6 +28,7 @@ import {
   type ProtocolNote,
   parseClientMessage,
   type ServerMessage,
+  type TimerState,
   WS_CLOSE_LEFT_ROOM,
   WS_CLOSE_LEFT_ROOM_REASON,
   WS_CLOSE_ROOM_DISBANDED,
@@ -261,6 +263,72 @@ export class RoomDO extends DurableObject {
     // 旧 "writing" は phase1 扱い
     if (phase === "writing") return "phase1";
     return "lobby";
+  }
+
+  getTimerState(): TimerState {
+    const row = this.ctx.storage.sql
+      .exec(
+        "SELECT status, ends_at, remaining_ms, duration_ms FROM timer_state WHERE id = 1",
+      )
+      .toArray()[0] as
+      | {
+          status: "idle" | "running" | "paused";
+          ends_at: number | null;
+          remaining_ms: number | null;
+          duration_ms: number | null;
+        }
+      | undefined;
+    if (!row || row.status === "idle") return { status: "idle" };
+    if (
+      row.status === "running" &&
+      row.ends_at !== null &&
+      row.duration_ms !== null
+    ) {
+      return {
+        status: "running",
+        endsAt: row.ends_at,
+        durationMs: row.duration_ms,
+      };
+    }
+    if (
+      row.status === "paused" &&
+      row.remaining_ms !== null &&
+      row.duration_ms !== null
+    ) {
+      return {
+        status: "paused",
+        remainingMs: row.remaining_ms,
+        durationMs: row.duration_ms,
+      };
+    }
+    return { status: "idle" };
+  }
+
+  private saveTimerState(timer: TimerState): void {
+    if (timer.status === "idle") {
+      this.ctx.storage.sql.exec(
+        "UPDATE timer_state SET status = 'idle', ends_at = NULL, remaining_ms = NULL, duration_ms = NULL WHERE id = 1",
+      );
+      return;
+    }
+    if (timer.status === "running") {
+      this.ctx.storage.sql.exec(
+        "UPDATE timer_state SET status = 'running', ends_at = ?1, remaining_ms = NULL, duration_ms = ?2 WHERE id = 1",
+        timer.endsAt,
+        timer.durationMs,
+      );
+      return;
+    }
+    this.ctx.storage.sql.exec(
+      "UPDATE timer_state SET status = 'paused', ends_at = NULL, remaining_ms = ?1, duration_ms = ?2 WHERE id = 1",
+      timer.remainingMs,
+      timer.durationMs,
+    );
+  }
+
+  private updateTimer(timer: TimerState, serverNow = Date.now()): void {
+    this.saveTimerState(timer);
+    this.broadcastToAll({ type: "timer:updated", timer, serverNow });
   }
 
   private savePhase(phase: Phase): void {
@@ -813,6 +881,109 @@ export class RoomDO extends DurableObject {
         return;
       }
 
+      case "timer:start": {
+        if (!this.canControlTimer(userId, hostId)) {
+          this.sendTimerForbidden(ws);
+          return;
+        }
+        const serverNow = Date.now();
+        this.updateTimer(
+          {
+            status: "running",
+            endsAt: serverNow + message.durationMs,
+            durationMs: message.durationMs,
+          },
+          serverNow,
+        );
+        return;
+      }
+
+      case "timer:pause": {
+        if (!this.canControlTimer(userId, hostId)) {
+          this.sendTimerForbidden(ws);
+          return;
+        }
+        const current = this.getTimerState();
+        if (current.status !== "running") {
+          this.sendTimerForbidden(ws);
+          return;
+        }
+        const serverNow = Date.now();
+        this.updateTimer(
+          {
+            status: "paused",
+            remainingMs: Math.max(0, current.endsAt - serverNow),
+            durationMs: current.durationMs,
+          },
+          serverNow,
+        );
+        return;
+      }
+
+      case "timer:resume": {
+        if (!this.canControlTimer(userId, hostId)) {
+          this.sendTimerForbidden(ws);
+          return;
+        }
+        const current = this.getTimerState();
+        if (current.status !== "paused") {
+          this.sendTimerForbidden(ws);
+          return;
+        }
+        const serverNow = Date.now();
+        this.updateTimer(
+          {
+            status: "running",
+            endsAt: serverNow + current.remainingMs,
+            durationMs: current.durationMs,
+          },
+          serverNow,
+        );
+        return;
+      }
+
+      case "timer:extend": {
+        if (!this.canControlTimer(userId, hostId)) {
+          this.sendTimerForbidden(ws);
+          return;
+        }
+        const current = this.getTimerState();
+        const serverNow = Date.now();
+        if (current.status === "running") {
+          this.updateTimer(
+            {
+              status: "running",
+              endsAt: Math.max(current.endsAt, serverNow) + 60_000,
+              durationMs: current.durationMs + 60_000,
+            },
+            serverNow,
+          );
+          return;
+        }
+        if (current.status === "paused") {
+          this.updateTimer(
+            {
+              status: "paused",
+              remainingMs: current.remainingMs + 60_000,
+              durationMs: current.durationMs + 60_000,
+            },
+            serverNow,
+          );
+          return;
+        }
+        this.sendTimerForbidden(ws);
+        return;
+      }
+
+      case "timer:stop": {
+        if (!this.canControlTimer(userId, hostId)) {
+          this.sendTimerForbidden(ws);
+          return;
+        }
+        this.updateTimer({ status: "idle" });
+        return;
+      }
+
       default: {
         const _exhaustive: never = message;
         void _exhaustive;
@@ -837,6 +1008,11 @@ export class RoomDO extends DurableObject {
         return true;
       case "start_phase":
       case "phase:next":
+      case "timer:start":
+      case "timer:pause":
+      case "timer:resume":
+      case "timer:extend":
+      case "timer:stop":
         return false;
     }
   }
@@ -854,6 +1030,8 @@ export class RoomDO extends DurableObject {
       members: this.listMembers().map((m) => this.toProtocolMember(m)),
       phase: this.getPhase(),
       isHost: this.isHostUser(userId),
+      timer: this.getTimerState(),
+      serverNow: Date.now(),
     });
   }
 
@@ -902,7 +1080,7 @@ export class RoomDO extends DurableObject {
     }
   }
 
-  // ノート以外の共有情報（member / phase）を全員に送る。
+  // ノート以外の共有情報（member / phase / timer）を全員に送る。
   private broadcastToAll(message: ServerMessage): void {
     const payload = JSON.stringify(message);
     for (const socket of this.ctx.getWebSockets()) {
@@ -949,6 +1127,18 @@ export class RoomDO extends DurableObject {
       type: "error",
       code: "forbidden",
       message: "この操作を行う権限がありません。",
+    });
+  }
+
+  private canControlTimer(userId: string, hostId: string): boolean {
+    return userId === hostId || this.isHostUser(userId);
+  }
+
+  private sendTimerForbidden(ws: WebSocket): void {
+    this.sendTo(ws, {
+      type: "error",
+      code: "forbidden",
+      message: "タイマーはホストのみ操作できます。",
     });
   }
 

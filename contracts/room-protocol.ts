@@ -93,6 +93,24 @@ export const PhaseSchema = z.enum([
 ]);
 export type Phase = z.infer<typeof PhaseSchema>;
 
+export const TIMER_MAX_DURATION_MS = 5_999_000;
+const TimerMillisecondsSchema = z.number().int().finite().min(0);
+
+export const TimerStateSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("idle") }),
+  z.object({
+    status: z.literal("running"),
+    endsAt: TimerMillisecondsSchema,
+    durationMs: TimerMillisecondsSchema,
+  }),
+  z.object({
+    status: z.literal("paused"),
+    remainingMs: TimerMillisecondsSchema,
+    durationMs: TimerMillisecondsSchema,
+  }),
+]);
+export type TimerState = z.infer<typeof TimerStateSchema>;
+
 // メンバー一覧スナップショットの単位。
 export const MemberSchema = z.object({
   userId: z.string().uuid(),
@@ -171,6 +189,14 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
     type: z.literal("phase:next"),
     force: z.boolean().optional(),
   }),
+  z.object({
+    type: z.literal("timer:start"),
+    durationMs: z.number().int().min(1).max(TIMER_MAX_DURATION_MS),
+  }),
+  z.object({ type: z.literal("timer:pause") }),
+  z.object({ type: z.literal("timer:resume") }),
+  z.object({ type: z.literal("timer:extend") }),
+  z.object({ type: z.literal("timer:stop") }),
 ]);
 
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;
@@ -192,6 +218,8 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
     members: z.array(MemberSchema),
     phase: PhaseSchema,
     isHost: z.boolean(),
+    timer: TimerStateSchema,
+    serverNow: TimerMillisecondsSchema,
   }),
   z.object({ type: z.literal("note:inserted"), note: NoteSchema }),
   z.object({ type: z.literal("note:updated"), note: NoteSchema }),
@@ -222,6 +250,11 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("phase:updated"),
     phase: PhaseSchema,
+  }),
+  z.object({
+    type: z.literal("timer:updated"),
+    timer: TimerStateSchema,
+    serverNow: TimerMillisecondsSchema,
   }),
   z.object({
     type: z.literal("error"),

@@ -24,6 +24,7 @@ const ALL_TABLES = [
   "room_owner",
   "room_state",
   "schema_migrations",
+  "timer_state",
 ];
 
 describe("ROOM_DO_MIGRATIONS", () => {

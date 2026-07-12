@@ -36,6 +36,8 @@ describe("applyServerMessage", () => {
       members: [],
       phase: "phase1",
       isHost: false,
+      timer: { status: "idle" },
+      serverNow: 1_000,
     };
 
     const result = applyServerMessage([], message, { draggingNoteId: null });
@@ -52,6 +54,8 @@ describe("applyServerMessage", () => {
       members: [],
       phase: "phase1",
       isHost: false,
+      timer: { status: "idle" },
+      serverNow: 1_000,
     };
 
     const result = applyServerMessage([existing], message, {
