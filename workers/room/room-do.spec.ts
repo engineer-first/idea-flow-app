@@ -8,9 +8,9 @@ import { describe, expect, it } from "vitest";
 import {
   NOTE_COLOR_PALETTE,
   TIMER_MAX_DURATION_MS,
-} from "../contracts/room-protocol";
+} from "../../contracts/room-protocol";
+import { listMemberIds, runInRoomDO } from "../test-helpers";
 import { HOST_ID_HEADER, USER_ID_HEADER } from "./room-do";
-import { listMemberIds, runInRoomDO } from "./test-helpers";
 
 const USER_A = "11111111-1111-4111-8111-111111111111";
 const USER_B = "22222222-2222-4222-8222-222222222222";
