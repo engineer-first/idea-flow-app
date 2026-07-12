@@ -9,7 +9,7 @@ import { NOTE_COLOR_PALETTE } from "../contracts/room-protocol";
 import { TOKEN_AUDIENCE } from "../contracts/session";
 import { signToken } from "../lib/session/token";
 import { HOST_ID_HEADER } from "./room-do";
-import { joinRoomAs, listMemberIds } from "./test-helpers";
+import { joinRoomAs, listMemberIds, runInRoomDO } from "./test-helpers";
 
 const OWNER = {
   sub: "11111111-1111-4111-8111-111111111111",
@@ -552,6 +552,55 @@ describe("WebSocket 接続の認可", () => {
     await expect(nextMessage()).resolves.toMatchObject({
       type: "snapshot",
       isHost: false,
+    });
+
+    ws.send(JSON.stringify({ type: "start_phase" }));
+    await expect(nextMessage()).resolves.toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+    ws.close();
+  });
+
+  it("room_owner が NULL でも非ホストの偽装ヘッダーを無効化し D1 ホストでバックフィルする", async () => {
+    const { roomId, inviteCode } = await createRoomAs(OWNER);
+    await joinRoomAs(MEMBER, inviteCode);
+    await runInRoomDO(roomId, (_instance, state) => {
+      state.storage.sql.exec(
+        "UPDATE room_owner SET host_id = NULL WHERE id = 1",
+      );
+    });
+
+    const res = await SELF.fetch(`https://api.test/api/rooms/${roomId}/ws`, {
+      headers: {
+        Upgrade: "websocket",
+        Cookie: await sessionCookie(MEMBER),
+        [HOST_ID_HEADER]: MEMBER.sub,
+      },
+    });
+    expect(res.status).toBe(101);
+    const ws = res.webSocket;
+    if (!ws) throw new Error("WebSocket 接続を確立できませんでした。");
+    ws.accept();
+    const nextMessage = () =>
+      new Promise<Record<string, unknown>>((resolve) => {
+        ws.addEventListener(
+          "message",
+          (event) => resolve(JSON.parse(String(event.data))),
+          { once: true },
+        );
+      });
+
+    await expect(nextMessage()).resolves.toMatchObject({
+      type: "snapshot",
+      isHost: false,
+    });
+    await runInRoomDO(roomId, (_instance, state) => {
+      expect(
+        state.storage.sql
+          .exec("SELECT host_id FROM room_owner WHERE id = 1")
+          .toArray(),
+      ).toEqual([{ host_id: OWNER.sub }]);
     });
 
     ws.send(JSON.stringify({ type: "start_phase" }));

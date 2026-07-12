@@ -360,16 +360,22 @@ describe("member_joined（Realtime 反映）", () => {
 
   it("既存メンバーが同じ表示名で再 join しても member_joined は届かない", async () => {
     const { roomId, owner, member } = await setupRoom();
-    const received: ServerMessage[] = [];
-    owner.ws.addEventListener("message", (event) => {
-      const message = JSON.parse(String(event.data)) as ServerMessage;
-      if (message.type === "member_joined") received.push(message);
+    const newcomer: TestUser = {
+      sub: "33333333-3333-4333-8333-333333333333",
+      email: "newcomer@example.test",
+      name: "Newcomer",
+    };
+    const inviteCode = await getInviteCode(roomId, OWNER);
+
+    await joinRoomAs(MEMBER, inviteCode);
+    await joinRoomAs(newcomer, inviteCode);
+    const received = await expectType(owner, "member_joined");
+
+    expect(received.member).toEqual({
+      userId: newcomer.sub,
+      name: newcomer.name,
+      color: expect.stringMatching(NOTE_COLOR_PATTERN),
     });
-
-    await joinRoomAs(MEMBER, await getInviteCode(roomId, OWNER));
-    await new Promise((resolve) => setTimeout(resolve, 30));
-
-    expect(received).toEqual([]);
 
     owner.close();
     member.close();
