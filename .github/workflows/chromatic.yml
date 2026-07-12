@@ -20,6 +20,9 @@ jobs:
         with:
           # Chromatic はベースライン特定に git 履歴全体を使う
           fetch-depth: 0
+          # 履歴は checkout 時に取得済みで、後続に git push/fetch はないため
+          # トークンを workspace に残さない
+          persist-credentials: false
 
       - uses: jdx/mise-action@v3
         with:
