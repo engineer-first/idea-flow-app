@@ -18,6 +18,7 @@ import {
   ensureUser,
   findRoomByCode,
   findRoomById,
+  findUserNameById,
   insertRoom,
   upsertUserFromAssertion,
 } from "./lib/db";
@@ -227,14 +228,11 @@ async function handleLookupRoom(
   if (!room) {
     return error(404, "ルームが見つかりませんでした。");
   }
-  // hostname を users.name から引く
-  const host = await env.DB.prepare("SELECT name FROM users WHERE id = ?1")
-    .bind(room.hostId)
-    .first<{ name: string | null }>();
+  const hostName = await findUserNameById(env.DB, room.hostId);
   return json({
     roomId: room.roomId,
     inviteCode: room.inviteCode,
-    hostName: host?.name ?? "ホスト",
+    hostName: hostName ?? "ホスト",
   });
 }
 
