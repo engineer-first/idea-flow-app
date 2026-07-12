@@ -68,6 +68,7 @@ Google ログインを確認する場合は、Google Cloud Console で OAuth ク
 | `npm run dev`          | Next.js 開発サーバーを起動                                  |
 | `npm run dev:api`      | api-worker（D1 + Durable Objects）をローカル起動            |
 | `npm run db:migrate`   | ローカル D1 に migration を適用                             |
+| `npm run new:room-do-migration -- 短い説明` | RoomDO migration の `.sql` スタブをタイムスタンプ付きで作成（例: `-- add-note-kind`）。コミットするのは `.sql` だけ（集約 `index.ts` は gitignore 済みの生成物で、`npm ci` / `test:workers` / `dev:api` などが自動再生成する） |
 | `npm run build`        | Next.js 本番ビルド                                          |
 | `npm run build:cf`     | Cloudflare Workers 向けビルド（OpenNext）                   |
 | `npm run preview:cf`   | Workers 向けビルドを workerd 上でローカル実行（2構成同時）  |
@@ -82,7 +83,7 @@ Google ログインを確認する場合は、Google Cloud Console で OAuth ク
 
 1. `wrangler d1 create idea-flow-lobby` で D1 を作成し、`workers/wrangler.jsonc` の `database_id` を置き換える
 2. `wrangler secret put SESSION_SECRET --config workers/wrangler.jsonc` で本番秘密鍵を設定する
-3. `wrangler deploy --config workers/wrangler.jsonc` で api-worker をデプロイする
+3. `npm run deploy:api` で api-worker をデプロイする（RoomDO migration の集約を再生成してから deploy する）
 4. `npm run build:cf && wrangler deploy` で Next.js ワーカーをデプロイする
 
 ### MSW (Mock Service Worker)

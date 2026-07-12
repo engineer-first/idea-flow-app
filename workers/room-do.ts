@@ -32,7 +32,11 @@ import {
   WS_CLOSE_ROOM_DISBANDED,
   WS_CLOSE_ROOM_DISBANDED_REASON,
 } from "../contracts/room-protocol";
-import { migrateRoomStorage } from "./room-do-migrations";
+import {
+  LEGACY_ROOM_DO_MIGRATION_IDS,
+  migrateRoomStorage,
+  ROOM_DO_MIGRATIONS,
+} from "./room-do-migrations";
 import { filterVisible, visibleTo } from "./visibility";
 
 // api-worker がセッション検証済みのユーザーIDを DO へ引き継ぐヘッダー。
@@ -71,11 +75,15 @@ type UpsertMemberResult = { ok: true } | { ok: false; reason: "room-full" };
 export class RoomDO extends DurableObject {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    // スキーマは room-do-migrations.ts の版管理で管理する。
+    // スキーマは room-do-migrations/ の版管理で管理する。
     // マイグレーション完了までイベント配信を止め、移行中のストレージに
     // 古い・新しいスキーマ前提の操作が届かないようにする。
     this.ctx.blockConcurrencyWhile(async () => {
-      migrateRoomStorage(this.ctx.storage);
+      migrateRoomStorage(
+        this.ctx.storage,
+        ROOM_DO_MIGRATIONS,
+        LEGACY_ROOM_DO_MIGRATION_IDS,
+      );
     });
   }
 
@@ -205,7 +213,7 @@ export class RoomDO extends DurableObject {
   }
 
   // ルーム解散（ホスト操作）。全 WS を閉じ、ストレージを完全に空にする。
-  // deleteAll しないと room_state / room_owner / schema_version が残り、
+  // deleteAll しないと room_state / room_owner / schema_migrations が残り、
   // Durable Object が GC 対象にならない。次回起床時は constructor の
   // マイグレーションがスキーマを再構築する。
   async disband(): Promise<void> {

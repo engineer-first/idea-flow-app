@@ -66,3 +66,8 @@ workers/.wrangler/
 # Chromatic 側で管理するため、リポジトリにはコミットしない。
 /tmp/*.sqlite
 /schema-diagrams/
+
+# RoomDO マイグレーション集約（generate-room-do-migrations.mjs が生成）。
+# postinstall / pretest:workers / predev:api などで自動再生成されるため
+# コミットしない（レビュー対象は *.sql のみ）。
+workers/room-do-migrations/index.ts

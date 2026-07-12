@@ -60,6 +60,19 @@ jobs:
           # preview.tsx を除外するとトークン変更の検出が漏れるので対象は慎重に選ぶ。
           untraced: "package-lock.json"
 
+          # Schema/* stories の入力（migration .sql / tbls 設定 / スキーマ生成
+          # スクリプト）は build-storybook 時に生成する静的アセット経由で story に
+          # 届くため、Vite の依存グラフに乗らない。externals に載せないと
+          # 「migration だけ変えた PR」で schema stories がベースラインのコピーに
+          # なり、ER 図の差分検出が働かない。
+          externals: |
+            workers/migrations/**
+            workers/room-do-migrations/**/*.sql
+            .tbls/**
+            scripts/build-d1-schema.mts
+            scripts/build-room-do-schema.mts
+            scripts/generate-room-do-migrations.mjs
+
           # bot が作るブランチではビルド自体をスキップする（スナップショット消費 0。
           # skip はビルドを「スキップ済み」として記録するため、チェックが pending の
           # まま残らない）
