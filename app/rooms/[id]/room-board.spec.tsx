@@ -228,7 +228,6 @@ describe("サーバーメッセージ → 画面反映", () => {
   it("snapshot のタイマーを表示し、ホスト操作を timer:* として送る", () => {
     const { socket } = connectWithSnapshot([]);
 
-    fireEvent.click(screen.getByRole("button", { name: "3分" }));
     fireEvent.click(screen.getByRole("button", { name: "開始" }));
     expect(socket.sent).toContain(
       JSON.stringify({ type: "timer:start", durationMs: 180_000 }),

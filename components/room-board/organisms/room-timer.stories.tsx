@@ -37,7 +37,7 @@ export const IdleHostMinimum: Story = {
 export const IdleHostMaximum: Story = {
   args: { initialDurationMs: ROOM_TIMER_IDLE_MAX_ADJUST_DURATION_MS },
 };
-export const IdleMember: Story = { args: { isHost: false } };
+export const IdleMemberHidden: Story = { args: { isHost: false } };
 export const RunningHost: Story = {
   args: {
     timer: buildRunningTimer(),

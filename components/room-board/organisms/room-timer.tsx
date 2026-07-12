@@ -9,7 +9,6 @@ import {
 } from "@/contracts/room-protocol";
 import { cn } from "@/lib/utils";
 
-const TIMER_PRESETS = [1, 3, 5, 10] as const;
 export const TIMER_DEFAULT_DURATION_MS = 3 * 60_000;
 const TIMER_IDLE_ADJUST_MAX_MS = 99 * 60_000;
 
@@ -123,6 +122,8 @@ export function RoomTimer({
     );
   };
 
+  if (!isHost && timer.status === "idle") return null;
+
   return (
     <section
       data-testid="room-timer"
@@ -138,31 +139,23 @@ export function RoomTimer({
         <span className="text-xs font-medium text-muted-foreground">
           タイマー
         </span>
-        <span role="timer" className="font-mono text-xl font-bold tabular-nums">
-          {remainingMs === null ? "--:--" : formatDuration(remainingMs)}
-        </span>
-        <span aria-live="polite" className="sr-only">
-          {isEnded ? "タイマーが終了しました。" : null}
-        </span>
+        {timer.status !== "idle" ? (
+          <>
+            <span
+              role="timer"
+              className="font-mono text-xl font-bold tabular-nums"
+            >
+              {formatDuration(remainingMs ?? 0)}
+            </span>
+            <span aria-live="polite" className="sr-only">
+              {isEnded ? "タイマーが終了しました。" : null}
+            </span>
+          </>
+        ) : null}
       </div>
 
       {isHost && timer.status === "idle" ? (
         <div className="flex flex-col gap-2">
-          <div className="flex gap-1">
-            {TIMER_PRESETS.map((minutes) => (
-              <Button
-                key={minutes}
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 flex-1 px-1 text-xs"
-                disabled={disabled}
-                onClick={() => setDuration(minutes * 60_000)}
-              >
-                {minutes}分
-              </Button>
-            ))}
-          </div>
           <div className="flex gap-1">
             <Button
               type="button"

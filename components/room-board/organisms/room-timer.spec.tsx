@@ -36,6 +36,12 @@ describe("RoomTimer", () => {
       />,
     );
     expect(TIMER_DEFAULT_DURATION_MS).toBe(180_000);
+    expect(screen.getByTestId("room-timer")).toBeInTheDocument();
+    expect(screen.queryByRole("timer")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "1分" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "3分" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "5分" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "10分" })).toBeNull();
     expect(screen.getByLabelText("タイマー時間（分）")).toHaveValue("03");
     expect(screen.getByLabelText("タイマー時間（秒）")).toHaveValue("00");
   });
@@ -84,7 +90,7 @@ describe("RoomTimer", () => {
     expect(screen.getByLabelText("タイマー時間（秒）")).toHaveValue("59");
   });
 
-  it("ホストはプリセットと分・秒の自由入力から開始できる", () => {
+  it("ホストは分・秒の自由入力から開始できる", () => {
     render(
       <RoomTimer
         timer={{ status: "idle" }}
@@ -95,9 +101,6 @@ describe("RoomTimer", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "5分" }));
-    expect(screen.getByLabelText("タイマー時間（分）")).toHaveValue("05");
-    expect(screen.getByLabelText("タイマー時間（秒）")).toHaveValue("00");
     fireEvent.change(screen.getByLabelText("タイマー時間（分）"), {
       target: { value: "1" },
     });
@@ -162,7 +165,7 @@ describe("RoomTimer", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("非ホストの未設定状態は --:-- だけを表示する", () => {
+  it("非ホストの未設定状態はタイマーカード自体を表示しない", () => {
     render(
       <RoomTimer
         timer={{ status: "idle" }}
@@ -172,8 +175,7 @@ describe("RoomTimer", () => {
         {...handlers}
       />,
     );
-    expect(screen.getByRole("timer")).toHaveTextContent("--:--");
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("room-timer")).not.toBeInTheDocument();
   });
 
   it("実行中は補正済みサーバー時刻を基準に減り、ホスト操作を送る", () => {
