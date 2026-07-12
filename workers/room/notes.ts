@@ -1,6 +1,7 @@
 // 付箋（notes）の真実。ストレージアクセス・可視性判定・プロトコル射影と、
 // 受信者ごとの可視性を踏まえたノート配信ヘルパをここに集約する。
 import type { NoteColor, ProtocolNote } from "../../contracts/room-protocol";
+import { visibleTo } from "../visibility";
 import type { RoomBroadcaster } from "./broadcast";
 import { type HandlerCtx, replyNotFound } from "./handler-context";
 import { countNoteVotes, countUserNoteVotes, hasVote } from "./votes";
@@ -45,11 +46,16 @@ export function isVisibleTo(row: NoteRow, viewerId: string): boolean {
   return canAccessNote(row, viewerId);
 }
 
+// ルール本体は visibility.ts の visibleTo が持つ（一点集約）。
+// ここは行形式（snake_case）を visibleTo の形へ写像するだけ。
 function canAccessNote(
   row: Pick<NoteRow, "visibility" | "author_id">,
   viewerId: string,
 ): boolean {
-  return row.visibility === "shared" || row.author_id === viewerId;
+  return visibleTo(
+    { viewerId },
+    { visibility: row.visibility, authorId: row.author_id },
+  );
 }
 
 export function listNotes(sql: SqlStorage, viewerId: string): ProtocolNote[] {
