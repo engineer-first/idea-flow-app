@@ -57,9 +57,14 @@ function fieldsFromDuration(durationMs: number): {
   };
 }
 
-function normalizePart(value: string, max: number): string {
+function normalizeEditingPart(value: string, max: number): string {
   const digits = value.replace(/\D/g, "");
-  const numeric = digits === "" ? 0 : Number(digits);
+  if (digits === "") return "";
+  return Number(digits) > max ? String(max) : digits;
+}
+
+function normalizeBlurredPart(value: string, max: number): string {
+  const numeric = value === "" ? 0 : Number(value);
   return formatPart(Math.min(numeric, max));
 }
 
@@ -218,12 +223,16 @@ export function RoomTimer({
               aria-invalid={parsedDuration === null}
               inputMode="numeric"
               maxLength={2}
+              placeholder="00"
               value={minutesInput}
               disabled={disabled}
               className="h-8 w-12 px-2 text-center font-mono tabular-nums"
               onFocus={(event) => event.currentTarget.select()}
+              onBlur={(event) =>
+                setMinutesInput(normalizeBlurredPart(event.target.value, 99))
+              }
               onChange={(event) =>
-                setMinutesInput(normalizePart(event.target.value, 99))
+                setMinutesInput(normalizeEditingPart(event.target.value, 99))
               }
             />
             <span className="font-mono font-bold">:</span>
@@ -232,12 +241,16 @@ export function RoomTimer({
               aria-invalid={parsedDuration === null}
               inputMode="numeric"
               maxLength={2}
+              placeholder="00"
               value={secondsInput}
               disabled={disabled}
               className="h-8 w-12 px-2 text-center font-mono tabular-nums"
               onFocus={(event) => event.currentTarget.select()}
+              onBlur={(event) =>
+                setSecondsInput(normalizeBlurredPart(event.target.value, 59))
+              }
               onChange={(event) =>
-                setSecondsInput(normalizePart(event.target.value, 59))
+                setSecondsInput(normalizeEditingPart(event.target.value, 59))
               }
             />
             <Button

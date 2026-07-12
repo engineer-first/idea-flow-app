@@ -59,6 +59,14 @@ describe("RoomTimer", () => {
     openPanel();
     expect(screen.getByLabelText("タイマー時間（分）")).toHaveValue("03");
     expect(screen.getByLabelText("タイマー時間（秒）")).toHaveValue("00");
+    expect(screen.getByLabelText("タイマー時間（分）")).toHaveAttribute(
+      "placeholder",
+      "00",
+    );
+    expect(screen.getByLabelText("タイマー時間（秒）")).toHaveAttribute(
+      "placeholder",
+      "00",
+    );
     fireEvent.click(chip);
     expect(chip).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByTestId("room-timer-panel")).not.toBeInTheDocument();
@@ -110,6 +118,80 @@ describe("RoomTimer", () => {
     expect(screen.getByLabelText("タイマー時間（秒）")).toHaveValue("59");
   });
 
+  it("編集中は空文字を許容し、00:00 は開始不可のまま blur で 00 に正規化する", () => {
+    render(
+      <RoomTimer
+        timer={{ status: "idle" }}
+        serverOffsetMs={0}
+        isHost
+        disabled={false}
+        initialDurationMs={0}
+        {...handlers}
+      />,
+    );
+    openPanel();
+    const minutes = screen.getByLabelText("タイマー時間（分）");
+    const seconds = screen.getByLabelText("タイマー時間（秒）");
+
+    fireEvent.change(minutes, { target: { value: "" } });
+    fireEvent.change(seconds, { target: { value: "" } });
+    expect(minutes).toHaveValue("");
+    expect(seconds).toHaveValue("");
+    expect(minutes).toHaveAttribute("placeholder", "00");
+    expect(seconds).toHaveAttribute("placeholder", "00");
+    expect(minutes).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("button", { name: "開始" })).toBeDisabled();
+
+    fireEvent.blur(minutes);
+    fireEvent.blur(seconds);
+    expect(minutes).toHaveValue("00");
+    expect(seconds).toHaveValue("00");
+  });
+
+  it("1桁の入力は編集中そのまま保ち、blur でゼロ埋めする", () => {
+    render(
+      <RoomTimer
+        timer={{ status: "idle" }}
+        serverOffsetMs={0}
+        isHost
+        disabled={false}
+        {...handlers}
+      />,
+    );
+    openPanel();
+    const minutes = screen.getByLabelText("タイマー時間（分）");
+    fireEvent.change(minutes, { target: { value: "5" } });
+    expect(minutes).toHaveValue("5");
+    fireEvent.blur(minutes);
+    expect(minutes).toHaveValue("05");
+  });
+
+  it("±1分は空の入力を 0 として調整する", () => {
+    render(
+      <RoomTimer
+        timer={{ status: "idle" }}
+        serverOffsetMs={0}
+        isHost
+        disabled={false}
+        initialDurationMs={0}
+        {...handlers}
+      />,
+    );
+    openPanel();
+    const minutes = screen.getByLabelText("タイマー時間（分）");
+    const seconds = screen.getByLabelText("タイマー時間（秒）");
+    fireEvent.change(minutes, { target: { value: "" } });
+    fireEvent.change(seconds, { target: { value: "" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "+1分" }));
+    expect(minutes).toHaveValue("01");
+    expect(seconds).toHaveValue("00");
+    fireEvent.change(minutes, { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "-1分" }));
+    expect(minutes).toHaveValue("00");
+    expect(seconds).toHaveValue("00");
+  });
+
   it("ホストは分・秒の自由入力から開始できる", () => {
     render(
       <RoomTimer
@@ -129,7 +211,7 @@ describe("RoomTimer", () => {
     fireEvent.change(screen.getByLabelText("タイマー時間（秒）"), {
       target: { value: "30" },
     });
-    expect(screen.getByLabelText("タイマー時間（分）")).toHaveValue("01");
+    expect(screen.getByLabelText("タイマー時間（分）")).toHaveValue("1");
     expect(screen.getByLabelText("タイマー時間（秒）")).toHaveValue("30");
     fireEvent.click(screen.getByRole("button", { name: "開始" }));
     expect(handlers.onStart).toHaveBeenCalledWith(90_000);
