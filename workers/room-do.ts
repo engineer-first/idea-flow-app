@@ -231,7 +231,9 @@ export class RoomDO extends DurableObject {
   // メンバー一覧を参加順（joined_at 昇順）で返す。snapshot 構築に使う。
   listMembers(): { userId: string; name: string; color: NoteColor }[] {
     const rows = this.ctx.storage.sql
-      .exec("SELECT user_id, name, color FROM members ORDER BY joined_at")
+      .exec(
+        "SELECT user_id, name, color FROM members ORDER BY joined_at, user_id",
+      )
       .toArray();
     return rows.map((row) => {
       const member = row as unknown as MemberRow;

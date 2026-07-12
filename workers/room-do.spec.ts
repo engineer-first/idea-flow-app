@@ -108,6 +108,25 @@ describe("RoomDO メンバーシップ", () => {
     ]);
   });
 
+  it("listMembers は joined_at が同じメンバーを user_id 昇順で返す", async () => {
+    const roomId = "room-list-tie-break";
+    await runInRoomDO(roomId, (_instance, state) => {
+      const joinedAt = "2026-07-12T00:00:00.000Z";
+      state.storage.sql.exec(
+        `INSERT INTO members (user_id, joined_at, name, color)
+         VALUES (?1, ?3, 'Beta', 'blue'), (?2, ?3, 'Alpha', 'yellow')`,
+        USER_B,
+        USER_A,
+        joinedAt,
+      );
+    });
+
+    expect(await roomStub(roomId).listMembers()).toEqual([
+      { userId: USER_A, name: "Alpha", color: "yellow" },
+      { userId: USER_B, name: "Beta", color: "blue" },
+    ]);
+  });
+
   it("メンバーでないユーザーは isMember で false になる", async () => {
     const stub = roomStub("room-membership");
     await stub.upsertMember(USER_A, "Alpha");
