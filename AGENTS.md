@@ -87,11 +87,15 @@
   ファイル名を変更したり削除したりせず、修正も新しい migration で行う。
 - D1 migration または `workers/room-do-migrations/`（RoomDO の `.sql`）を変更
   すると、Storybook の
-  `Schema/SchemaDiagram`（`components/schema-diagrams/`）の ER 図に自動反映
+  `Schema/SchemaDiagram`（ER 図）と `Schema/SchemaDetails`（カラム・
+  インデックス・制約の一覧。いずれも `components/schema-diagrams/`）に自動反映
   される（`npm run storybook` / `build-storybook` が `tbls` で再生成する）。
   Chromatic が develop との見た目の差分を検出するため、手動生成やコミットは
   不要。D1 と RoomDO は物理的に別ストレージで DB レベルの結合を持たないため、
   ER 図もあえて分離している（1枚に混ぜて結合があるように見せない）。
+- スキーマの構造ルール（FK インデックス必須・カラム数上限など）は
+  `.tbls/*.yml` の `lint` に書き、`npm run db:schema:lint`（CI でも実行）で
+  機械検査する。
 
 ## 境界ルール
 

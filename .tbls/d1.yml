@@ -9,3 +9,20 @@ docPath: schema-diagrams/d1
 
 er:
   format: svg
+
+# tbls lint（npm run db:schema:lint / CI で実行）。
+# コメント必須系のルールは入れない: SQLite にコメント構文がなく、この YAML に
+# comments マップを手で保守することになり「生成物に手作業を挟まない」方針に反する。
+lint:
+  # FK カラムにインデックスが無いと JOIN / 参照整合性チェックが
+  # テーブルスキャンになるため、貼り忘れを機械で止める
+  requireForeignKeyIndex:
+    enabled: true
+  # カラム数の上限。超えたら「1テーブルに責務を詰め込みすぎていないか」を
+  # 立ち止まって考えるためのガードレール
+  columnCount:
+    enabled: true
+    max: 12
+  # 同じ関係の重複定義を検出する
+  duplicateRelations:
+    enabled: true

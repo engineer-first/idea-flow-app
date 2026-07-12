@@ -42,6 +42,11 @@ jobs:
       - name: Check RoomDO migrations index is up to date
         run: npm run gen:room-do-migrations:check
 
+      # マイグレーションから組み立てた実スキーマに対する構造ルールの機械検査
+      # （FK インデックス貼り忘れ・テーブル肥大化など）。ルールは .tbls/*.yml。
+      - name: Lint database schemas (tbls)
+        run: npm run db:schema:lint
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -110,4 +115,3 @@ jobs:
         run: npm run smoke
         env:
           CI: true
-

@@ -17,3 +17,16 @@ exclude:
 
 er:
   format: svg
+
+# tbls lint（npm run db:schema:lint / CI で実行）。ルール選定の理由は
+# .tbls/d1.yml のコメントを参照。RoomDO は現状宣言的な FK を持たないため
+# requireForeignKeyIndex は今は何も検出しないが、将来 FK を導入したときの
+# インデックス貼り忘れを防ぐガードとして先に置いておく。
+lint:
+  requireForeignKeyIndex:
+    enabled: true
+  columnCount:
+    enabled: true
+    max: 12
+  duplicateRelations:
+    enabled: true

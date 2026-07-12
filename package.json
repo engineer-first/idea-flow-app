@@ -23,6 +23,7 @@
     "db:schema:d1": "node --no-warnings scripts/build-d1-schema.mts",
     "db:schema:room-do": "node --no-warnings scripts/build-room-do-schema.mts",
     "db:schema:diagrams": "npm run db:schema:d1 && npm run db:schema:room-do && tbls doc --config .tbls/d1.yml --rm-dist && tbls doc --config .tbls/room-do.yml --rm-dist",
+    "db:schema:lint": "npm run db:schema:d1 && npm run db:schema:room-do && tbls lint --config .tbls/d1.yml && tbls lint --config .tbls/room-do.yml",
     "gen:room-do-migrations": "node scripts/generate-room-do-migrations.mjs",
     "gen:room-do-migrations:check": "node scripts/generate-room-do-migrations.mjs --check",
     "build:cf": "opennextjs-cloudflare build",
