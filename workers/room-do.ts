@@ -373,14 +373,21 @@ export class RoomDO extends DurableObject {
     message: ClientMessage,
   ): Promise<void> {
     const { userId } = attachment;
-    // phase4 は投票結果を確認しながら既存ボードで話し合う工程。
-    // WebSocket を直接送っても投票結果や付箋配置を変えられないよう、
-    // 変更系メッセージを境界で一元的に拒否する。
-    if (this.getPhase() === "phase4" && this.isBoardMutation(message)) {
+    // lobby はボード開始前、phase4 は投票結果を確認しながら話し合う工程。
+    // どちらも「ボードを変更してよい工程」ではないため、WebSocket を直接
+    // 送られても状態が変わらないよう、変更系メッセージを境界で一元的に拒否する。
+    const phase = this.getPhase();
+    if (
+      (phase === "lobby" || phase === "phase4") &&
+      this.isBoardMutation(message)
+    ) {
       this.sendTo(ws, {
         type: "error",
         code: "forbidden",
-        message: "投票結果の確認中はボードを変更できません。",
+        message:
+          phase === "lobby"
+            ? "ボード開始前はボードを変更できません。"
+            : "投票結果の確認中はボードを変更できません。",
       });
       return;
     }
