@@ -102,7 +102,9 @@ export class RoomDO extends DurableObject {
     name: string | undefined,
   ): Promise<UpsertMemberResult> {
     const safeName = name ?? "";
-    const existed = this.isMember(userId);
+    const existing = this.ctx.storage.sql
+      .exec("SELECT name FROM members WHERE user_id = ?1", userId)
+      .toArray()[0] as { name: string } | undefined;
     const assigned = this.ctx.storage.sql
       .exec(
         "SELECT color FROM member_color_assignments WHERE user_id = ?1",
@@ -142,7 +144,7 @@ export class RoomDO extends DurableObject {
       color,
     );
 
-    if (!existed) {
+    if (!existing || existing.name !== safeName) {
       this.broadcastToAllExcept(
         {
           type: "member_joined",

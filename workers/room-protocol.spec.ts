@@ -335,50 +335,41 @@ describe("member_joined（Realtime 反映）", () => {
     member.close();
   });
 
-  it("既存メンバーへの再 join（name 変更）は member_joined を再送しない（冪等）", async () => {
-    // 同じユーザが REST join を 2 回叩いても、新着イベントは 1 回だけ。
-    // 既にメンバー登録されているので 2 回目は name 更新のみで broadcast しない。
+  it("既存メンバーが表示名を変更して再 join すると他クライアントへ member_joined が届く", async () => {
     const { roomId, owner, member } = await setupRoom();
+    const renamedMember = { ...MEMBER, name: "Renamed Member" };
 
-    const newcomer: TestUser = {
-      sub: "33333333-3333-4333-8333-333333333333",
-      email: "newcomer@example.test",
-      name: "Newcomer",
-    };
-    // 1 回目: 新規
-    await joinRoomAs(newcomer, await getInviteCode(roomId, OWNER));
-    const joined = await expectType(owner, "member_joined");
-    expect(joined.member).toEqual({
-      userId: newcomer.sub,
-      name: newcomer.name,
-      color: expect.stringMatching(NOTE_COLOR_PATTERN),
+    await joinRoomAs(renamedMember, await getInviteCode(roomId, OWNER));
+    const received = await Promise.race([
+      owner.next(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 50)),
+    ]);
+
+    expect(received).toEqual({
+      type: "member_joined",
+      member: {
+        userId: MEMBER.sub,
+        name: renamedMember.name,
+        color: expect.stringMatching(NOTE_COLOR_PATTERN),
+      },
     });
-    // 2 回目: 既存なので broadcast されない（member への到着も無し）
-    await joinRoomAs(newcomer, await getInviteCode(roomId, OWNER));
-    // member 側に member_joined が**追加で届かない**ことを確認。
-    // 一定時間内に何も届かないことを直接は確認しづらいので、
-    // member.next() を短いタイムアウトで呼んで何も来ないことを示す代わりに、
-    // ここでは member_joined のカウントが増えないことで検証する。
-    // → 直前に送った member_joined を member 側で消費済みという前提で、
-    // もう 1 個 member_joined は届かないことを「次に届いたメッセージの
-    // type は member_joined ではない」ことで表現する。
-    // 確実性のため、ここでは member_joined 以外のメッセージが次に来る
-    // ことを確認するかわりに、RoomDO の members 数が変わらないことを
-    // 別途確認する形に切り替える。
-    const beforeRes = await SELF.fetch(
-      `https://api.test/api/rooms/${roomId}/members`,
-      { headers: { Cookie: await sessionCookieFor(OWNER) } },
-    );
-    const before = (await beforeRes.json()) as {
-      members: { userId: string }[];
-    };
-    await joinRoomAs(newcomer, await getInviteCode(roomId, OWNER));
-    const afterRes = await SELF.fetch(
-      `https://api.test/api/rooms/${roomId}/members`,
-      { headers: { Cookie: await sessionCookieFor(OWNER) } },
-    );
-    const after = (await afterRes.json()) as { members: { userId: string }[] };
-    expect(after.members.length).toBe(before.members.length);
+
+    owner.close();
+    member.close();
+  });
+
+  it("既存メンバーが同じ表示名で再 join しても member_joined は届かない", async () => {
+    const { roomId, owner, member } = await setupRoom();
+    const received: ServerMessage[] = [];
+    owner.ws.addEventListener("message", (event) => {
+      const message = JSON.parse(String(event.data)) as ServerMessage;
+      if (message.type === "member_joined") received.push(message);
+    });
+
+    await joinRoomAs(MEMBER, await getInviteCode(roomId, OWNER));
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    expect(received).toEqual([]);
 
     owner.close();
     member.close();
