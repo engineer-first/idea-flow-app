@@ -416,11 +416,95 @@ describe("RoomDO phase:next", () => {
       ws.addEventListener("message", resolve, { once: true });
     });
 
+    // 投票未完了によるゲート拒否は voting-incomplete。クライアントは
+    // このコードでホストへ「強制的に進むか」の確認を出す。
     expect(JSON.parse(String(message.data))).toMatchObject({
+      type: "error",
+      code: "voting-incomplete",
+    });
+    expect(await stub.getPhase()).toBe("phase3");
+    ws.close();
+  });
+
+  it("未投票メンバーが残っていても、ホストは force で phase4 へ進められる", async () => {
+    const roomName = "room-phase-force-next";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.upsertMember(USER_B, "Member");
+    await stub.setPhase("phase3", USER_A);
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "phase:next", force: true }));
+
+    expect(await nextJson(ws)).toMatchObject({
+      type: "phase:updated",
+      phase: "phase4",
+    });
+    expect(await stub.getPhase()).toBe("phase4");
+    ws.close();
+  });
+
+  it("ホスト以外は force を付けても phase を進められない", async () => {
+    const roomName = "room-phase-force-non-host";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.upsertMember(USER_B, "Member");
+    await stub.setPhase("phase3", USER_A);
+
+    const ws = await connectDirectly(roomName, USER_B, USER_A);
+    ws.send(JSON.stringify({ type: "phase:next", force: true }));
+
+    expect(await nextJson(ws)).toMatchObject({
       type: "error",
       code: "forbidden",
     });
     expect(await stub.getPhase()).toBe("phase3");
+    ws.close();
+  });
+
+  it("lobby では force を付けても phase:next できない", async () => {
+    const roomName = "room-phase-force-lobby";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "phase:next", force: true }));
+
+    expect(await nextJson(ws)).toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+    expect(await stub.getPhase()).toBe("lobby");
+    ws.close();
+  });
+
+  it("全員の投票が完了していれば force なしで phase4 へ進める", async () => {
+    const roomName = "room-phase-voting-complete";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.upsertMember(USER_B, "Member");
+    await stub.setPhase("phase3", USER_A);
+    // 全員が主観1票・客観3票をちょうど使い切った状態を直接作る。
+    await runInRoomDO(roomName, (_instance, state) => {
+      const now = new Date().toISOString();
+      for (const userId of [USER_A, USER_B]) {
+        state.storage.sql.exec(
+          `INSERT INTO note_votes (note_id, user_id, kind, created_at, vote_count)
+           VALUES ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', ?1, 'subjective', ?2, 1),
+                  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', ?1, 'objective', ?2, 3)`,
+          userId,
+          now,
+        );
+      }
+    });
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "phase:next" }));
+
+    expect(await nextJson(ws)).toMatchObject({
+      type: "phase:updated",
+      phase: "phase4",
+    });
     ws.close();
   });
 

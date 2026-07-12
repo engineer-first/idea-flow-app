@@ -184,6 +184,43 @@ describe("ServerMessageSchema", () => {
     });
   });
 
+  it("phase:next は force フラグを受け入れ、パース結果に保持する", () => {
+    expect(
+      ClientMessageSchema.parse({ type: "phase:next", force: true }),
+    ).toEqual({ type: "phase:next", force: true });
+  });
+
+  it("phase:next の force に boolean 以外は拒否する", () => {
+    expect(
+      ClientMessageSchema.safeParse({ type: "phase:next", force: "yes" })
+        .success,
+    ).toBe(false);
+  });
+
+  it("error は voting-incomplete コードを受け入れる", () => {
+    expect(
+      ServerMessageSchema.parse({
+        type: "error",
+        code: "voting-incomplete",
+        message: "全員の主観・客観投票が完了していません。",
+      }),
+    ).toEqual({
+      type: "error",
+      code: "voting-incomplete",
+      message: "全員の主観・客観投票が完了していません。",
+    });
+  });
+
+  it("error の未知の code は拒否する", () => {
+    expect(
+      ServerMessageSchema.safeParse({
+        type: "error",
+        code: "rate-limited",
+        message: "x",
+      }).success,
+    ).toBe(false);
+  });
+
   it("phase:updated に未知のフェーズは拒否する", () => {
     expect(
       ServerMessageSchema.safeParse({ type: "phase:updated", phase: "done" })

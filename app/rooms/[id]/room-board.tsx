@@ -17,6 +17,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { notify } from "@/app/_lib/notify";
+import { ForceNextPhaseDialog } from "@/app/rooms/[id]/force-next-phase-dialog";
 import { leaveRoom } from "@/app/rooms/actions";
 import {
   applyServerMessage,
@@ -101,6 +102,8 @@ export function RoomBoard({
     typeof createThrottled<[NoteDragPayload]>
   > | null>(null);
   const [isNextPhasePending, setIsNextPhasePending] = useState(false);
+  const [isForceNextPhaseDialogOpen, setIsForceNextPhaseDialogOpen] =
+    useState(false);
 
   useEffect(() => {
     draggingNoteIdRef.current = draggingNoteId;
@@ -121,62 +124,76 @@ export function RoomBoard({
     return next;
   }, []);
 
-  const handleServerMessage = useCallback((message: ServerMessage) => {
-    if (message.type === "error") {
-      console.warn(`ルーム操作エラー (${message.code}): ${message.message}`);
-      notify.error(message.message);
-      if (message.code === "forbidden") {
+  const handleServerMessage = useCallback(
+    (message: ServerMessage) => {
+      if (message.type === "error") {
+        // 投票未完了によるゲート拒否はホストの phase:next 起点なので、toast
+        // ではなく「強制的に進むか」の確認ダイアログで案内する。サーバーの
+        // 評価順が変わって非ホストに届いた場合は通常のエラー表示へ落とす。
+        if (message.code === "voting-incomplete" && isHost) {
+          setIsNextPhasePending(false);
+          setIsForceNextPhaseDialogOpen(true);
+          return;
+        }
+        console.warn(`ルーム操作エラー (${message.code}): ${message.message}`);
+        notify.error(message.message);
+        if (message.code === "forbidden") {
+          setIsNextPhasePending(false);
+        }
+        return;
+      }
+
+      if (message.type === "snapshot") {
+        setGroups(message.groups || []);
+      }
+
+      if (message.type === "group:updated") {
+        setGroups((current) => {
+          const index = current.findIndex((g) => g.id === message.group.id);
+          if (index >= 0) {
+            const next = [...current];
+            next[index] = message.group;
+            return next;
+          }
+          return [...current, message.group];
+        });
+      }
+
+      if (message.type === "group:deleted") {
+        setGroups((current) => current.filter((g) => g.id !== message.groupId));
+      }
+
+      setNotes((current) =>
+        applyServerMessage(current, message, {
+          draggingNoteId: draggingNoteIdRef.current,
+        }),
+      );
+      // member_joined / member_left は自分以外の参加者から届く通知。
+      // 自分自身の参加・退出はサーバから届かない（broadcastToAllExcept）。
+      if (message.type === "member_joined") {
+        notify.memberJoined(message.member.name);
+      }
+      if (message.type === "member_left") {
+        // member_left は userId のみなので、除去前の members から名前を引く。
+        const left = membersRef.current.find(
+          (m) => m.userId === message.userId,
+        );
+        if (left) {
+          notify.memberLeft(left.name);
+        }
+      }
+      if (message.type === "phase:updated") {
         setIsNextPhasePending(false);
       }
-      return;
-    }
-
-    if (message.type === "snapshot") {
-      setGroups(message.groups || []);
-    }
-
-    if (message.type === "group:updated") {
-      setGroups((current) => {
-        const index = current.findIndex((g) => g.id === message.group.id);
-        if (index >= 0) {
-          const next = [...current];
-          next[index] = message.group;
-          return next;
-        }
-        return [...current, message.group];
-      });
-    }
-
-    if (message.type === "group:deleted") {
-      setGroups((current) => current.filter((g) => g.id !== message.groupId));
-    }
-
-    setNotes((current) =>
-      applyServerMessage(current, message, {
-        draggingNoteId: draggingNoteIdRef.current,
-      }),
-    );
-    // member_joined / member_left は自分以外の参加者から届く通知。
-    // 自分自身の参加・退出はサーバから届かない（broadcastToAllExcept）。
-    if (message.type === "member_joined") {
-      notify.memberJoined(message.member.name);
-    }
-    if (message.type === "member_left") {
-      // member_left は userId のみなので、除去前の members から名前を引く。
-      const left = membersRef.current.find((m) => m.userId === message.userId);
-      if (left) {
-        notify.memberLeft(left.name);
-      }
-    }
-    if (message.type === "phase:updated") {
-      setIsNextPhasePending(false);
-    }
-    // ref を同期更新して、連続メッセージでも最新 members を引けるようにする。
-    const nextMembers = applyMemberServerMessage(membersRef.current, message);
-    membersRef.current = nextMembers;
-    setMembers(nextMembers);
-    setPhase((current) => applyPhaseServerMessage(current, message));
-  }, []);
+      // ref を同期更新して、連続メッセージでも最新 members を引けるようにする。
+      const nextMembers = applyMemberServerMessage(membersRef.current, message);
+      membersRef.current = nextMembers;
+      setMembers(nextMembers);
+      setPhase((current) => applyPhaseServerMessage(current, message));
+      // isHost はサーバー側で確定する不変の prop（再レンダーで変わらない）。
+    },
+    [isHost],
+  );
 
   const isLeavingRef = useRef(false);
   useEffect(() => {
@@ -251,6 +268,20 @@ export function RoomBoard({
 
     clientRef.current?.send({
       type: "phase:next",
+    });
+  }, [isNextPhasePending]);
+
+  // 投票未完了ゲートの脱出ハッチ。ForceNextPhaseDialog の確認後に
+  // force 付きで再送する（ホスト以外はサーバー側で拒否される）。
+  const handleForceNextPhase = useCallback(() => {
+    setIsForceNextPhaseDialogOpen(false);
+    if (isNextPhasePending) return;
+
+    setIsNextPhasePending(true);
+
+    clientRef.current?.send({
+      type: "phase:next",
+      force: true,
     });
   }, [isNextPhasePending]);
 
@@ -388,37 +419,44 @@ export function RoomBoard({
   }, [isLeaving, isLeavePending, roomId, isHost]);
 
   return (
-    <BoardView
-      notes={notes.filter((note) => note.visibility === "shared")}
-      privateNotes={notes.filter((note) => note.visibility === "private")}
-      groups={groups}
-      inviteCode={inviteCode}
-      inviteUrl={inviteUrl}
-      phase={phase}
-      isHost={isHost}
-      connectionStatus={connectionStatus}
-      draggingNoteId={draggingNoteId}
-      members={members}
-      currentUserId={currentUserId}
-      hostUserId={hostUserId}
-      isNextPhasePending={isNextPhasePending}
-      onAddPrivateNote={handleAddNote}
-      onPrivateNoteContentChange={handleNoteContentChange}
-      onPrivateNoteDelete={handleNoteDelete}
-      onPrivateNotePublish={handlePrivateNotePublish}
-      onPrivateNoteUnpublish={handlePrivateNoteUnpublish}
-      onNextPhase={handleNextPhase}
-      onNoteDragStart={handleNoteDragStart}
-      onNoteDragMove={handleNoteDragMove}
-      onNoteDragEnd={handleNoteDragEnd}
-      onNoteContentChange={handleNoteContentChange}
-      onNoteDelete={handleNoteDelete}
-      onGroupCreate={handleGroupCreate}
-      onGroupUpdateName={handleGroupUpdateName}
-      onNoteVote={handleNoteVote}
-      onNoteVoteReset={handleNoteVoteReset}
-      onLeave={handleLeave}
-      isLeaving={isLeaving}
-    />
+    <>
+      <ForceNextPhaseDialog
+        open={isForceNextPhaseDialogOpen}
+        onOpenChange={setIsForceNextPhaseDialogOpen}
+        onConfirm={handleForceNextPhase}
+      />
+      <BoardView
+        notes={notes.filter((note) => note.visibility === "shared")}
+        privateNotes={notes.filter((note) => note.visibility === "private")}
+        groups={groups}
+        inviteCode={inviteCode}
+        inviteUrl={inviteUrl}
+        phase={phase}
+        isHost={isHost}
+        connectionStatus={connectionStatus}
+        draggingNoteId={draggingNoteId}
+        members={members}
+        currentUserId={currentUserId}
+        hostUserId={hostUserId}
+        isNextPhasePending={isNextPhasePending}
+        onAddPrivateNote={handleAddNote}
+        onPrivateNoteContentChange={handleNoteContentChange}
+        onPrivateNoteDelete={handleNoteDelete}
+        onPrivateNotePublish={handlePrivateNotePublish}
+        onPrivateNoteUnpublish={handlePrivateNoteUnpublish}
+        onNextPhase={handleNextPhase}
+        onNoteDragStart={handleNoteDragStart}
+        onNoteDragMove={handleNoteDragMove}
+        onNoteDragEnd={handleNoteDragEnd}
+        onNoteContentChange={handleNoteContentChange}
+        onNoteDelete={handleNoteDelete}
+        onGroupCreate={handleGroupCreate}
+        onGroupUpdateName={handleGroupUpdateName}
+        onNoteVote={handleNoteVote}
+        onNoteVoteReset={handleNoteVoteReset}
+        onLeave={handleLeave}
+        isLeaving={isLeaving}
+      />
+    </>
   );
 }

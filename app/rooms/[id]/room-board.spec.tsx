@@ -33,6 +33,7 @@ vi.mock("@/app/_lib/notify", () => ({
   },
 }));
 
+import { FORCE_NEXT_PHASE_COPY } from "@/app/rooms/[id]/force-next-phase-dialog";
 import { RoomBoard } from "@/app/rooms/[id]/room-board";
 import type { ProtocolNote } from "@/contracts/room-protocol";
 
@@ -125,7 +126,7 @@ function protocolNote(overrides?: Partial<ProtocolNote>): ProtocolNote {
   };
 }
 
-function renderBoard(options: { open?: boolean } = {}) {
+function renderBoard(options: { open?: boolean; isHost?: boolean } = {}) {
   FakeWebSocket.instances = [];
   const factory = (url: string) =>
     new FakeWebSocket(url) as unknown as WebSocket;
@@ -135,7 +136,7 @@ function renderBoard(options: { open?: boolean } = {}) {
       inviteCode="AB12CD"
       inviteUrl="https://idea-flow.example/invite/AB12CD"
       currentUserId={USER_ID}
-      isHost
+      isHost={options.isHost ?? true}
       hostUserId={USER_ID}
       initialMembers={[]}
       initialPhase="phase1"
@@ -157,7 +158,7 @@ function connectWithSnapshot(
     isHost?: boolean;
   },
 ) {
-  const { view, socket } = renderBoard();
+  const { view, socket } = renderBoard({ isHost: options?.isHost ?? true });
 
   act(() =>
     socket.simulateServerMessage({
@@ -220,13 +221,58 @@ describe("メンバー参加・退出の通知", () => {
 });
 
 describe("サーバーメッセージ → 画面反映", () => {
-  it("phase3 の投票未完了エラーを受信するとポップアップ通知を表示する", () => {
+  it("forbidden エラーを受信するとポップアップ通知を表示する", () => {
     const { socket } = connectWithSnapshot([], { phase: "phase3" });
 
     act(() =>
       socket.simulateServerMessage({
         type: "error",
         code: "forbidden",
+        message: "ホストのみ操作できます。",
+      }),
+    );
+
+    expect(notifyMocks.error).toHaveBeenCalledWith("ホストのみ操作できます。");
+  });
+
+  it("投票未完了（voting-incomplete）を受信すると toast ではなく強制進行の確認を表示し、確認で force 付き phase:next を送信する", () => {
+    const { socket } = connectWithSnapshot([], {
+      isHost: true,
+      phase: "phase3",
+    });
+
+    act(() =>
+      socket.simulateServerMessage({
+        type: "error",
+        code: "voting-incomplete",
+        message: "全員の主観・客観投票が完了していません。",
+      }),
+    );
+
+    expect(notifyMocks.error).not.toHaveBeenCalled();
+    expect(screen.getByText(FORCE_NEXT_PHASE_COPY.title)).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: FORCE_NEXT_PHASE_COPY.confirm }),
+    );
+
+    expect(socket.sent).toContain(
+      JSON.stringify({ type: "phase:next", force: true }),
+    );
+  });
+
+  it("非ホストに voting-incomplete が届いた場合はダイアログを開かず toast へフォールバックする", () => {
+    // サーバーの評価順では非ホストに届かないコードだが、UI 側はその暗黙の
+    // 保証に依存せず通常のエラー表示へ落とすことを固定する。
+    const { socket } = connectWithSnapshot([], {
+      isHost: false,
+      phase: "phase3",
+    });
+
+    act(() =>
+      socket.simulateServerMessage({
+        type: "error",
+        code: "voting-incomplete",
         message: "全員の主観・客観投票が完了していません。",
       }),
     );
@@ -234,6 +280,34 @@ describe("サーバーメッセージ → 画面反映", () => {
     expect(notifyMocks.error).toHaveBeenCalledWith(
       "全員の主観・客観投票が完了していません。",
     );
+    expect(
+      screen.queryByText(FORCE_NEXT_PHASE_COPY.title),
+    ).not.toBeInTheDocument();
+  });
+
+  it("強制進行の確認をキャンセルすると force 付き phase:next は送信されない", () => {
+    const { socket } = connectWithSnapshot([], {
+      isHost: true,
+      phase: "phase3",
+    });
+
+    act(() =>
+      socket.simulateServerMessage({
+        type: "error",
+        code: "voting-incomplete",
+        message: "全員の主観・客観投票が完了していません。",
+      }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: FORCE_NEXT_PHASE_COPY.cancel }),
+    );
+
+    expect(socket.sent).not.toContain(
+      JSON.stringify({ type: "phase:next", force: true }),
+    );
+    expect(
+      screen.queryByText(FORCE_NEXT_PHASE_COPY.title),
+    ).not.toBeInTheDocument();
   });
 
   it("snapshot の付箋がボードに描画される", () => {
