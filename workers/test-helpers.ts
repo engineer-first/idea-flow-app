@@ -7,7 +7,7 @@ import {
 } from "../contracts/room-protocol";
 import { TOKEN_AUDIENCE } from "../contracts/session";
 import { signToken } from "../lib/session/token";
-import type { RoomDO } from "./room-do";
+import type { RoomDO } from "./room/room-do";
 
 export type TestUser = {
   sub: string;

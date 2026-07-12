@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { NOTE_COLOR_PALETTE } from "../contracts/room-protocol";
 import { TOKEN_AUDIENCE } from "../contracts/session";
 import { signToken } from "../lib/session/token";
-import { HOST_ID_HEADER } from "./room-do";
+import { HOST_ID_HEADER } from "./room/room-do";
 import { joinRoomAs, listMemberIds, runInRoomDO } from "./test-helpers";
 
 const OWNER = {

@@ -1,0 +1,224 @@
+// 付箋（notes）の真実。ストレージアクセス・可視性判定・プロトコル射影と、
+// 受信者ごとの可視性を踏まえたノート配信ヘルパをここに集約する。
+import type { NoteColor, ProtocolNote } from "../../contracts/room-protocol";
+import { visibleTo } from "../visibility";
+import type { RoomBroadcaster } from "./broadcast";
+import { type HandlerCtx, replyNotFound } from "./handler-context";
+import { countNoteVotes, countUserNoteVotes, hasVote } from "./votes";
+
+export type NoteRow = {
+  id: string;
+  author_id: string;
+  content: string;
+  visibility: "private" | "shared";
+  color: NoteColor;
+  x: number;
+  y: number;
+  created_at: string;
+  updated_at: string;
+};
+
+// 「誰の視点でもない」射影に使う viewerId。listSharedNotes や自動再編成の
+// broadcast subject のように、votedByMe 等の視点依存フィールドを読まない
+// 文脈でだけ使う。
+export const NULL_VIEWER_ID = "00000000-0000-0000-0000-000000000000";
+
+export function findNote(sql: SqlStorage, noteId: string): NoteRow | null {
+  const rows = sql.exec("SELECT * FROM notes WHERE id = ?1", noteId).toArray();
+  return rows.length > 0 ? (rows[0] as unknown as NoteRow) : null;
+}
+
+export function requireNote(ctx: HandlerCtx, noteId: string): NoteRow | null {
+  const row = findNote(ctx.sql, noteId);
+  if (!row) {
+    replyNotFound(ctx);
+    return null;
+  }
+  return row;
+}
+
+// shared の付箋は既存仕様どおり共同編集、private は作者だけが操作できる。
+export function canEdit(row: NoteRow, userId: string): boolean {
+  return canAccessNote(row, userId);
+}
+
+export function isVisibleTo(row: NoteRow, viewerId: string): boolean {
+  return canAccessNote(row, viewerId);
+}
+
+// ルール本体は visibility.ts の visibleTo が持つ（一点集約）。
+// ここは行形式（snake_case）を visibleTo の形へ写像するだけ。
+function canAccessNote(
+  row: Pick<NoteRow, "visibility" | "author_id">,
+  viewerId: string,
+): boolean {
+  return visibleTo(
+    { viewerId },
+    { visibility: row.visibility, authorId: row.author_id },
+  );
+}
+
+export function listNotes(sql: SqlStorage, viewerId: string): ProtocolNote[] {
+  return sql
+    .exec("SELECT * FROM notes ORDER BY created_at")
+    .toArray()
+    .map((row) => toProtocolNote(sql, row as unknown as NoteRow, viewerId));
+}
+
+export function listSharedNotes(sql: SqlStorage): ProtocolNote[] {
+  return listNotes(sql, NULL_VIEWER_ID).filter(
+    (note) => note.visibility === "shared",
+  );
+}
+
+export function hasOnlySharedNotes(
+  sql: SqlStorage,
+  noteIds: readonly string[],
+): boolean {
+  return noteIds.every(
+    (noteId) => findNote(sql, noteId)?.visibility === "shared",
+  );
+}
+
+export function insertNote(sql: SqlStorage, note: NoteRow): void {
+  sql.exec(
+    `INSERT INTO notes (id, author_id, content, visibility, color, x, y, created_at, updated_at)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`,
+    note.id,
+    note.author_id,
+    note.content,
+    note.visibility,
+    note.color,
+    note.x,
+    note.y,
+    note.created_at,
+    note.updated_at,
+  );
+}
+
+export function publishNote(
+  sql: SqlStorage,
+  noteId: string,
+  x: number,
+  y: number,
+  updatedAt: string,
+): void {
+  sql.exec(
+    `UPDATE notes
+     SET visibility = 'shared', x = ?2, y = ?3, updated_at = ?4
+     WHERE id = ?1`,
+    noteId,
+    x,
+    y,
+    updatedAt,
+  );
+}
+
+export function unpublishNote(
+  sql: SqlStorage,
+  noteId: string,
+  updatedAt: string,
+): void {
+  sql.exec(
+    `UPDATE notes
+     SET visibility = 'private', updated_at = ?2
+     WHERE id = ?1`,
+    noteId,
+    updatedAt,
+  );
+}
+
+export function updateNoteContent(
+  sql: SqlStorage,
+  noteId: string,
+  content: string,
+  updatedAt: string,
+): void {
+  sql.exec(
+    "UPDATE notes SET content = ?2, updated_at = ?3 WHERE id = ?1",
+    noteId,
+    content,
+    updatedAt,
+  );
+}
+
+export function moveNote(
+  sql: SqlStorage,
+  noteId: string,
+  x: number,
+  y: number,
+  updatedAt: string,
+): void {
+  sql.exec(
+    "UPDATE notes SET x = ?2, y = ?3, updated_at = ?4 WHERE id = ?1",
+    noteId,
+    x,
+    y,
+    updatedAt,
+  );
+}
+
+export function deleteNote(sql: SqlStorage, noteId: string): void {
+  sql.exec("DELETE FROM notes WHERE id = ?1", noteId);
+}
+
+// updated_at だけを進める（投票の変化を note:updated として配信するため）。
+export function touchNote(
+  sql: SqlStorage,
+  noteId: string,
+  updatedAt: string,
+): void {
+  sql.exec("UPDATE notes SET updated_at = ?2 WHERE id = ?1", noteId, updatedAt);
+}
+
+export function toProtocolNote(
+  sql: SqlStorage,
+  row: NoteRow,
+  viewerId: string,
+): ProtocolNote {
+  return {
+    id: row.id,
+    authorId: row.author_id,
+    content: row.content,
+    visibility: row.visibility,
+    color: row.color,
+    x: row.x,
+    y: row.y,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    dotVotes: {
+      subjective: {
+        count: countNoteVotes(sql, row.id, "subjective"),
+        votedByMe: hasVote(sql, row.id, viewerId, "subjective"),
+        ownCount: countUserNoteVotes(sql, row.id, viewerId, "subjective"),
+      },
+      objective: {
+        count: countNoteVotes(sql, row.id, "objective"),
+        votedByMe: hasVote(sql, row.id, viewerId, "objective"),
+        ownCount: countUserNoteVotes(sql, row.id, viewerId, "objective"),
+      },
+    },
+  };
+}
+
+export function broadcastNoteInserted(
+  sql: SqlStorage,
+  broadcaster: RoomBroadcaster,
+  row: NoteRow,
+): void {
+  broadcaster.broadcastNote((viewerId) => ({
+    type: "note:inserted",
+    note: toProtocolNote(sql, row, viewerId),
+  }));
+}
+
+export function broadcastNoteUpdated(
+  sql: SqlStorage,
+  broadcaster: RoomBroadcaster,
+  row: NoteRow,
+): void {
+  broadcaster.broadcastNote((viewerId) => ({
+    type: "note:updated",
+    note: toProtocolNote(sql, row, viewerId),
+  }));
+}

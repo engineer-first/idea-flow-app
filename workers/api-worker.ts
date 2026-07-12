@@ -24,7 +24,7 @@ import {
 } from "./lib/db";
 import { getSessionFromRequest } from "./lib/session";
 import { requireSessionSecret } from "./lib/session-secret";
-import { HOST_ID_HEADER, RoomDO, USER_ID_HEADER } from "./room-do";
+import { HOST_ID_HEADER, RoomDO, USER_ID_HEADER } from "./room/room-do";
 
 export { RoomDO };
 

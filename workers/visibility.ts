@@ -10,9 +10,13 @@ export type VisibilityContext = {
   viewerId: string;
 };
 
+// note は判定が実際に依存するフィールドだけを要求する。
+// これにより DB の行形式（NoteRow）からも dotVotes 等の射影を
+// 経由せずに呼べ、操作認可の述語（workers/room/notes.ts）も
+// この関数に委譲できる。
 export function visibleTo(
   context: VisibilityContext,
-  note: ProtocolNote,
+  note: Pick<ProtocolNote, "visibility" | "authorId">,
 ): boolean {
   return note.visibility === "shared" || note.authorId === context.viewerId;
 }

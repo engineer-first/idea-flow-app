@@ -21,7 +21,9 @@
 - `contracts/` — 境界スキーマ（zod）。WS プロトコル・REST・セッション・ボード定数。
   クライアントとサーバーの両方がここを import する。実装より先にここを変える。
 - `workers/` — Cloudflare Workers 側。`api-worker.ts`（D1 + RoomDO への唯一の入口）、
-  `room-do.ts`（1ルーム = 1 Durable Object の権威サーバー）、`migrations/`（D1）。
+  `room/`（1ルーム = 1 Durable Object の権威サーバー。`room-do.ts` が
+  エントリポイントの façade で、ドメインロジックは同ディレクトリの
+  モジュールに分割）、`migrations/`（D1）。
 - `lib/api-client.ts` — Next サーバーから api-worker を呼ぶ唯一のクライアント。
 - `lib/session/` — セッション（HS256 JWT Cookie）の発行・検証。
 - `lib/room-client/` — ルーム WebSocket クライアント（自動再接続つき）。
