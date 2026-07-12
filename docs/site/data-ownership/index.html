@@ -480,12 +480,12 @@
         <tr>
           <td>適用タイミング</td>
           <td>デプロイ時に <code>npm run db:migrate</code> で一括適用</td>
-          <td>各 DO の起動時。<code>schema_version</code> テーブルと突き合わせ、不足分だけを <code>transactionSync</code> で原子的に適用</td>
+          <td>各 DO の起動時。<code>schema_migrations</code> テーブル（適用済みIDの記録）と突き合わせ、不足分だけを <code>transactionSync</code> で原子的に適用</td>
         </tr>
         <tr>
           <td>なぜそうなるか</td>
           <td>DB は1つしかないので、1回適用すれば終わり</td>
-          <td>DO はルームごとに独立ストレージを持ち、起床タイミングもバラバラ。「どの版まで適用済みか」を各自が記録して収束させるしかない</td>
+          <td>DO はルームごとに独立ストレージを持ち、起床タイミングもバラバラ。「どのマイグレーションを適用済みか」を各自が記録して収束させるしかない</td>
         </tr>
       </tbody>
     </table>

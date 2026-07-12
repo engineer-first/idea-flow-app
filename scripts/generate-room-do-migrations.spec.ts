@@ -1,7 +1,12 @@
 // workers/room-do-migrations/*.sql から index.ts を生成するスクリプトの
 // ロジック部分のテスト。実ファイルシステムには依存させず、ファイル名の
 // パース・並び替え・重複検出・出力レンダリングをそれぞれ検証する。
-import { describe, expect, it } from "vitest";
+// --check モードだけはスクリプトを丸ごと実行して確認する（一時ディレクトリ使用）。
+import { spawnSync } from "node:child_process";
+import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   collectMigrations,
   parseMigrationFileName,
@@ -84,22 +89,27 @@ describe("collectMigrations", () => {
 });
 
 describe("renderIndexFile", () => {
-  it("timestamp 順の SQL 配列と migrateRoomStorage の re-export を含む TypeScript を生成する", () => {
+  it("timestamp 順の {id, sql} 配列と migrateRoomStorage の re-export を含む TypeScript を生成する", () => {
     const output = renderIndexFile([
       {
+        timestamp: "20260708092459",
         file: "20260708092459-initial-schema.sql",
         sql: "CREATE TABLE a (id TEXT);",
       },
       {
+        timestamp: "20260709094433",
         file: "20260709094433-note-votes.sql",
         sql: "CREATE TABLE b (id TEXT);",
       },
     ]);
 
     expect(output).toContain(
-      "export const ROOM_DO_MIGRATIONS: readonly string[] = [",
+      "export const ROOM_DO_MIGRATIONS: readonly RoomDoMigration[] = [",
     );
     expect(output).toContain('export { migrateRoomStorage } from "./apply";');
+    // 適用済み管理に使うIDとして、ファイル名の timestamp が埋め込まれること。
+    expect(output).toContain('id: "20260708092459"');
+    expect(output).toContain('id: "20260709094433"');
     expect(output).toContain("`CREATE TABLE a (id TEXT);`");
     expect(output).toContain("`CREATE TABLE b (id TEXT);`");
     // a (initial-schema) が b (note-votes) より前に来ること。
@@ -112,7 +122,7 @@ describe("renderIndexFile", () => {
     // biome-ignore lint/suspicious/noTemplateCurlyInString: エスケープ処理そのものを検証するため、意図的に ${ を含む通常の文字列を使う
     const sql = "SELECT '`weird`' , '${not_a_template}';";
     const output = renderIndexFile([
-      { file: "20260708092459-tricky.sql", sql },
+      { timestamp: "20260708092459", file: "20260708092459-tricky.sql", sql },
     ]);
     expect(output).toContain("\\`weird\\`");
     // biome-ignore lint/suspicious/noTemplateCurlyInString: 生成後の文字列にエスケープ済み ${ が含まれることを確認する
@@ -124,5 +134,62 @@ describe("renderIndexFile", () => {
     const output = renderIndexFile([]);
     expect(output).toContain("自動生成");
     expect(output).toContain("gen:room-do-migrations");
+  });
+});
+
+describe("--check モード", () => {
+  const tempDirs: string[] = [];
+
+  afterEach(() => {
+    for (const dir of tempDirs.splice(0)) {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  function createProject() {
+    const dir = mkdtempSync(join(tmpdir(), "gen-room-do-migrations-"));
+    tempDirs.push(dir);
+    mkdirSync(join(dir, "scripts"), { recursive: true });
+    cpSync(
+      join(process.cwd(), "scripts/generate-room-do-migrations.mjs"),
+      join(dir, "scripts/generate-room-do-migrations.mjs"),
+    );
+    mkdirSync(join(dir, "workers/room-do-migrations"), { recursive: true });
+    writeFileSync(
+      join(dir, "workers/room-do-migrations/20260101000000-example.sql"),
+      "CREATE TABLE example (id TEXT);\n",
+    );
+    return dir;
+  }
+
+  function runScript(dir: string, ...args: string[]) {
+    // 絶対パスだと macOS の tmpdir シンボリックリンク（/var → /private/var）
+    // により process.argv[1] と import.meta.url が食い違い、main ガードが
+    // 実行をスキップしてしまう。cwd + 相対パスなら chdir が realpath を返す
+    // ため一致する（フック本体の呼び出し方とも同じ形になる）。
+    return spawnSync(
+      "node",
+      ["scripts/generate-room-do-migrations.mjs", ...args],
+      { cwd: dir, encoding: "utf8" },
+    );
+  }
+
+  it("index.ts が未生成でもスタックトレースではなく、生成手順の案内を出して失敗する", () => {
+    const dir = createProject();
+
+    const result = runScript(dir, "--check");
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("gen:room-do-migrations");
+    expect(result.stderr).not.toContain("ENOENT");
+  });
+
+  it("生成直後の index.ts は検証を通過する", () => {
+    const dir = createProject();
+
+    expect(runScript(dir).status).toBe(0);
+    const result = runScript(dir, "--check");
+
+    expect(result.status).toBe(0);
   });
 });

@@ -159,7 +159,7 @@ describe("RoomDO 進行状態", () => {
 });
 
 describe("RoomDO 解散", () => {
-  it("disband はストレージを完全に空にする（schema_version 含む）", async () => {
+  it("disband はストレージを完全に空にする（schema_migrations 含む）", async () => {
     const roomId = "room-disband-empty";
     const stub = roomStub(roomId);
     await stub.initializeNewRoom(USER_A, "Host");

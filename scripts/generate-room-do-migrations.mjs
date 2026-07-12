@@ -2,9 +2,9 @@
 // workers/room-do-migrations/*.sql から workers/room-do-migrations/index.ts を
 // 生成する。複数人が同時にマイグレーションファイルを追加しても集約ファイル
 // （index.ts）を手で編集する必要がなくなり、コンフリクトが起きない。
-// ファイル名の先頭14桁（YYYYMMDDHHmmss）が適用順序を決める。タイムスタンプ
-// なので複数人が同時に追加しても衝突しにくく、万一衝突したらこのスクリプトが
-// エラーで検出する。
+// ファイル名の先頭14桁（YYYYMMDDHHmmss）が適用順序を決めるIDになる。タイム
+// スタンプなので複数人が同時に追加しても衝突しにくく、万一衝突したらこの
+// スクリプトがエラーで検出する。
 //
 // 実行:
 //   npm run gen:room-do-migrations         index.ts を生成して書き込む
@@ -83,9 +83,9 @@ export function renderIndexFile(migrations) {
 //
 // RoomDO 内蔵 SQLite のマイグレーション定義を集約する。D1 の migrations/ と
 // 違い、DO はルームごとに独立したストレージを持ち起床タイミングもバラバラ
-// なので、「どの版まで適用済みか」を各 DO 自身が schema_version テーブルに
-// 記録し、起動時に不足分だけを適用して収束させる（適用の実装は ./apply.ts。
-// この仕組み自体は変更しない）。
+// なので、「どれを適用済みか」を各 DO 自身が schema_migrations テーブルに
+// 適用済みID（ファイル名のタイムスタンプ）として記録し、起動時に不足分だけ
+// を適用して収束させる（適用の実装は ./apply.ts。この仕組み自体は変更しない）。
 //
 // 新しいマイグレーションを追加する手順:
 // 1. workers/room-do-migrations/ に YYYYMMDDHHmmss-短い説明.sql を作る
@@ -96,16 +96,20 @@ export function renderIndexFile(migrations) {
 // 2人が同時に同じ秒でファイルを作ってしまった場合は、このスクリプトが
 // timestamp の重複としてエラーを出す。解消は片方のファイル名の秒を
 // ずらすだけでよい。
+import type { RoomDoMigration } from "./apply";
 `;
 
   const body = migrations
-    .map((m) => `  // ${m.file}\n  \`${escapeForTemplateLiteral(m.sql)}\`,`)
+    .map(
+      (m) =>
+        `  // ${m.file}\n  {\n    id: "${m.timestamp}",\n    sql: \`${escapeForTemplateLiteral(m.sql)}\`,\n  },`,
+    )
     .join("\n\n");
 
   const arrayBlock =
     migrations.length > 0
-      ? `export const ROOM_DO_MIGRATIONS: readonly string[] = [\n${body}\n];\n`
-      : "export const ROOM_DO_MIGRATIONS: readonly string[] = [];\n";
+      ? `export const ROOM_DO_MIGRATIONS: readonly RoomDoMigration[] = [\n${body}\n];\n`
+      : "export const ROOM_DO_MIGRATIONS: readonly RoomDoMigration[] = [];\n";
 
   return `${header}\n${arrayBlock}\nexport { migrateRoomStorage } from "./apply";\n`;
 }
@@ -115,7 +119,12 @@ function main() {
   const output = renderIndexFile(migrations);
 
   if (process.argv.includes("--check")) {
-    const current = readFileSync(OUTPUT_FILE, "utf8");
+    let current = null;
+    try {
+      current = readFileSync(OUTPUT_FILE, "utf8");
+    } catch {
+      // 未生成（ENOENT など）は「一致していない」として下の案内に合流させる。
+    }
     if (current !== output) {
       console.error(
         "workers/room-do-migrations/index.ts が *.sql の内容と一致していません。`npm run gen:room-do-migrations` を実行してコミットしてください。",

@@ -1,39 +1,43 @@
 // RoomDO 内蔵 SQLite のマイグレーション集約（ROOM_DO_MIGRATIONS）の統合
 // テスト。実際のマイグレーション定義一式を使い、DO 起動時に最新スキーマ
 // まで収束できることを検証する。個々の migrateRoomStorage の振る舞い
-// （未適用分のみ適用・原子性・fail-closed）は ./apply.spec.ts を参照。
+// （未適用IDのみ適用・原子性・fail-closed）は ./apply.spec.ts を参照。
 import { describe, expect, it } from "vitest";
 import { runInRoomDO } from "../test-helpers";
 import { migrateRoomStorage, ROOM_DO_MIGRATIONS } from "./index";
-import { dropAllTables, schemaVersion, tableNames } from "./test-helpers";
+import { appliedMigrationIds, dropAllTables, tableNames } from "./test-helpers";
 
 const USER_A = "11111111-1111-4111-8111-111111111111";
 
+const ALL_MIGRATION_IDS = ROOM_DO_MIGRATIONS.map((m) => m.id);
+
+const ALL_TABLES = [
+  "groups",
+  "member_color_assignments",
+  "members",
+  "note_votes",
+  "notes",
+  "room_owner",
+  "room_state",
+  "schema_migrations",
+];
+
 describe("ROOM_DO_MIGRATIONS", () => {
-  it("空のストレージに全マイグレーションを適用し、版を記録する", async () => {
+  it("空のストレージに全マイグレーションを適用し、適用済みIDを記録する", async () => {
     await runInRoomDO("mig-fresh", (_instance, state) => {
       dropAllTables(state.storage);
       migrateRoomStorage(state.storage, ROOM_DO_MIGRATIONS);
-      expect(tableNames(state.storage)).toEqual([
-        "groups",
-        "member_color_assignments",
-        "members",
-        "note_votes",
-        "notes",
-        "room_owner",
-        "room_state",
-        "schema_version",
-      ]);
-      expect(schemaVersion(state.storage)).toBe(ROOM_DO_MIGRATIONS.length);
+      expect(tableNames(state.storage)).toEqual(ALL_TABLES);
+      expect(appliedMigrationIds(state.storage)).toEqual(ALL_MIGRATION_IDS);
     });
   });
 
-  it("再実行しても失敗せず、版も変わらない（冪等）", async () => {
+  it("再実行しても失敗せず、適用記録も変わらない（冪等）", async () => {
     await runInRoomDO("mig-idempotent", (_instance, state) => {
       dropAllTables(state.storage);
       migrateRoomStorage(state.storage, ROOM_DO_MIGRATIONS);
       migrateRoomStorage(state.storage, ROOM_DO_MIGRATIONS);
-      expect(schemaVersion(state.storage)).toBe(ROOM_DO_MIGRATIONS.length);
+      expect(appliedMigrationIds(state.storage)).toEqual(ALL_MIGRATION_IDS);
     });
   });
 
@@ -64,7 +68,7 @@ describe("ROOM_DO_MIGRATIONS", () => {
 
       migrateRoomStorage(state.storage, ROOM_DO_MIGRATIONS);
 
-      expect(schemaVersion(state.storage)).toBe(ROOM_DO_MIGRATIONS.length);
+      expect(appliedMigrationIds(state.storage)).toEqual(ALL_MIGRATION_IDS);
       // 既存データは破壊されない。
       const members = state.storage.sql
         .exec("SELECT user_id FROM members")
@@ -136,17 +140,8 @@ describe("ROOM_DO_MIGRATIONS", () => {
 describe("RoomDO constructor の配線", () => {
   it("新規 DO は起動時に最新版までマイグレーションされている", async () => {
     await runInRoomDO("mig-wired", (_instance, state) => {
-      expect(schemaVersion(state.storage)).toBe(ROOM_DO_MIGRATIONS.length);
-      expect(tableNames(state.storage)).toEqual([
-        "groups",
-        "member_color_assignments",
-        "members",
-        "note_votes",
-        "notes",
-        "room_owner",
-        "room_state",
-        "schema_version",
-      ]);
+      expect(appliedMigrationIds(state.storage)).toEqual(ALL_MIGRATION_IDS);
+      expect(tableNames(state.storage)).toEqual(ALL_TABLES);
     });
   });
 });

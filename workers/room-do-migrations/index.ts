@@ -9,9 +9,9 @@
 //
 // RoomDO 内蔵 SQLite のマイグレーション定義を集約する。D1 の migrations/ と
 // 違い、DO はルームごとに独立したストレージを持ち起床タイミングもバラバラ
-// なので、「どの版まで適用済みか」を各 DO 自身が schema_version テーブルに
-// 記録し、起動時に不足分だけを適用して収束させる（適用の実装は ./apply.ts。
-// この仕組み自体は変更しない）。
+// なので、「どれを適用済みか」を各 DO 自身が schema_migrations テーブルに
+// 適用済みID（ファイル名のタイムスタンプ）として記録し、起動時に不足分だけ
+// を適用して収束させる（適用の実装は ./apply.ts。この仕組み自体は変更しない）。
 //
 // 新しいマイグレーションを追加する手順:
 // 1. workers/room-do-migrations/ に YYYYMMDDHHmmss-短い説明.sql を作る
@@ -22,10 +22,13 @@
 // 2人が同時に同じ秒でファイルを作ってしまった場合は、このスクリプトが
 // timestamp の重複としてエラーを出す。解消は片方のファイル名の秒を
 // ずらすだけでよい。
+import type { RoomDoMigration } from "./apply";
 
-export const ROOM_DO_MIGRATIONS: readonly string[] = [
+export const ROOM_DO_MIGRATIONS: readonly RoomDoMigration[] = [
   // 20260708092459-initial-schema.sql
-  `-- v1: 初期スキーマ。版管理導入以前の DO（テーブルはあるが版記録がない）を
+  {
+    id: "20260708092459",
+    sql: `-- v1: 初期スキーマ。版管理導入以前の DO（テーブルはあるが版記録がない）を
 -- 吸収するため IF NOT EXISTS を維持する。旧 meta テーブルは招待コードの
 -- 複製（ベアラートークン相当の秘密）を残さないよう掃除する。
 CREATE TABLE IF NOT EXISTS members (
@@ -42,9 +45,12 @@ CREATE TABLE IF NOT EXISTS notes (
   updated_at TEXT NOT NULL
 );
 DROP TABLE IF EXISTS meta;`,
+  },
 
   // 20260709094433-votes-phase-group-names.sql
-  `-- v2: ドット投票 + フェーズ管理 + グループ名管理テーブルの追加。
+  {
+    id: "20260709094433",
+    sql: `-- v2: ドット投票 + フェーズ管理 + グループ名管理テーブルの追加。
 -- 1ユーザーは同じ付箋・同じ種別に1票だけ持てる。種別ごとの総投票数上限は
 -- RoomDO の操作処理で enforcing する。
 CREATE TABLE IF NOT EXISTS group_names (
@@ -70,9 +76,12 @@ CREATE TABLE IF NOT EXISTS room_state (
 );
 INSERT OR IGNORE INTO room_state (id, phase)
 VALUES (1, 'phase1');`,
+  },
 
   // 20260709094434-vote-count-groups-host.sql
-  `-- v3: 客観ドットは同じ付箋に複数票を積める（既存行は1票として保持する）。
+  {
+    id: "20260709094434",
+    sql: `-- v3: 客観ドットは同じ付箋に複数票を積める（既存行は1票として保持する）。
 -- あわせて host 管理（room_owner）と、グループ指向の自動グループ化対応
 -- （groups テーブル追加・旧 group_names テーブル削除）を行う。
 DROP TABLE IF EXISTS group_names;
@@ -92,23 +101,35 @@ CREATE TABLE IF NOT EXISTS room_owner (
 );
 INSERT OR IGNORE INTO room_owner (id)
 VALUES (1);`,
+  },
 
   // 20260710134136-member-name.sql
-  `-- v4: メンバー表示名（ロビー UI）。
+  {
+    id: "20260710134136",
+    sql: `-- v4: メンバー表示名（ロビー UI）。
 ALTER TABLE members ADD COLUMN name TEXT NOT NULL DEFAULT '';`,
+  },
 
   // 20260711011916-note-visibility.sql
-  `-- v5: 個人ツールバー用の非公開付箋。既存の付箋は共有済みとして維持する。
+  {
+    id: "20260711011916",
+    sql: `-- v5: 個人ツールバー用の非公開付箋。既存の付箋は共有済みとして維持する。
 ALTER TABLE notes ADD COLUMN visibility TEXT NOT NULL DEFAULT 'shared'
   CHECK (visibility IN ('private', 'shared'));`,
+  },
 
   // 20260712113052-member-note-colors.sql
-  `-- v6: メンバーのランダム色割り当て、および付箋の個別色保持対応。
+  {
+    id: "20260712113052",
+    sql: `-- v6: メンバーのランダム色割り当て、および付箋の個別色保持対応。
 ALTER TABLE members ADD COLUMN color TEXT NOT NULL DEFAULT 'yellow';
 ALTER TABLE notes ADD COLUMN color TEXT NOT NULL DEFAULT 'yellow';`,
+  },
 
   // 20260712113053-member-color-assignments.sql
-  `-- v7: 退出後も色を保持し、付箋の作者色を通算で一意にする。
+  {
+    id: "20260712113053",
+    sql: `-- v7: 退出後も色を保持し、付箋の作者色を通算で一意にする。
 CREATE TABLE member_color_assignments (
   user_id TEXT PRIMARY KEY,
   color TEXT NOT NULL UNIQUE,
@@ -116,6 +137,7 @@ CREATE TABLE member_color_assignments (
 );
 INSERT OR IGNORE INTO member_color_assignments (user_id, color)
 SELECT user_id, color FROM members;`,
+  },
 ];
 
 export { migrateRoomStorage } from "./apply";
