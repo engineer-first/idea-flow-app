@@ -525,3 +525,11 @@ describe("WebSocket 接続の認可", () => {
     res.webSocket?.close();
   });
 });
+
+describe("GET /api/health（疎通確認用、認可不要）", () => {
+  it("セッションなしでも 200 で ok:true を返す", async () => {
+    const res = await SELF.fetch("https://api.test/api/health");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+  });
+});
