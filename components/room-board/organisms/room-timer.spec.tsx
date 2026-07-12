@@ -145,6 +145,11 @@ describe("RoomTimer", () => {
       />,
     );
     expect(screen.getByRole("timer")).toHaveTextContent("00:00");
+    expect(screen.getByRole("timer")).not.toHaveAttribute("aria-live");
+    expect(screen.getByText("タイマーが終了しました。")).toHaveAttribute(
+      "aria-live",
+      "polite",
+    );
     expect(screen.getByTestId("room-timer")).toHaveAttribute(
       "data-ended",
       "true",

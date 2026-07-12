@@ -100,15 +100,11 @@ export function RoomTimer({
         <span className="text-xs font-medium text-muted-foreground">
           タイマー
         </span>
-        <span
-          role="timer"
-          aria-live="polite"
-          className="font-mono text-xl font-bold tabular-nums"
-        >
+        <span role="timer" className="font-mono text-xl font-bold tabular-nums">
           {remainingMs === null ? "--:--" : formatDuration(remainingMs)}
-          <span className="sr-only">
-            {isEnded ? "タイマーが終了しました。" : null}
-          </span>
+        </span>
+        <span aria-live="polite" className="sr-only">
+          {isEnded ? "タイマーが終了しました。" : null}
         </span>
       </div>
 
