@@ -28,6 +28,8 @@ import { HOST_ID_HEADER, RoomDO, USER_ID_HEADER } from "./room-do";
 
 export { RoomDO };
 
+// wrangler types の生成物は api-worker.ts を root 型検査から参照する一方、
+// secret binding は生成されないため、公開境界で SESSION_SECRET を明示する。
 type ApiWorkerEnv = Env & {
   SESSION_SECRET: string;
 };

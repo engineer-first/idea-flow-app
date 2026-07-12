@@ -21,7 +21,10 @@ export type RoomTimerProps = {
   onResume: () => void;
   onExtend: () => void;
   onStop: () => void;
+  now?: () => number;
 };
+
+const systemNow = (): number => Date.now();
 
 function parseDuration(value: string): number | null {
   const match = /^(\d{1,2}):(\d{2})$/.exec(value);
@@ -51,14 +54,15 @@ export function RoomTimer({
   onResume,
   onExtend,
   onStop,
+  now: getNow = systemNow,
 }: RoomTimerProps) {
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState(() => getNow());
   const [durationInput, setDurationInput] = useState("05:00");
 
   useEffect(() => {
     if (timer.status !== "running") return;
     const tick = () => {
-      const clientNow = Date.now();
+      const clientNow = getNow();
       setNow(clientNow);
       if (clientNow + serverOffsetMs >= timer.endsAt) {
         window.clearInterval(intervalId);
@@ -67,7 +71,7 @@ export function RoomTimer({
     const intervalId = window.setInterval(tick, 250);
     tick();
     return () => window.clearInterval(intervalId);
-  }, [serverOffsetMs, timer]);
+  }, [getNow, serverOffsetMs, timer]);
 
   const remainingMs =
     timer.status === "running"
@@ -98,10 +102,13 @@ export function RoomTimer({
         </span>
         <span
           role="timer"
-          aria-live={isEnded ? "assertive" : "off"}
+          aria-live="polite"
           className="font-mono text-xl font-bold tabular-nums"
         >
           {remainingMs === null ? "--:--" : formatDuration(remainingMs)}
+          <span className="sr-only">
+            {isEnded ? "タイマーが終了しました。" : null}
+          </span>
         </span>
       </div>
 
@@ -128,7 +135,7 @@ export function RoomTimer({
             <Input
               aria-label="タイマー時間（分:秒）"
               aria-invalid={parsedDuration === null}
-              inputMode="numeric"
+              inputMode="text"
               value={durationInput}
               disabled={disabled}
               className="h-8 w-20 font-mono tabular-nums"

@@ -132,6 +132,7 @@ export function RoomBoard({
 
   const handleServerMessage = useCallback(
     (message: ServerMessage) => {
+      const receivedAt = Date.now();
       if (message.type === "error") {
         // 投票未完了によるゲート拒否はホストの phase:next 起点なので、toast
         // ではなく「強制的に進むか」の確認ダイアログで案内する。サーバーの
@@ -199,7 +200,9 @@ export function RoomBoard({
       membersRef.current = nextMembers;
       setMembers(nextMembers);
       setPhase((current) => applyPhaseServerMessage(current, message));
-      setTimerState((current) => applyTimerServerMessage(current, message));
+      setTimerState((current) =>
+        applyTimerServerMessage(current, message, receivedAt),
+      );
       // isHost はサーバー側で確定する不変の prop（再レンダーで変わらない）。
     },
     [isHost],

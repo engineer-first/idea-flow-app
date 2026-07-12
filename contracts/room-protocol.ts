@@ -95,18 +95,19 @@ export type Phase = z.infer<typeof PhaseSchema>;
 
 export const TIMER_MAX_DURATION_MS = 5_999_000;
 const TimerMillisecondsSchema = z.number().int().finite().min(0);
+const TimerDurationSchema = TimerMillisecondsSchema.max(TIMER_MAX_DURATION_MS);
 
 export const TimerStateSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("idle") }),
   z.object({
     status: z.literal("running"),
     endsAt: TimerMillisecondsSchema,
-    durationMs: TimerMillisecondsSchema,
+    durationMs: TimerDurationSchema,
   }),
   z.object({
     status: z.literal("paused"),
-    remainingMs: TimerMillisecondsSchema,
-    durationMs: TimerMillisecondsSchema,
+    remainingMs: TimerDurationSchema,
+    durationMs: TimerDurationSchema,
   }),
 ]);
 export type TimerState = z.infer<typeof TimerStateSchema>;

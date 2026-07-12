@@ -171,6 +171,17 @@ describe("applyPhaseServerMessage", () => {
 });
 
 describe("applyTimerServerMessage", () => {
+  it("タイマー以外のメッセージでは状態を変えない", () => {
+    const current = { timer: { status: "idle" } as const, serverOffsetMs: 0 };
+    expect(
+      applyTimerServerMessage(
+        current,
+        { type: "phase:updated", phase: "phase2" },
+        1_000,
+      ),
+    ).toBe(current);
+  });
+
   it("snapshot と timer:updated からタイマーとサーバー時計補正を復元する", () => {
     const snapshot: ServerMessage = {
       type: "snapshot",
@@ -204,16 +215,5 @@ describe("applyTimerServerMessage", () => {
         1_850,
       ),
     ).toEqual({ timer: updated.timer, serverOffsetMs: 150 });
-  });
-
-  it("タイマー以外のメッセージでは状態を変えない", () => {
-    const current = { timer: { status: "idle" } as const, serverOffsetMs: 0 };
-    expect(
-      applyTimerServerMessage(
-        current,
-        { type: "phase:updated", phase: "phase2" },
-        1_000,
-      ),
-    ).toBe(current);
   });
 });

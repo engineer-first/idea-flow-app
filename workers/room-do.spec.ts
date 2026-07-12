@@ -5,7 +5,10 @@
 // room-protocol.spec.ts の E2E テスト（実 WS 接続）で検証する。
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import { NOTE_COLOR_PALETTE } from "../contracts/room-protocol";
+import {
+  NOTE_COLOR_PALETTE,
+  TIMER_MAX_DURATION_MS,
+} from "../contracts/room-protocol";
 import { HOST_ID_HEADER, USER_ID_HEADER } from "./room-do";
 import { listMemberIds, runInRoomDO } from "./test-helpers";
 
@@ -699,6 +702,163 @@ describe("RoomDO timer:* の認可", () => {
       type: "error",
       code: "forbidden",
     });
+    ws.close();
+  });
+
+  it("D1由来 hostId が本人でも RoomDO の所有者でなければ操作できない", async () => {
+    const stub = roomStub("room-timer-forged-host-header");
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.upsertMember(USER_B, "Member");
+    const res = await stub.fetch("https://do/ws", {
+      headers: {
+        Upgrade: "websocket",
+        [USER_ID_HEADER]: USER_B,
+        [HOST_ID_HEADER]: USER_B,
+      },
+    });
+    const ws = res.webSocket;
+    if (!ws) throw new Error("WebSocket 接続を確立できませんでした。");
+    ws.accept();
+    await new Promise<MessageEvent>((resolve) => {
+      ws.addEventListener("message", resolve, { once: true });
+    });
+    ws.send(JSON.stringify({ type: "timer:start", durationMs: 60_000 }));
+    const event = await new Promise<MessageEvent>((resolve) => {
+      ws.addEventListener("message", resolve, { once: true });
+    });
+    expect(JSON.parse(String(event.data))).toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+    ws.close();
+  });
+
+  it("ホストでも現在状態に合わない操作は権限エラーと異なる文言で拒否する", async () => {
+    const stub = roomStub("room-timer-invalid-state");
+    await stub.initializeNewRoom(USER_A, "Host");
+    const res = await stub.fetch("https://do/ws", {
+      headers: {
+        Upgrade: "websocket",
+        [USER_ID_HEADER]: USER_A,
+        [HOST_ID_HEADER]: USER_A,
+      },
+    });
+    const ws = res.webSocket;
+    if (!ws) throw new Error("WebSocket 接続を確立できませんでした。");
+    ws.accept();
+    const receive = () =>
+      new Promise<Record<string, unknown>>((resolve) => {
+        ws.addEventListener(
+          "message",
+          (event) => resolve(JSON.parse(String(event.data))),
+          { once: true },
+        );
+      });
+    await receive();
+
+    ws.send(JSON.stringify({ type: "timer:pause" }));
+    expect(await receive()).toMatchObject({
+      type: "error",
+      code: "forbidden",
+      message: "この状態ではその操作はできません。",
+    });
+
+    ws.send(JSON.stringify({ type: "timer:start", durationMs: 60_000 }));
+    await receive();
+    ws.send(JSON.stringify({ type: "timer:start", durationMs: 30_000 }));
+    expect(await receive()).toMatchObject({
+      type: "error",
+      code: "forbidden",
+      message: "この状態ではその操作はできません。",
+    });
+    ws.close();
+  });
+
+  it("実行中・一時停止中の延長を 99:59 にクランプする", async () => {
+    const stub = roomStub("room-timer-extend-limit");
+    await stub.initializeNewRoom(USER_A, "Host");
+    const res = await stub.fetch("https://do/ws", {
+      headers: {
+        Upgrade: "websocket",
+        [USER_ID_HEADER]: USER_A,
+        [HOST_ID_HEADER]: USER_A,
+      },
+    });
+    const ws = res.webSocket;
+    if (!ws) throw new Error("WebSocket 接続を確立できませんでした。");
+    ws.accept();
+    const receive = () =>
+      new Promise<Record<string, unknown>>((resolve) => {
+        ws.addEventListener(
+          "message",
+          (event) => resolve(JSON.parse(String(event.data))),
+          { once: true },
+        );
+      });
+    await receive();
+    ws.send(
+      JSON.stringify({
+        type: "timer:start",
+        durationMs: TIMER_MAX_DURATION_MS - 30_000,
+      }),
+    );
+    const started = await receive();
+    ws.send(JSON.stringify({ type: "timer:extend" }));
+    const extended = await receive();
+    expect(extended).toMatchObject({
+      type: "timer:updated",
+      timer: { status: "running", durationMs: TIMER_MAX_DURATION_MS },
+    });
+    expect((extended.timer as { endsAt: number }).endsAt).toBe(
+      (started.timer as { endsAt: number }).endsAt + 30_000,
+    );
+
+    ws.send(JSON.stringify({ type: "timer:stop" }));
+    await receive();
+    ws.send(
+      JSON.stringify({
+        type: "timer:start",
+        durationMs: TIMER_MAX_DURATION_MS - 30_000,
+      }),
+    );
+    await receive();
+    ws.send(JSON.stringify({ type: "timer:pause" }));
+    const paused = await receive();
+    ws.send(JSON.stringify({ type: "timer:extend" }));
+    const extendedPaused = await receive();
+    expect(extendedPaused).toMatchObject({
+      type: "timer:updated",
+      timer: { status: "paused", durationMs: TIMER_MAX_DURATION_MS },
+    });
+    expect((extendedPaused.timer as { remainingMs: number }).remainingMs).toBe(
+      (paused.timer as { remainingMs: number }).remainingMs + 30_000,
+    );
+    ws.close();
+  });
+
+  it("idle への stop は状態変化も配信も行わない", async () => {
+    const stub = roomStub("room-timer-stop-idle");
+    await stub.initializeNewRoom(USER_A, "Host");
+    const res = await stub.fetch("https://do/ws", {
+      headers: {
+        Upgrade: "websocket",
+        [USER_ID_HEADER]: USER_A,
+        [HOST_ID_HEADER]: USER_A,
+      },
+    });
+    const ws = res.webSocket;
+    if (!ws) throw new Error("WebSocket 接続を確立できませんでした。");
+    ws.accept();
+    await new Promise<MessageEvent>((resolve) => {
+      ws.addEventListener("message", resolve, { once: true });
+    });
+    const messages: unknown[] = [];
+    ws.addEventListener("message", (event) => {
+      messages.push(JSON.parse(String(event.data)));
+    });
+    ws.send(JSON.stringify({ type: "timer:stop" }));
+    expect(await stub.getTimerState()).toEqual({ status: "idle" });
+    expect(messages).toEqual([]);
     ws.close();
   });
 

@@ -54,6 +54,30 @@ describe("PhaseSchema", () => {
 });
 
 describe("TimerStateSchema", () => {
+  it("負数や有限でない時刻・時間を拒否する", () => {
+    expect(
+      TimerStateSchema.safeParse({
+        status: "running",
+        endsAt: Number.POSITIVE_INFINITY,
+        durationMs: 60_000,
+      }).success,
+    ).toBe(false);
+    expect(
+      TimerStateSchema.safeParse({
+        status: "paused",
+        remainingMs: -1,
+        durationMs: 60_000,
+      }).success,
+    ).toBe(false);
+    expect(
+      TimerStateSchema.safeParse({
+        status: "paused",
+        remainingMs: 60_000,
+        durationMs: 5_999_001,
+      }).success,
+    ).toBe(false);
+  });
+
   it("idle / running / paused の共有状態を受け入れる", () => {
     expect(TimerStateSchema.parse({ status: "idle" })).toEqual({
       status: "idle",
@@ -80,23 +104,6 @@ describe("TimerStateSchema", () => {
       remainingMs: 30_000,
       durationMs: 60_000,
     });
-  });
-
-  it("負数や有限でない時刻・時間を拒否する", () => {
-    expect(
-      TimerStateSchema.safeParse({
-        status: "running",
-        endsAt: Number.POSITIVE_INFINITY,
-        durationMs: 60_000,
-      }).success,
-    ).toBe(false);
-    expect(
-      TimerStateSchema.safeParse({
-        status: "paused",
-        remainingMs: -1,
-        durationMs: 60_000,
-      }).success,
-    ).toBe(false);
   });
 });
 

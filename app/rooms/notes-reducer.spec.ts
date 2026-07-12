@@ -29,6 +29,20 @@ function makeNote(overrides: Partial<Note> = {}): Note {
 }
 
 describe("applyServerMessage", () => {
+  it("timer:updated は付箋配列を同じ参照のまま変更しない", () => {
+    const notes = [note];
+    const result = applyServerMessage(
+      notes,
+      {
+        type: "timer:updated",
+        timer: { status: "paused", remainingMs: 30_000, durationMs: 60_000 },
+        serverNow: 1_000,
+      },
+      { draggingNoteId: null },
+    );
+    expect(result).toBe(notes);
+  });
+
   it("snapshotで付箋を丸ごと置き換える", () => {
     const message: ServerMessage = {
       type: "snapshot",

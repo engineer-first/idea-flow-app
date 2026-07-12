@@ -28,6 +28,7 @@ import {
   type ProtocolNote,
   parseClientMessage,
   type ServerMessage,
+  TIMER_MAX_DURATION_MS,
   type TimerState,
   WS_CLOSE_LEFT_ROOM,
   WS_CLOSE_LEFT_ROOM_REASON,
@@ -882,8 +883,13 @@ export class RoomDO extends DurableObject {
       }
 
       case "timer:start": {
-        if (!this.canControlTimer(userId, hostId)) {
+        if (!this.canControlTimer(userId)) {
           this.sendTimerForbidden(ws);
+          return;
+        }
+        // start は初回開始専用。実行中・一時停止中のリセットは stop を経由する。
+        if (this.getTimerState().status !== "idle") {
+          this.sendTimerInvalidState(ws);
           return;
         }
         const serverNow = Date.now();
@@ -899,13 +905,13 @@ export class RoomDO extends DurableObject {
       }
 
       case "timer:pause": {
-        if (!this.canControlTimer(userId, hostId)) {
+        if (!this.canControlTimer(userId)) {
           this.sendTimerForbidden(ws);
           return;
         }
         const current = this.getTimerState();
         if (current.status !== "running") {
-          this.sendTimerForbidden(ws);
+          this.sendTimerInvalidState(ws);
           return;
         }
         const serverNow = Date.now();
@@ -921,13 +927,13 @@ export class RoomDO extends DurableObject {
       }
 
       case "timer:resume": {
-        if (!this.canControlTimer(userId, hostId)) {
+        if (!this.canControlTimer(userId)) {
           this.sendTimerForbidden(ws);
           return;
         }
         const current = this.getTimerState();
         if (current.status !== "paused") {
-          this.sendTimerForbidden(ws);
+          this.sendTimerInvalidState(ws);
           return;
         }
         const serverNow = Date.now();
@@ -943,43 +949,60 @@ export class RoomDO extends DurableObject {
       }
 
       case "timer:extend": {
-        if (!this.canControlTimer(userId, hostId)) {
+        if (!this.canControlTimer(userId)) {
           this.sendTimerForbidden(ws);
           return;
         }
         const current = this.getTimerState();
         const serverNow = Date.now();
         if (current.status === "running") {
+          const extensionMs = Math.min(
+            60_000,
+            TIMER_MAX_DURATION_MS - current.durationMs,
+          );
+          if (extensionMs <= 0) {
+            this.sendTimerInvalidState(ws);
+            return;
+          }
           this.updateTimer(
             {
               status: "running",
-              endsAt: Math.max(current.endsAt, serverNow) + 60_000,
-              durationMs: current.durationMs + 60_000,
+              endsAt: Math.max(current.endsAt, serverNow) + extensionMs,
+              durationMs: current.durationMs + extensionMs,
             },
             serverNow,
           );
           return;
         }
         if (current.status === "paused") {
+          const extensionMs = Math.min(
+            60_000,
+            TIMER_MAX_DURATION_MS - current.durationMs,
+          );
+          if (extensionMs <= 0) {
+            this.sendTimerInvalidState(ws);
+            return;
+          }
           this.updateTimer(
             {
               status: "paused",
-              remainingMs: current.remainingMs + 60_000,
-              durationMs: current.durationMs + 60_000,
+              remainingMs: current.remainingMs + extensionMs,
+              durationMs: current.durationMs + extensionMs,
             },
             serverNow,
           );
           return;
         }
-        this.sendTimerForbidden(ws);
+        this.sendTimerInvalidState(ws);
         return;
       }
 
       case "timer:stop": {
-        if (!this.canControlTimer(userId, hostId)) {
+        if (!this.canControlTimer(userId)) {
           this.sendTimerForbidden(ws);
           return;
         }
+        if (this.getTimerState().status === "idle") return;
         this.updateTimer({ status: "idle" });
         return;
       }
@@ -1130,8 +1153,8 @@ export class RoomDO extends DurableObject {
     });
   }
 
-  private canControlTimer(userId: string, hostId: string): boolean {
-    return userId === hostId || this.isHostUser(userId);
+  private canControlTimer(userId: string): boolean {
+    return this.isHostUser(userId);
   }
 
   private sendTimerForbidden(ws: WebSocket): void {
@@ -1139,6 +1162,14 @@ export class RoomDO extends DurableObject {
       type: "error",
       code: "forbidden",
       message: "タイマーはホストのみ操作できます。",
+    });
+  }
+
+  private sendTimerInvalidState(ws: WebSocket): void {
+    this.sendTo(ws, {
+      type: "error",
+      code: "forbidden",
+      message: "この状態ではその操作はできません。",
     });
   }
 

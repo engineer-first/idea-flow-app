@@ -1,6 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { fn } from "storybook/test";
 import { RoomTimer } from "./room-timer";
+import {
+  buildEndedTimer,
+  buildPausedTimer,
+  buildRunningTimer,
+  ROOM_TIMER_FIXTURE_NOW,
+} from "./room-timer.fixture";
 
 const meta = {
   title: "RoomBoard/Organisms/RoomTimer",
@@ -15,6 +21,7 @@ const meta = {
     onResume: fn(),
     onExtend: fn(),
     onStop: fn(),
+    now: () => ROOM_TIMER_FIXTURE_NOW,
   },
 } satisfies Meta<typeof RoomTimer>;
 
@@ -25,11 +32,7 @@ export const IdleHost: Story = {};
 export const IdleMember: Story = { args: { isHost: false } };
 export const RunningHost: Story = {
   args: {
-    timer: {
-      status: "running",
-      endsAt: Date.now() + 5 * 60_000,
-      durationMs: 5 * 60_000,
-    },
+    timer: buildRunningTimer(),
   },
 };
 export const RunningMember: Story = {
@@ -37,11 +40,7 @@ export const RunningMember: Story = {
 };
 export const PausedHost: Story = {
   args: {
-    timer: {
-      status: "paused",
-      remainingMs: 2 * 60_000 + 30_000,
-      durationMs: 5 * 60_000,
-    },
+    timer: buildPausedTimer(),
   },
 };
 export const PausedMember: Story = {
@@ -49,7 +48,7 @@ export const PausedMember: Story = {
 };
 export const EndedHost: Story = {
   args: {
-    timer: { status: "running", endsAt: Date.now() - 1, durationMs: 60_000 },
+    timer: buildEndedTimer(),
   },
 };
 export const EndedMember: Story = {

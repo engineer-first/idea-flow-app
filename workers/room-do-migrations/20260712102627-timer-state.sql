@@ -1,4 +1,3 @@
--- TODO: このマイグレーションの意図と SQL を書く。
 -- ルーム共有タイマーの権威状態。1 RoomDO につき常に1行だけを持つ。
 CREATE TABLE timer_state (
   id INTEGER PRIMARY KEY CHECK (id = 1),
