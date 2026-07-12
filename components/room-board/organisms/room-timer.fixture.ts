@@ -1,6 +1,8 @@
 import type { TimerState } from "@/contracts/room-protocol";
 
 export const ROOM_TIMER_FIXTURE_NOW = Date.parse("2026-07-12T10:00:00.000Z");
+export const ROOM_TIMER_IDLE_MIN_DURATION_MS = 0;
+export const ROOM_TIMER_IDLE_MAX_ADJUST_DURATION_MS = 99 * 60_000;
 
 export function buildRunningTimer(
   options: { now?: number; remainingMs?: number; durationMs?: number } = {},

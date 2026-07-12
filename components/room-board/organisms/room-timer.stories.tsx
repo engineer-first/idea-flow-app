@@ -6,6 +6,8 @@ import {
   buildPausedTimer,
   buildRunningTimer,
   ROOM_TIMER_FIXTURE_NOW,
+  ROOM_TIMER_IDLE_MAX_ADJUST_DURATION_MS,
+  ROOM_TIMER_IDLE_MIN_DURATION_MS,
 } from "./room-timer.fixture";
 
 const meta = {
@@ -29,6 +31,12 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const IdleHost: Story = {};
+export const IdleHostMinimum: Story = {
+  args: { initialDurationMs: ROOM_TIMER_IDLE_MIN_DURATION_MS },
+};
+export const IdleHostMaximum: Story = {
+  args: { initialDurationMs: ROOM_TIMER_IDLE_MAX_ADJUST_DURATION_MS },
+};
 export const IdleMember: Story = { args: { isHost: false } };
 export const RunningHost: Story = {
   args: {

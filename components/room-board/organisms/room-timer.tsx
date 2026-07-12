@@ -10,6 +10,8 @@ import {
 import { cn } from "@/lib/utils";
 
 const TIMER_PRESETS = [1, 3, 5, 10] as const;
+export const TIMER_DEFAULT_DURATION_MS = 3 * 60_000;
+const TIMER_IDLE_ADJUST_MAX_MS = 99 * 60_000;
 
 export type RoomTimerProps = {
   timer: TimerState;
@@ -22,19 +24,38 @@ export type RoomTimerProps = {
   onExtend: () => void;
   onStop: () => void;
   now?: () => number;
+  initialDurationMs?: number;
 };
 
 const systemNow = (): number => Date.now();
 
-function parseDuration(value: string): number | null {
-  const match = /^(\d{1,2}):(\d{2})$/.exec(value);
-  if (!match) return null;
-  const minutes = Number(match[1]);
-  const seconds = Number(match[2]);
-  if (seconds > 59) return null;
-  const durationMs = (minutes * 60 + seconds) * 1_000;
+function parseDuration(minutes: string, seconds: string): number | null {
+  const durationMs = (Number(minutes) * 60 + Number(seconds)) * 1_000;
   if (durationMs < 1 || durationMs > TIMER_MAX_DURATION_MS) return null;
   return durationMs;
+}
+
+function formatPart(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+function fieldsFromDuration(durationMs: number): {
+  minutes: string;
+  seconds: string;
+} {
+  const totalSeconds = Math.floor(
+    Math.min(Math.max(durationMs, 0), TIMER_MAX_DURATION_MS) / 1_000,
+  );
+  return {
+    minutes: formatPart(Math.floor(totalSeconds / 60)),
+    seconds: formatPart(totalSeconds % 60),
+  };
+}
+
+function normalizePart(value: string, max: number): string {
+  const digits = value.replace(/\D/g, "");
+  const numeric = digits === "" ? 0 : Number(digits);
+  return formatPart(Math.min(numeric, max));
 }
 
 function formatDuration(durationMs: number): string {
@@ -55,9 +76,12 @@ export function RoomTimer({
   onExtend,
   onStop,
   now: getNow = systemNow,
+  initialDurationMs = TIMER_DEFAULT_DURATION_MS,
 }: RoomTimerProps) {
   const [now, setNow] = useState(() => getNow());
-  const [durationInput, setDurationInput] = useState("05:00");
+  const initialFields = fieldsFromDuration(initialDurationMs);
+  const [minutesInput, setMinutesInput] = useState(initialFields.minutes);
+  const [secondsInput, setSecondsInput] = useState(initialFields.seconds);
 
   useEffect(() => {
     if (timer.status !== "running") return;
@@ -81,9 +105,23 @@ export function RoomTimer({
         : null;
   const isEnded = timer.status === "running" && remainingMs === 0;
   const parsedDuration = useMemo(
-    () => parseDuration(durationInput),
-    [durationInput],
+    () => parseDuration(minutesInput, secondsInput),
+    [minutesInput, secondsInput],
   );
+
+  const setDuration = (durationMs: number) => {
+    const fields = fieldsFromDuration(durationMs);
+    setMinutesInput(fields.minutes);
+    setSecondsInput(fields.seconds);
+  };
+
+  const adjustDuration = (deltaMs: number) => {
+    const currentMs =
+      (Number(minutesInput) * 60 + Number(secondsInput)) * 1_000;
+    setDuration(
+      Math.min(Math.max(currentMs + deltaMs, 0), TIMER_IDLE_ADJUST_MAX_MS),
+    );
+  };
 
   return (
     <section
@@ -119,24 +157,62 @@ export function RoomTimer({
                 size="sm"
                 className="h-7 flex-1 px-1 text-xs"
                 disabled={disabled}
-                onClick={() =>
-                  setDurationInput(`${String(minutes).padStart(2, "0")}:00`)
-                }
+                onClick={() => setDuration(minutes * 60_000)}
               >
                 {minutes}分
               </Button>
             ))}
           </div>
           <div className="flex gap-1">
-            <Input
-              aria-label="タイマー時間（分:秒）"
-              aria-invalid={parsedDuration === null}
-              inputMode="text"
-              value={durationInput}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 px-2 text-xs"
               disabled={disabled}
-              className="h-8 w-20 font-mono tabular-nums"
-              onChange={(event) => setDurationInput(event.target.value)}
+              onClick={() => adjustDuration(-60_000)}
+            >
+              -1分
+            </Button>
+            <Input
+              aria-label="タイマー時間（分）"
+              aria-invalid={parsedDuration === null}
+              inputMode="numeric"
+              maxLength={2}
+              value={minutesInput}
+              disabled={disabled}
+              className="h-8 w-12 px-2 text-center font-mono tabular-nums"
+              onFocus={(event) => event.currentTarget.select()}
+              onChange={(event) =>
+                setMinutesInput(normalizePart(event.target.value, 99))
+              }
             />
+            <span className="self-center font-mono font-bold">:</span>
+            <Input
+              aria-label="タイマー時間（秒）"
+              aria-invalid={parsedDuration === null}
+              inputMode="numeric"
+              maxLength={2}
+              value={secondsInput}
+              disabled={disabled}
+              className="h-8 w-12 px-2 text-center font-mono tabular-nums"
+              onFocus={(event) => event.currentTarget.select()}
+              onChange={(event) =>
+                setSecondsInput(normalizePart(event.target.value, 59))
+              }
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 px-2 text-xs"
+              disabled={disabled}
+              onClick={() => adjustDuration(60_000)}
+            >
+              +1分
+            </Button>
+          </div>
+          <div className="flex">
             <Button
               type="button"
               size="sm"
