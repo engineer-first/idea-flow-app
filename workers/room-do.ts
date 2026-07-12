@@ -270,6 +270,9 @@ export class RoomDO extends DurableObject {
     );
   }
 
+  // テスト用途限定の RPC。phase 順序や phase3 の投票ゲートを通らず任意の
+  // フェーズへ移動できるため、api-worker のエンドポイントなどクライアント
+  // 到達経路には載せない（載せるとゲートが無言で無効化される）。
   async setPhase(phase: Phase, byUserId: string): Promise<void> {
     if (!this.isHostUser(byUserId)) {
       throw new Error("進行状態を変更する権限がありません。");
@@ -373,14 +376,21 @@ export class RoomDO extends DurableObject {
     message: ClientMessage,
   ): Promise<void> {
     const { userId } = attachment;
-    // phase4 は投票結果を確認しながら既存ボードで話し合う工程。
-    // WebSocket を直接送っても投票結果や付箋配置を変えられないよう、
-    // 変更系メッセージを境界で一元的に拒否する。
-    if (this.getPhase() === "phase4" && this.isBoardMutation(message)) {
+    // lobby はボード開始前、phase4 は投票結果を確認しながら話し合う工程。
+    // どちらも「ボードを変更してよい工程」ではないため、WebSocket を直接
+    // 送られても状態が変わらないよう、変更系メッセージを境界で一元的に拒否する。
+    const phase = this.getPhase();
+    if (
+      (phase === "lobby" || phase === "phase4") &&
+      this.isBoardMutation(message)
+    ) {
       this.sendTo(ws, {
         type: "error",
         code: "forbidden",
-        message: "投票結果の確認中はボードを変更できません。",
+        message:
+          phase === "lobby"
+            ? "ボード開始前はボードを変更できません。"
+            : "投票結果の確認中はボードを変更できません。",
       });
       return;
     }
@@ -783,10 +793,16 @@ export class RoomDO extends DurableObject {
           });
           return;
         }
-        if (current === "phase3" && !this.haveAllMembersCompletedVoting()) {
+        // force はホストだけが使える脱出ハッチ（上のホストチェックが先に
+        // 効く）。離脱して戻らないメンバーが居ても進行を止めないための経路。
+        if (
+          current === "phase3" &&
+          !message.force &&
+          !this.haveAllMembersCompletedVoting()
+        ) {
           this.sendTo(ws, {
             type: "error",
-            code: "forbidden",
+            code: "voting-incomplete",
             message: "全員の主観・客観投票が完了していません。",
           });
           return;

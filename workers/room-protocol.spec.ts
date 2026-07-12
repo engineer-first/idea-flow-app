@@ -61,6 +61,21 @@ async function setupRoom(): Promise<{
   return { roomId, owner, member };
 }
 
+// setupRoom に加えて、ホストが start_phase でボードを開始した状態を作る。
+// lobby 中のボード変更系メッセージは境界で拒否されるため、
+// note / group 系のテストはこちらを使う。
+async function setupStartedRoom(): Promise<{
+  roomId: string;
+  owner: RoomSocket;
+  member: RoomSocket;
+}> {
+  const room = await setupRoom();
+  send(room.owner, { type: "start_phase" });
+  await expectType(room.owner, "phase:updated");
+  await expectType(room.member, "phase:updated");
+  return room;
+}
+
 function send(socket: RoomSocket, message: unknown): void {
   socket.ws.send(JSON.stringify(message));
 }
@@ -123,7 +138,7 @@ describe("snapshot（接続・再接続の復帰パス）", () => {
   });
 
   it("再接続すると、切断中を含む全ての確定状態が snapshot に反映されている", async () => {
-    const { roomId, owner, member } = await setupRoom();
+    const { roomId, owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
 
     // owner が切断している間に member が本文と位置を確定する。
@@ -160,7 +175,8 @@ describe("snapshot（接続・再接続の復帰パス）", () => {
         color: expect.stringMatching(NOTE_COLOR_PATTERN),
       },
     ]);
-    expect(snapshot.phase).toBe("lobby");
+    // ボード開始済みルームへの再接続なので、現在の進行状態（phase1）が届く。
+    expect(snapshot.phase).toBe("phase1");
 
     reconnected.close();
     member.close();
@@ -211,6 +227,10 @@ describe("メンバー色と付箋色", () => {
     for (const user of additionalMembers) {
       await joinRoomAs(user, inviteCode);
     }
+    // 付箋色の検証はボード操作（note:create）を伴うため phase1 へ進めておく。
+    await runInRoomDO(roomId, (instance) =>
+      instance.setPhase("phase1", OWNER.sub),
+    );
 
     const member = await connectRoomAs(MEMBER, roomId);
     const memberSnapshot = await expectType(member, "snapshot");
@@ -611,7 +631,7 @@ async function getInviteCode(
 
 describe("note:create", () => {
   it("作成者だけにprivate付箋を配信し、公開後に全メンバーへ配信する", async () => {
-    const { roomId, owner, member } = await setupRoom();
+    const { roomId, owner, member } = await setupStartedRoom();
 
     send(owner, { type: "note:create" });
     const toOwner = await expectType(owner, "note:inserted");
@@ -658,7 +678,7 @@ describe("note:create", () => {
 
 describe("note:publish", () => {
   it("公開した付箋が既存グループに近ければ自動で加入する", async () => {
-    const { owner, member } = await setupRoom();
+    const { owner, member } = await setupStartedRoom();
     const firstNoteId = await createNote({ owner, member });
     const secondNoteId = await createNote({ owner, member });
     const groupId = "55555555-5555-4555-8555-555555555555";
@@ -707,7 +727,7 @@ describe("note:publish", () => {
   });
 
   it("作者以外は非公開付箋を公開・編集できない", async () => {
-    const { owner, member } = await setupRoom();
+    const { owner, member } = await setupStartedRoom();
     send(owner, { type: "note:create" });
     const drafted = await expectType(owner, "note:inserted");
 
@@ -750,7 +770,7 @@ describe("note:publish", () => {
 
 describe("note:unpublish", () => {
   it("作者がshared付箋をprivateへ戻すと、他メンバーには削除だけが届く", async () => {
-    const { owner, member } = await setupRoom();
+    const { owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
 
     send(owner, { type: "note:unpublish", noteId });
@@ -770,7 +790,7 @@ describe("note:unpublish", () => {
   });
 
   it("共有グループから非公開へ戻した付箋は、他メンバーの再接続snapshotに残らない", async () => {
-    const { roomId, owner, member } = await setupRoom();
+    const { roomId, owner, member } = await setupStartedRoom();
     const firstNoteId = await createNote({ owner, member });
     const secondNoteId = await createNote({ owner, member });
 
@@ -804,7 +824,7 @@ describe("note:unpublish", () => {
 
 describe("private note の永続化", () => {
   it("他メンバーは非公開付箋へ投票できない", async () => {
-    const { owner, member } = await setupRoom();
+    const { owner, member } = await setupStartedRoom();
     send(owner, { type: "note:create" });
     const drafted = await expectType(owner, "note:inserted");
 
@@ -821,7 +841,7 @@ describe("private note の永続化", () => {
   });
 
   it("作者だけが更新・削除でき、再接続後にも更新内容が復元される", async () => {
-    const { roomId, owner, member } = await setupRoom();
+    const { roomId, owner, member } = await setupStartedRoom();
     send(owner, { type: "note:create" });
     const drafted = await expectType(owner, "note:inserted");
 
@@ -864,7 +884,7 @@ describe("private note の永続化", () => {
 
 describe("note:update-content / note:move（pgTAP: メンバーの共同編集）", () => {
   it("author でないメンバーも content を更新でき、authorId は変わらない", async () => {
-    const { owner, member } = await setupRoom();
+    const { owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
 
     send(member, {
@@ -883,7 +903,7 @@ describe("note:update-content / note:move（pgTAP: メンバーの共同編集�
   });
 
   it("note:move で位置が確定し、全員に note:updated が届く", async () => {
-    const { owner, member } = await setupRoom();
+    const { owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
 
     send(member, { type: "note:move", noteId, x: 123, y: 456 });
@@ -898,7 +918,7 @@ describe("note:update-content / note:move（pgTAP: メンバーの共同編集�
   });
 
   it("存在しない付箋の更新は not-found エラーになる", async () => {
-    const { owner, member } = await setupRoom();
+    const { owner, member } = await setupStartedRoom();
 
     send(owner, {
       type: "note:update-content",
@@ -915,7 +935,7 @@ describe("note:update-content / note:move（pgTAP: メンバーの共同編集�
 
 describe("note:vote（課題ドット投票）", () => {
   it("主観ドットは1票まで投票でき、全員へ集計が届く", async () => {
-    const { owner, member } = await setupRoom();
+    const { owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
 
     send(member, { type: "note:vote", noteId, kind: "subjective" });
@@ -938,7 +958,7 @@ describe("note:vote（課題ドット投票）", () => {
   });
 
   it("投票済みの主観ドットを再度押すと取り消せる", async () => {
-    const { owner, member } = await setupRoom();
+    const { owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
 
     send(member, { type: "note:vote", noteId, kind: "subjective" });
@@ -961,7 +981,7 @@ describe("note:vote（課題ドット投票）", () => {
   });
 
   it("主観ドットの2票目は forbidden で拒否される", async () => {
-    const { roomId, owner, member } = await setupRoom();
+    const { roomId, owner, member } = await setupStartedRoom();
     const firstNoteId = await createNote({ owner, member });
     const secondNoteId = await createNote({ owner, member });
 
@@ -993,7 +1013,7 @@ describe("note:vote（課題ドット投票）", () => {
   });
 
   it("客観ドットは3票まで投票でき、4票目は forbidden で拒否される", async () => {
-    const { roomId, owner, member } = await setupRoom();
+    const { roomId, owner, member } = await setupStartedRoom();
     const noteIds: string[] = [];
     for (let i = 0; i < 4; i++) {
       noteIds.push(await createNote({ owner, member }));
@@ -1021,7 +1041,7 @@ describe("note:vote（課題ドット投票）", () => {
   });
 
   it("参加者ごとに客観ドットを3票ずつ投票できる", async () => {
-    const { owner, member } = await setupRoom();
+    const { owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
 
     for (const voter of [owner, member]) {
@@ -1042,7 +1062,7 @@ describe("note:vote（課題ドット投票）", () => {
   });
 
   it("客観ドットは同じ付箋に残り数まで積める", async () => {
-    const { owner, member } = await setupRoom();
+    const { owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
 
     for (const expected of [1, 2, 3]) {
@@ -1068,7 +1088,7 @@ describe("note:vote（課題ドット投票）", () => {
   });
 
   it("客観ドットはリセットで同じ付箋上の自分の票を0に戻せる", async () => {
-    const { owner, member } = await setupRoom();
+    const { owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
 
     for (let i = 0; i < 2; i++) {
@@ -1099,7 +1119,7 @@ describe("note:vote（課題ドット投票）", () => {
 
 describe("note:delete（pgTAP: DELETE は author のみ）", () => {
   it("author は削除でき、全員に note:deleted が届く", async () => {
-    const { owner, member } = await setupRoom();
+    const { owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
 
     send(owner, { type: "note:delete", noteId });
@@ -1113,7 +1133,7 @@ describe("note:delete（pgTAP: DELETE は author のみ）", () => {
   });
 
   it("author でないメンバーの削除は forbidden で拒否され、付箋は残る", async () => {
-    const { roomId, owner, member } = await setupRoom();
+    const { roomId, owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
 
     send(member, { type: "note:delete", noteId });
@@ -1133,7 +1153,7 @@ describe("note:delete（pgTAP: DELETE は author のみ）", () => {
 
 describe("note:drag（エフェメラル同期）", () => {
   it("他メンバーには届き、送信者自身にはエコーされず、永続化もされない", async () => {
-    const { roomId, owner, member } = await setupRoom();
+    const { roomId, owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
 
     send(owner, { type: "note:drag", noteId, x: 300, y: 300 });
@@ -1158,7 +1178,7 @@ describe("note:drag（エフェメラル同期）", () => {
 
 describe("入力検証（コントラクト境界）", () => {
   it("不正な JSON は invalid-message エラーになり、接続は維持される", async () => {
-    const { owner, member } = await setupRoom();
+    const { owner, member } = await setupStartedRoom();
 
     owner.ws.send("not-json{{{");
     const error = await expectType(owner, "error");
@@ -1173,7 +1193,7 @@ describe("入力検証（コントラクト境界）", () => {
   });
 
   it("本文が2000文字を超える更新は invalid-message で拒否される", async () => {
-    const { owner, member } = await setupRoom();
+    const { owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
 
     send(owner, {
@@ -1189,7 +1209,7 @@ describe("入力検証（コントラクト境界）", () => {
   });
 
   it("ボード範囲外への move は invalid-message で拒否される", async () => {
-    const { owner, member } = await setupRoom();
+    const { owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
 
     send(owner, { type: "note:move", noteId, x: -10, y: 99999 });
@@ -1203,7 +1223,7 @@ describe("入力検証（コントラクト境界）", () => {
 
 describe("グループ指向のグループ同期", () => {
   it("非公開付箋を含むグループの作成は拒否される", async () => {
-    const { owner, member } = await setupRoom();
+    const { owner, member } = await setupStartedRoom();
     const sharedNoteId = await createNote({ owner, member });
     send(owner, { type: "note:create" });
     const drafted = await expectType(owner, "note:inserted");
@@ -1226,7 +1246,7 @@ describe("グループ指向のグループ同期", () => {
   });
 
   it("グループを作成・更新でき、再接続時に復元され、付箋の離脱・削除で自動消滅すること", async () => {
-    const { roomId, owner, member } = await setupRoom();
+    const { roomId, owner, member } = await setupStartedRoom();
 
     // 付箋を2個作成
     const noteId1 = await createNote({ owner, member });
@@ -1298,7 +1318,7 @@ describe("グループ指向のグループ同期", () => {
   });
 
   it("存在しない代表付箋IDへのグループ名更新は not-found で拒否されること", async () => {
-    const { owner, member } = await setupRoom();
+    const { owner, member } = await setupStartedRoom();
     const fakeId = "99999999-9999-4999-8999-999999999999";
 
     send(owner, {

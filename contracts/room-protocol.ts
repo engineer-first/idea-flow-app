@@ -164,7 +164,13 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
   // ロビーからボードへ（lobby → phase1）。ホストのみ。
   z.object({ type: z.literal("start_phase") }),
   // ボード内の次工程（phase1 → phase2 → phase3 → phase4）。ホストのみ。
-  z.object({ type: z.literal("phase:next") }),
+  // force は phase3 の全員投票ゲートを迂回する脱出ハッチ（離脱者がいても
+  // ホストが進行できる）。ホスト判定が先に評価されるため、非ホストが
+  // force を送っても効果はない。
+  z.object({
+    type: z.literal("phase:next"),
+    force: z.boolean().optional(),
+  }),
 ]);
 
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;
@@ -219,7 +225,14 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("error"),
-    code: z.enum(["invalid-message", "forbidden", "not-found"]),
+    // voting-incomplete: phase3 の全員投票ゲートによる phase:next 拒否。
+    // クライアントがホストへ「強制的に進むか」の確認を出す判別に使う。
+    code: z.enum([
+      "invalid-message",
+      "forbidden",
+      "not-found",
+      "voting-incomplete",
+    ]),
     message: z.string(),
   }),
 ]);

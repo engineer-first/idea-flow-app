@@ -416,11 +416,95 @@ describe("RoomDO phase:next", () => {
       ws.addEventListener("message", resolve, { once: true });
     });
 
+    // 投票未完了によるゲート拒否は voting-incomplete。クライアントは
+    // このコードでホストへ「強制的に進むか」の確認を出す。
     expect(JSON.parse(String(message.data))).toMatchObject({
+      type: "error",
+      code: "voting-incomplete",
+    });
+    expect(await stub.getPhase()).toBe("phase3");
+    ws.close();
+  });
+
+  it("未投票メンバーが残っていても、ホストは force で phase4 へ進められる", async () => {
+    const roomName = "room-phase-force-next";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.upsertMember(USER_B, "Member");
+    await stub.setPhase("phase3", USER_A);
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "phase:next", force: true }));
+
+    expect(await nextJson(ws)).toMatchObject({
+      type: "phase:updated",
+      phase: "phase4",
+    });
+    expect(await stub.getPhase()).toBe("phase4");
+    ws.close();
+  });
+
+  it("ホスト以外は force を付けても phase を進められない", async () => {
+    const roomName = "room-phase-force-non-host";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.upsertMember(USER_B, "Member");
+    await stub.setPhase("phase3", USER_A);
+
+    const ws = await connectDirectly(roomName, USER_B, USER_A);
+    ws.send(JSON.stringify({ type: "phase:next", force: true }));
+
+    expect(await nextJson(ws)).toMatchObject({
       type: "error",
       code: "forbidden",
     });
     expect(await stub.getPhase()).toBe("phase3");
+    ws.close();
+  });
+
+  it("lobby では force を付けても phase:next できない", async () => {
+    const roomName = "room-phase-force-lobby";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "phase:next", force: true }));
+
+    expect(await nextJson(ws)).toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+    expect(await stub.getPhase()).toBe("lobby");
+    ws.close();
+  });
+
+  it("全員の投票が完了していれば force なしで phase4 へ進める", async () => {
+    const roomName = "room-phase-voting-complete";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.upsertMember(USER_B, "Member");
+    await stub.setPhase("phase3", USER_A);
+    // 全員が主観1票・客観3票をちょうど使い切った状態を直接作る。
+    await runInRoomDO(roomName, (_instance, state) => {
+      const now = new Date().toISOString();
+      for (const userId of [USER_A, USER_B]) {
+        state.storage.sql.exec(
+          `INSERT INTO note_votes (note_id, user_id, kind, created_at, vote_count)
+           VALUES ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', ?1, 'subjective', ?2, 1),
+                  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', ?1, 'objective', ?2, 3)`,
+          userId,
+          now,
+        );
+      }
+    });
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "phase:next" }));
+
+    expect(await nextJson(ws)).toMatchObject({
+      type: "phase:updated",
+      phase: "phase4",
+    });
     ws.close();
   });
 
@@ -582,6 +666,8 @@ describe("RoomDO phase4 のボード凍結", () => {
   it("phase4 では非公開付箋を公開できない", async () => {
     const stub = roomStub("room-phase4-publish-freeze");
     await stub.initializeNewRoom(USER_A, "Host");
+    // lobby のままでは付箋を作れないため、ボード工程に進めてから凍結を検証する。
+    await stub.setPhase("phase1", USER_A);
 
     const res = await stub.fetch("https://do/ws", {
       headers: {
@@ -632,6 +718,7 @@ describe("RoomDO phase4 のボード凍結", () => {
   it("phase4 では共有付箋を非公開に戻せない", async () => {
     const stub = roomStub("room-phase4-unpublish-freeze");
     await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase("phase1", USER_A);
 
     const res = await stub.fetch("https://do/ws", {
       headers: {
@@ -685,6 +772,7 @@ describe("RoomDO phase4 のボード凍結", () => {
   it("phase4 では WebSocket からの付箋本文更新を拒否し、付箋内容を維持する", async () => {
     const stub = roomStub("room-phase4-freeze");
     await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase("phase1", USER_A);
 
     const res = await stub.fetch("https://do/ws", {
       headers: {
@@ -727,6 +815,122 @@ describe("RoomDO phase4 のボード凍結", () => {
       type: "error",
       code: "forbidden",
     });
+
+    ws.close();
+  });
+});
+
+describe("RoomDO lobby のボード凍結", () => {
+  it("lobby では note:create が拒否され、付箋は作成されない", async () => {
+    const roomName = "room-lobby-create-freeze";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "note:create" }));
+
+    expect(await nextJson(ws)).toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+    const noteCount = await runInRoomDO(roomName, (_instance, state) => {
+      return state.storage.sql.exec("SELECT COUNT(*) AS c FROM notes").one()
+        .c as number;
+    });
+    expect(noteCount).toBe(0);
+
+    ws.close();
+  });
+
+  it("lobby では note:vote が付箋の存在確認より前に境界で拒否される", async () => {
+    const roomName = "room-lobby-vote-freeze";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(
+      JSON.stringify({
+        type: "note:vote",
+        noteId: "99999999-9999-4999-8999-999999999999",
+        kind: "subjective",
+      }),
+    );
+
+    // not-found ではなく forbidden: ガードが個別処理より先に効いている。
+    expect(await nextJson(ws)).toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+
+    ws.close();
+  });
+
+  it("lobby では group:create が拒否され、グループは作成されない", async () => {
+    const roomName = "room-lobby-group-freeze";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+
+    // 共有付箋の検証（hasOnlySharedNotes）を通過する状態を直接作り、
+    // 境界ガードがなければ group:create が成功してしまうことを保証する。
+    const sharedNoteIds = [
+      "77777777-7777-4777-8777-777777777777",
+      "66666666-6666-4666-8666-666666666666",
+    ];
+    await runInRoomDO(roomName, (_instance, state) => {
+      const now = new Date().toISOString();
+      for (const noteId of sharedNoteIds) {
+        state.storage.sql.exec(
+          `INSERT INTO notes (id, author_id, content, visibility, color, x, y, created_at, updated_at)
+           VALUES (?1, ?2, '', 'shared', 'yellow', 0, 0, ?3, ?3)`,
+          noteId,
+          USER_A,
+          now,
+        );
+      }
+    });
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    const now = new Date().toISOString();
+    ws.send(
+      JSON.stringify({
+        type: "group:create",
+        group: {
+          id: "88888888-8888-4888-8888-888888888888",
+          name: "lobby中のグループ",
+          noteIds: sharedNoteIds,
+          createdAt: now,
+          updatedAt: now,
+        },
+      }),
+    );
+
+    expect(await nextJson(ws)).toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+    const groupCount = await runInRoomDO(roomName, (_instance, state) => {
+      return state.storage.sql.exec("SELECT COUNT(*) AS c FROM groups").one()
+        .c as number;
+    });
+    expect(groupCount).toBe(0);
+
+    ws.close();
+  });
+
+  it("start_phase で phase1 に進むと note:create が通る（凍結は lobby 限定）", async () => {
+    const roomName = "room-lobby-unfreeze";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "start_phase" }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "phase:updated",
+      phase: "phase1",
+    });
+
+    ws.send(JSON.stringify({ type: "note:create" }));
+    expect(await nextJson(ws)).toMatchObject({ type: "note:inserted" });
 
     ws.close();
   });
