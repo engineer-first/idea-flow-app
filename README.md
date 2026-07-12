@@ -68,6 +68,8 @@ Google ログインを確認する場合は、Google Cloud Console で OAuth ク
 | `npm run dev`          | Next.js 開発サーバーを起動                                  |
 | `npm run dev:api`      | api-worker（D1 + Durable Objects）をローカル起動            |
 | `npm run db:migrate`   | ローカル D1 に migration を適用                             |
+| `npm run new:room-do-migration -- 短い説明` | RoomDO migration の `.sql` スタブをタイムスタンプ付きで作成（例: `-- add-note-kind`） |
+| `npm run gen:room-do-migrations` | RoomDO migration の集約 `index.ts` を `.sql` から再生成（SQL を書いたら実行） |
 | `npm run build`        | Next.js 本番ビルド                                          |
 | `npm run build:cf`     | Cloudflare Workers 向けビルド（OpenNext）                   |
 | `npm run preview:cf`   | Workers 向けビルドを workerd 上でローカル実行（2構成同時）  |
