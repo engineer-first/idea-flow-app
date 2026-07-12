@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { NOTE_COLOR_PALETTE } from "../contracts/room-protocol";
 import { TOKEN_AUDIENCE } from "../contracts/session";
 import { signToken } from "../lib/session/token";
+import { HOST_ID_HEADER } from "./room-do";
 import { joinRoomAs, listMemberIds } from "./test-helpers";
 
 const OWNER = {
@@ -523,6 +524,42 @@ describe("WebSocket 接続の認可", () => {
     expect(res.status).toBe(101);
     res.webSocket?.accept();
     res.webSocket?.close();
+  });
+
+  it("クライアントが HOST_ID_HEADER を偽装しても api-worker が D1 の値で上書きする", async () => {
+    const { roomId, inviteCode } = await createRoomAs(OWNER);
+    await joinRoomAs(MEMBER, inviteCode);
+    const res = await SELF.fetch(`https://api.test/api/rooms/${roomId}/ws`, {
+      headers: {
+        Upgrade: "websocket",
+        Cookie: await sessionCookie(MEMBER),
+        [HOST_ID_HEADER]: MEMBER.sub,
+      },
+    });
+    expect(res.status).toBe(101);
+    const ws = res.webSocket;
+    if (!ws) throw new Error("WebSocket 接続を確立できませんでした。");
+    ws.accept();
+
+    const nextMessage = () =>
+      new Promise<Record<string, unknown>>((resolve) => {
+        ws.addEventListener(
+          "message",
+          (event) => resolve(JSON.parse(String(event.data))),
+          { once: true },
+        );
+      });
+    await expect(nextMessage()).resolves.toMatchObject({
+      type: "snapshot",
+      isHost: false,
+    });
+
+    ws.send(JSON.stringify({ type: "start_phase" }));
+    await expect(nextMessage()).resolves.toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+    ws.close();
   });
 });
 

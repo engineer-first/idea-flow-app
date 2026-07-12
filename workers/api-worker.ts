@@ -239,8 +239,9 @@ async function handleLookupRoom(
 }
 
 // GET /api/rooms/:id/ws — メンバーのみ WebSocket 接続できる。
-// 認可はここで完結させ、DO へは検証済みユーザーIDと hostId をヘッダーで
-// 引き継ぐ。hostId は start_phase の認可で RoomDO が再判定に使う。
+// 認可はここで完結させ、DO へは検証済みユーザーIDと D1 rooms.host_id を
+// ヘッダーで引き継ぐ。入力された同名ヘッダーは必ず上書きし、hostId は
+// RoomDO の room_owner が未設定の旧ルームをバックフィルするシードにだけ使う。
 async function handleRoomWebSocket(
   request: Request,
   env: Env,

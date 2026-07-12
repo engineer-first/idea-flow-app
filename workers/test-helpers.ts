@@ -7,7 +7,7 @@ import {
 } from "../contracts/room-protocol";
 import { TOKEN_AUDIENCE } from "../contracts/session";
 import { signToken } from "../lib/session/token";
-import { HOST_ID_HEADER, type RoomDO } from "./room-do";
+import type { RoomDO } from "./room-do";
 
 export type TestUser = {
   sub: string;
@@ -81,19 +81,11 @@ export type RoomSocket = {
 export async function connectRoomAs(
   user: TestUser,
   roomId: string,
-  options?: { hostId?: string },
 ): Promise<RoomSocket> {
-  // テストの単純化のため、hostId が省略されたときは user.sub を hostId
-  // として送る（OWNER が自分用の host として接続するシナリオと一致）。
-  const hostId = options?.hostId ?? user.sub;
-  // api-worker は rooms.host_id を D1 から引いて HOST_ID_HEADER を
-  // セットするので、テストではその値を直接ヘッダーに詰めて api-worker
-  // の処理を再現する。OWNER.sub が hostId になるのが通常シナリオ。
   const res = await SELF.fetch(`https://api.test/api/rooms/${roomId}/ws`, {
     headers: {
       Upgrade: "websocket",
       Cookie: await sessionCookieFor(user),
-      [HOST_ID_HEADER]: hostId,
     },
   });
   expect(res.status).toBe(101);
