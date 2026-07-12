@@ -14,6 +14,8 @@ function setup(overrides: Partial<Parameters<typeof BoardView>[0]> = {}) {
     inviteCode: "AB12CD",
     inviteUrl: "https://idea-flow.example/invite/AB12CD",
     phase: "phase1" as const,
+    timer: { status: "idle" } as const,
+    timerServerOffsetMs: 0,
     isHost: false,
     isNextPhasePending: false,
     privateNotes: [],
@@ -22,6 +24,11 @@ function setup(overrides: Partial<Parameters<typeof BoardView>[0]> = {}) {
     currentUserId: ME,
     hostUserId: ME,
     onNextPhase: vi.fn(),
+    onTimerStart: vi.fn(),
+    onTimerPause: vi.fn(),
+    onTimerResume: vi.fn(),
+    onTimerExtend: vi.fn(),
+    onTimerStop: vi.fn(),
     onAddPrivateNote: vi.fn(),
     onPrivateNoteContentChange: vi.fn(),
     onPrivateNoteDelete: vi.fn(),
@@ -61,6 +68,30 @@ function clickNote(card: HTMLElement) {
 }
 
 describe("BoardView", () => {
+  it("非ホストにはタイマー状態だけを表示し操作を出さない", () => {
+    setup({
+      isHost: false,
+      timer: { status: "paused", remainingMs: 30_000, durationMs: 60_000 },
+      timerServerOffsetMs: 0,
+    });
+    expect(screen.getByRole("timer")).toHaveTextContent("00:30");
+    expect(screen.queryByRole("button", { name: "再開" })).toBeNull();
+  });
+
+  it("ホストのタイマー開始操作を onTimerStart へ渡す", () => {
+    const onTimerStart = vi.fn();
+    setup({ isHost: true, onTimerStart });
+    fireEvent.click(screen.getByTestId("room-timer"));
+    fireEvent.change(screen.getByLabelText("タイマー時間（分）"), {
+      target: { value: "1" },
+    });
+    fireEvent.change(screen.getByLabelText("タイマー時間（秒）"), {
+      target: { value: "30" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "開始" }));
+    expect(onTimerStart).toHaveBeenCalledWith(90_000);
+  });
+
   it("host のとき招待URLと招待コードのラベルと値を表示する", () => {
     setup({
       isHost: true,

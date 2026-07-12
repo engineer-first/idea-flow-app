@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyMemberServerMessage,
   applyPhaseServerMessage,
+  applyTimerServerMessage,
 } from "@/app/rooms/room-reducer";
 import type {
   Phase,
@@ -28,6 +29,8 @@ describe("applyMemberServerMessage", () => {
       members: [A, B],
       phase: "lobby",
       isHost: true,
+      timer: { status: "idle" },
+      serverNow: 1_000,
     };
     expect(applyMemberServerMessage([], message)).toEqual([A, B]);
   });
@@ -160,7 +163,57 @@ describe("applyPhaseServerMessage", () => {
       members: [A],
       phase: "phase1",
       isHost: true,
+      timer: { status: "running", endsAt: 10_000, durationMs: 10_000 },
+      serverNow: 1_000,
     };
     expect(applyPhaseServerMessage("lobby" as Phase, message)).toBe("phase1");
+  });
+});
+
+describe("applyTimerServerMessage", () => {
+  it("タイマー以外のメッセージでは状態を変えない", () => {
+    const current = { timer: { status: "idle" } as const, serverOffsetMs: 0 };
+    expect(
+      applyTimerServerMessage(
+        current,
+        { type: "phase:updated", phase: "phase2" },
+        1_000,
+      ),
+    ).toBe(current);
+  });
+
+  it("snapshot と timer:updated からタイマーとサーバー時計補正を復元する", () => {
+    const snapshot: ServerMessage = {
+      type: "snapshot",
+      notes: [],
+      members: [A],
+      phase: "phase1",
+      isHost: true,
+      timer: { status: "running", endsAt: 10_000, durationMs: 10_000 },
+      serverNow: 1_000,
+    };
+    expect(
+      applyTimerServerMessage(
+        { timer: { status: "idle" }, serverOffsetMs: 0 },
+        snapshot,
+        900,
+      ),
+    ).toEqual({
+      timer: snapshot.timer,
+      serverOffsetMs: 100,
+    });
+
+    const updated: ServerMessage = {
+      type: "timer:updated",
+      timer: { status: "paused", remainingMs: 5_000, durationMs: 10_000 },
+      serverNow: 2_000,
+    };
+    expect(
+      applyTimerServerMessage(
+        { timer: snapshot.timer, serverOffsetMs: 100 },
+        updated,
+        1_850,
+      ),
+    ).toEqual({ timer: updated.timer, serverOffsetMs: 150 });
   });
 });

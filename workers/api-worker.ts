@@ -28,6 +28,12 @@ import { HOST_ID_HEADER, RoomDO, USER_ID_HEADER } from "./room-do";
 
 export { RoomDO };
 
+// wrangler types の生成物は api-worker.ts を root 型検査から参照する一方、
+// secret binding は生成されないため、公開境界で SESSION_SECRET を明示する。
+type ApiWorkerEnv = Env & {
+  SESSION_SECRET: string;
+};
+
 const SyncRequestSchema = z.object({ assertion: z.string().min(1) });
 const JoinRequestSchema = z.object({ code: z.string() });
 
@@ -42,7 +48,10 @@ function error(status: number, message: string): Response {
   return json({ error: message }, status);
 }
 
-function roomStub(env: Env, roomId: string): DurableObjectStub<RoomDO> {
+function roomStub(
+  env: ApiWorkerEnv,
+  roomId: string,
+): DurableObjectStub<RoomDO> {
   return env.ROOM_DO.get(env.ROOM_DO.idFromName(roomId));
 }
 
@@ -56,7 +65,10 @@ async function readJsonBody(request: Request): Promise<unknown | null> {
 
 // POST /api/auth/sync — ログイン確定時のユーザー upsert。
 // セッションではなく「署名済みログイン主張」で認証する（ログイン前なので）。
-async function handleAuthSync(request: Request, env: Env): Promise<Response> {
+async function handleAuthSync(
+  request: Request,
+  env: ApiWorkerEnv,
+): Promise<Response> {
   const body = SyncRequestSchema.safeParse(await readJsonBody(request));
   if (!body.success) {
     return error(400, "リクエスト形式が不正です。");
@@ -77,7 +89,7 @@ async function handleAuthSync(request: Request, env: Env): Promise<Response> {
 
 // POST /api/rooms — ルーム作成。D1 に行を作り、RoomDO に host を登録する。
 async function handleCreateRoom(
-  env: Env,
+  env: ApiWorkerEnv,
   session: SessionPayload,
 ): Promise<Response> {
   await ensureUser(env.DB, {
@@ -94,7 +106,7 @@ async function handleCreateRoom(
 // POST /api/rooms/join — 招待コードで参加（冪等）。
 async function handleJoinRoom(
   request: Request,
-  env: Env,
+  env: ApiWorkerEnv,
   session: SessionPayload,
 ): Promise<Response> {
   const body = JoinRequestSchema.safeParse(await readJsonBody(request));
@@ -125,7 +137,7 @@ async function handleJoinRoom(
 // isHost / hostUserId / phase はこのエンドポイントでのみ返す。
 // メンバー限定（非メンバーは 404）。hostUserId はメンバー一覧でホスト表示に使う。
 async function handleGetRoom(
-  env: Env,
+  env: ApiWorkerEnv,
   session: SessionPayload,
   roomId: string,
 ): Promise<Response> {
@@ -154,7 +166,7 @@ async function handleGetRoom(
 // 初期表示（SSR）のために name 付きで返す。Realtime 反映は WS の
 // member_joined / snapshot.members で行う。
 async function handleListMembers(
-  env: Env,
+  env: ApiWorkerEnv,
   session: SessionPayload,
   roomId: string,
 ): Promise<Response> {
@@ -181,7 +193,7 @@ async function handleListMembers(
 //   - ルームが存在しない、または自分がメンバーでない場合は 404
 //     （存在秘匿。クライアントは 204/404 を成功相当としてよい）
 async function handleLeaveRoom(
-  env: Env,
+  env: ApiWorkerEnv,
   session: SessionPayload,
   roomId: string,
 ): Promise<Response> {
@@ -216,7 +228,7 @@ async function handleLeaveRoom(
 // 未ログインは 401（招待URL ページ側でリダイレクト済みなので到達しない）。
 async function handleLookupRoom(
   request: Request,
-  env: Env,
+  env: ApiWorkerEnv,
   _session: SessionPayload,
 ): Promise<Response> {
   const url = new URL(request.url);
@@ -242,7 +254,7 @@ async function handleLookupRoom(
 // RoomDO の room_owner が未設定の旧ルームをバックフィルするシードにだけ使う。
 async function handleRoomWebSocket(
   request: Request,
-  env: Env,
+  env: ApiWorkerEnv,
   session: SessionPayload,
   roomId: string,
 ): Promise<Response> {
@@ -268,7 +280,7 @@ async function handleRoomWebSocket(
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: ApiWorkerEnv): Promise<Response> {
     const url = new URL(request.url);
     const { pathname } = url;
     const method = request.method;
@@ -350,4 +362,4 @@ export default {
 
     return error(404, "not found");
   },
-} satisfies ExportedHandler<Env>;
+} satisfies ExportedHandler<ApiWorkerEnv>;

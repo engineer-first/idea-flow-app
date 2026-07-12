@@ -29,7 +29,9 @@ import {
 import {
   applyMemberServerMessage,
   applyPhaseServerMessage,
+  applyTimerServerMessage,
   type Member,
+  type TimerClientState,
 } from "@/app/rooms/room-reducer";
 import { createThrottled } from "@/app/rooms/throttle";
 import { BoardView } from "@/components/room-board/templates/board-view";
@@ -85,6 +87,10 @@ export function RoomBoard({
   // メンバー一覧と進行状態は SSR で初期値を渡せるので、初回の白画面を防ぐ。
   const [members, setMembers] = useState<Member[]>(initialMembers);
   const [phase, setPhase] = useState<Phase>(initialPhase);
+  const [timerState, setTimerState] = useState<TimerClientState>({
+    timer: { status: "idle" },
+    serverOffsetMs: 0,
+  });
   // createRoomClient が生成直後に "connecting" を通知するので初期値と一致する。
   // ended / disbanded は set せずホームへ redirect する。
   const [connectionStatus, setConnectionStatus] =
@@ -126,6 +132,7 @@ export function RoomBoard({
 
   const handleServerMessage = useCallback(
     (message: ServerMessage) => {
+      const receivedAt = Date.now();
       if (message.type === "error") {
         // 投票未完了によるゲート拒否はホストの phase:next 起点なので、toast
         // ではなく「強制的に進むか」の確認ダイアログで案内する。サーバーの
@@ -193,6 +200,9 @@ export function RoomBoard({
       membersRef.current = nextMembers;
       setMembers(nextMembers);
       setPhase((current) => applyPhaseServerMessage(current, message));
+      setTimerState((current) =>
+        applyTimerServerMessage(current, message, receivedAt),
+      );
       // isHost はサーバー側で確定する不変の prop（再レンダーで変わらない）。
     },
     [isHost],
@@ -287,6 +297,22 @@ export function RoomBoard({
       force: true,
     });
   }, [isNextPhasePending]);
+
+  const handleTimerStart = useCallback((durationMs: number) => {
+    clientRef.current?.send({ type: "timer:start", durationMs });
+  }, []);
+  const handleTimerPause = useCallback(() => {
+    clientRef.current?.send({ type: "timer:pause" });
+  }, []);
+  const handleTimerResume = useCallback(() => {
+    clientRef.current?.send({ type: "timer:resume" });
+  }, []);
+  const handleTimerExtend = useCallback(() => {
+    clientRef.current?.send({ type: "timer:extend" });
+  }, []);
+  const handleTimerStop = useCallback(() => {
+    clientRef.current?.send({ type: "timer:stop" });
+  }, []);
 
   const handleNoteDragStart = useCallback((noteId: string) => {
     setDraggingNoteId(noteId);
@@ -435,6 +461,8 @@ export function RoomBoard({
         inviteCode={inviteCode}
         inviteUrl={inviteUrl}
         phase={phase}
+        timer={timerState.timer}
+        timerServerOffsetMs={timerState.serverOffsetMs}
         isHost={isHost}
         connectionStatus={connectionStatus}
         draggingNoteId={draggingNoteId}
@@ -448,6 +476,11 @@ export function RoomBoard({
         onPrivateNotePublish={handlePrivateNotePublish}
         onPrivateNoteUnpublish={handlePrivateNoteUnpublish}
         onNextPhase={handleNextPhase}
+        onTimerStart={handleTimerStart}
+        onTimerPause={handleTimerPause}
+        onTimerResume={handleTimerResume}
+        onTimerExtend={handleTimerExtend}
+        onTimerStop={handleTimerStop}
         onNoteDragStart={handleNoteDragStart}
         onNoteDragMove={handleNoteDragMove}
         onNoteDragEnd={handleNoteDragEnd}

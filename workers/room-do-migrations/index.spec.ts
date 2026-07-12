@@ -24,9 +24,45 @@ const ALL_TABLES = [
   "room_owner",
   "room_state",
   "schema_migrations",
+  "timer_state",
 ];
 
 describe("ROOM_DO_MIGRATIONS", () => {
+  it("timer_state は id=1 以外と状態に不整合な列を拒否する", async () => {
+    await runInRoomDO("mig-timer-constraints", (_instance, state) => {
+      expect(() =>
+        state.storage.sql.exec(
+          "INSERT INTO timer_state (id, status) VALUES (2, 'idle')",
+        ),
+      ).toThrow();
+      expect(() =>
+        state.storage.sql.exec(
+          "UPDATE timer_state SET status = 'running' WHERE id = 1",
+        ),
+      ).toThrow();
+    });
+  });
+
+  it("timer_state は id=1 の idle 状態で初期化される", async () => {
+    await runInRoomDO("mig-timer-seed", (_instance, state) => {
+      expect(
+        state.storage.sql
+          .exec(
+            "SELECT id, status, ends_at, remaining_ms, duration_ms FROM timer_state",
+          )
+          .toArray(),
+      ).toEqual([
+        {
+          id: 1,
+          status: "idle",
+          ends_at: null,
+          remaining_ms: null,
+          duration_ms: null,
+        },
+      ]);
+    });
+  });
+
   it("空のストレージに全マイグレーションを適用し、適用済みIDを記録する", async () => {
     await runInRoomDO("mig-fresh", (_instance, state) => {
       dropAllTables(state.storage);

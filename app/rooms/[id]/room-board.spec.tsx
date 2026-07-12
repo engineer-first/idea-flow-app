@@ -167,6 +167,8 @@ function connectWithSnapshot(
       members: [],
       phase: options?.phase ?? "phase1",
       isHost: options?.isHost ?? true,
+      timer: { status: "idle" },
+      serverNow: Date.now(),
     }),
   );
 
@@ -207,6 +209,8 @@ describe("メンバー参加・退出の通知", () => {
         ],
         phase: "phase1",
         isHost: true,
+        timer: { status: "idle" },
+        serverNow: Date.now(),
       }),
     );
     act(() =>
@@ -221,6 +225,27 @@ describe("メンバー参加・退出の通知", () => {
 });
 
 describe("サーバーメッセージ → 画面反映", () => {
+  it("snapshot のタイマーを表示し、ホスト操作を timer:* として送る", () => {
+    const { socket } = connectWithSnapshot([]);
+
+    fireEvent.click(screen.getByTestId("room-timer"));
+    fireEvent.click(screen.getByRole("button", { name: "開始" }));
+    expect(socket.sent).toContain(
+      JSON.stringify({ type: "timer:start", durationMs: 180_000 }),
+    );
+
+    act(() =>
+      socket.simulateServerMessage({
+        type: "timer:updated",
+        timer: { status: "paused", remainingMs: 30_000, durationMs: 180_000 },
+        serverNow: Date.now(),
+      }),
+    );
+    expect(screen.getByRole("timer")).toHaveTextContent("00:30");
+    fireEvent.click(screen.getByRole("button", { name: "再開" }));
+    expect(socket.sent).toContain(JSON.stringify({ type: "timer:resume" }));
+  });
+
   it("forbidden エラーを受信するとポップアップ通知を表示する", () => {
     const { socket } = connectWithSnapshot([], { phase: "phase3" });
 
@@ -332,6 +357,8 @@ describe("サーバーメッセージ → 画面反映", () => {
         members: [],
         phase: "phase4",
         isHost: true,
+        timer: { status: "idle" },
+        serverNow: Date.now(),
       }),
     );
 

@@ -174,6 +174,8 @@ describe("サーバーメッセージ → 画面反映", () => {
         ],
         phase: "lobby",
         isHost: true,
+        timer: { status: "idle" },
+        serverNow: Date.now(),
       }),
     );
     expect(screen.getAllByTestId("avatar")).toHaveLength(2);
@@ -241,6 +243,8 @@ describe("サーバーメッセージ → 画面反映", () => {
         members: [{ userId: HOST_ID, name: "Host", color: "yellow" }],
         phase: "lobby",
         isHost: true,
+        timer: { status: "idle" },
+        serverNow: Date.now(),
       }),
     );
     act(() =>

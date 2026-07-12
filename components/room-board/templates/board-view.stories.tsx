@@ -17,6 +17,8 @@ const meta = {
     inviteCode: "AB12CD",
     inviteUrl: "https://idea-flow.example/invite/AB12CD",
     phase: "phase1",
+    timer: { status: "idle" },
+    timerServerOffsetMs: 0,
     isHost: true,
     connectionStatus: "open",
     draggingNoteId: null,
@@ -43,6 +45,11 @@ const meta = {
     onLeave: fn(),
     isLeaving: false,
     onNextPhase: fn(),
+    onTimerStart: fn(),
+    onTimerPause: fn(),
+    onTimerResume: fn(),
+    onTimerExtend: fn(),
+    onTimerStop: fn(),
   },
   decorators: [
     (Story) => (
