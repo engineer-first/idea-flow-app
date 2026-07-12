@@ -357,6 +357,8 @@ describe("サーバーメッセージ → 画面反映", () => {
         members: [],
         phase: "phase4",
         isHost: true,
+        timer: { status: "idle" },
+        serverNow: Date.now(),
       }),
     );
 
