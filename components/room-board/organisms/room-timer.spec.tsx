@@ -235,7 +235,7 @@ describe("RoomTimer", () => {
     expect(screen.getByLabelText("タイマー時間（秒）")).toHaveValue("00");
   });
 
-  it("+1分は 99:00 を上限にクランプする", () => {
+  it("+1分は自由入力と同じ 99:59 を上限にクランプする", () => {
     render(
       <RoomTimer
         timer={{ status: "idle" }}
@@ -248,9 +248,33 @@ describe("RoomTimer", () => {
     );
     openPanel();
     fireEvent.click(screen.getByRole("button", { name: "+1分" }));
+    expect(screen.getByLabelText("タイマー時間（分）")).toHaveValue("99");
+    expect(screen.getByLabelText("タイマー時間（秒）")).toHaveValue("30");
     fireEvent.click(screen.getByRole("button", { name: "+1分" }));
     expect(screen.getByLabelText("タイマー時間（分）")).toHaveValue("99");
-    expect(screen.getByLabelText("タイマー時間（秒）")).toHaveValue("00");
+    expect(screen.getByLabelText("タイマー時間（秒）")).toHaveValue("59");
+  });
+
+  it("+1分は上限付近の自由入力値（99:59）を減少させない", () => {
+    render(
+      <RoomTimer
+        timer={{ status: "idle" }}
+        serverOffsetMs={0}
+        isHost
+        disabled={false}
+        {...handlers}
+      />,
+    );
+    openPanel();
+    fireEvent.change(screen.getByLabelText("タイマー時間（分）"), {
+      target: { value: "99" },
+    });
+    fireEvent.change(screen.getByLabelText("タイマー時間（秒）"), {
+      target: { value: "59" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "+1分" }));
+    expect(screen.getByLabelText("タイマー時間（分）")).toHaveValue("99");
+    expect(screen.getByLabelText("タイマー時間（秒）")).toHaveValue("59");
   });
 
   it("非ホストは状態だけを表示し操作UIを出さない", () => {

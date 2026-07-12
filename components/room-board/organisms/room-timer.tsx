@@ -15,7 +15,6 @@ import {
 import { cn } from "@/lib/utils";
 
 export const TIMER_DEFAULT_DURATION_MS = 3 * 60_000;
-const TIMER_IDLE_ADJUST_MAX_MS = 99 * 60_000;
 
 export type RoomTimerProps = {
   timer: TimerState;
@@ -130,8 +129,10 @@ export function RoomTimer({
   const adjustDuration = (deltaMs: number) => {
     const currentMs =
       (Number(minutesInput) * 60 + Number(secondsInput)) * 1_000;
+    // 上限は自由入力と同じ TIMER_MAX_DURATION_MS に揃える。調整専用の
+    // 低い上限を持つと、上限超過の入力値が「+1分」で逆に減少してしまう。
     setDuration(
-      Math.min(Math.max(currentMs + deltaMs, 0), TIMER_IDLE_ADJUST_MAX_MS),
+      Math.min(Math.max(currentMs + deltaMs, 0), TIMER_MAX_DURATION_MS),
     );
   };
 
