@@ -475,7 +475,7 @@
         <tr>
           <td>置き場所</td>
           <td><code>workers/migrations/*.sql</code>（連番ファイル、<code>wrangler d1 migrations</code> がディレクトリを直接読む）</td>
-          <td><code>workers/room-do-migrations/*.sql</code>（タイムスタンプ名ファイル）。適用順序を決める集約 <code>index.ts</code> は <code>npm run gen:room-do-migrations</code> が自動生成する（手編集しない）</td>
+          <td><code>workers/room-do-migrations/*.sql</code>（タイムスタンプ名ファイル）。適用順序を決める集約 <code>index.ts</code> は gitignore 済みの生成物で、<code>npm ci</code>・テスト・起動時に自動再生成される（コミットするのは <code>.sql</code> だけ）</td>
         </tr>
         <tr>
           <td>適用タイミング</td>
@@ -645,7 +645,7 @@
   </div>
 
   <h3>RoomDO 側 — 将来のマイグレーションのイメージ</h3>
-  <p>Q1 で見た版管理の仕組みに乗せると、増分は <code>workers/room-do-migrations/</code> 配下に <code>YYYYMMDDHHmmss-短い説明.sql</code> を1つ追加するだけです（<code>npm run new:room-do-migration -- 短い説明</code> が UTC で発番してスタブを作ります）。適用順序を決める集約ファイル <code>index.ts</code> は手で編集せず、<code>npm run gen:room-do-migrations</code> が全 <code>*.sql</code> をタイムスタンプ順に読んで自動生成します（CI は <code>gen:room-do-migrations:check</code> で生成結果と一致しているかを検証します）。ファイル名のタイムスタンプが衝突することはまずなく、万一 #79 と #80 が同じ秒に別々のファイルを追加しても、生成スクリプトが重複として検出してエラーにします。各 DO は次に起きたときに不足分だけを原子的に適用します。</p>
+  <p>Q1 で見た版管理の仕組みに乗せると、増分は <code>workers/room-do-migrations/</code> 配下に <code>YYYYMMDDHHmmss-短い説明.sql</code> を1つ追加するだけです（<code>npm run new:room-do-migration -- 短い説明</code> が UTC で発番してスタブを作ります）。適用順序を決める集約ファイル <code>index.ts</code> は gitignore 済みの生成物で、<code>npm ci</code>・テスト・起動時に全 <code>*.sql</code> をタイムスタンプ順に読んで自動再生成されるため、コミットもレビューも <code>.sql</code> だけで完結します。ファイル名のタイムスタンプが衝突することはまずなく、万一 #79 と #80 が同じ秒に別々のファイルを追加しても、生成スクリプトが重複として検出してエラーにします。各 DO は次に起きたときに不足分だけを原子的に適用します。</p>
   <pre><code>-- workers/room-do-migrations/20260810103000-phase-and-note-kind.sql（イメージ）
 CREATE TABLE room_state (
   phase TEXT NOT NULL DEFAULT 'lobby',   -- lobby/map/hmw/sketch/decide

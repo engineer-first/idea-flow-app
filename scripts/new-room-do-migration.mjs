@@ -4,9 +4,9 @@
 // 形式ミス・ローカルタイムゾーン差による順序の逆転・同じ秒の衝突が
 // 起きやすいので、発番をここに一元化して UTC で採番する。
 //
-// 作成するのは TODO コメントだけのスタブ。index.ts の再生成は SQL を
-// 書いたあとに行う（スタブのまま再生成すると、generate 側の空SQLガードが
-// 「書き忘れ」として検出する）。
+// 作成するのは TODO コメントだけのスタブ。index.ts（gitignore 済みの生成物）
+// は SQL を書いたあと test:workers / dev:api などの実行時に自動再生成される
+// （スタブのままだと generate 側の空SQLガードが「書き忘れ」として検出する）。
 //
 // 実行: npm run new:room-do-migration -- 短い説明（例: add-note-kind）
 import { readdirSync, writeFileSync } from "node:fs";
@@ -68,7 +68,7 @@ function main() {
   writeFileSync(filePath, TEMPLATE, { flag: "wx" });
   console.log(`Created ${filePath}`);
   console.log(
-    "SQL を書いたら `npm run gen:room-do-migrations` で index.ts を再生成してください。",
+    "SQL を書いたら .sql だけをコミットしてください（index.ts は test:workers などの実行時に自動再生成される生成物です）。",
   );
 }
 

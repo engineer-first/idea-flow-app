@@ -1,12 +1,7 @@
 // workers/room-do-migrations/*.sql から index.ts を生成するスクリプトの
 // ロジック部分のテスト。実ファイルシステムには依存させず、ファイル名の
 // パース・並び替え・重複検出・出力レンダリングをそれぞれ検証する。
-// --check モードだけはスクリプトを丸ごと実行して確認する（一時ディレクトリ使用）。
-import { spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   collectMigrations,
   parseMigrationFileName,
@@ -145,69 +140,13 @@ describe("renderIndexFile", () => {
     expect(output).toContain(expected);
   });
 
-  it("このファイルは自動生成である旨のヘッダーコメントを含む", () => {
+  it("自動生成・コミット不要である旨のヘッダーコメントを含む", () => {
     const output = renderIndexFile([]);
     expect(output).toContain("自動生成");
-    expect(output).toContain("gen:room-do-migrations");
+    // gitignore 済みの生成物であり、コミット対象ではないことを明示する。
+    expect(output).toContain("コミットされません");
     // 凍結の境界は「マージ済みか」。未マージの自分の .sql は編集してよい。
     expect(output).toContain("マージ済みの .sql は変更・削除せず");
     expect(output).toContain("未マージ");
-  });
-});
-
-describe("--check モード", () => {
-  const tempDirs: string[] = [];
-
-  afterEach(() => {
-    for (const dir of tempDirs.splice(0)) {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  function createProject() {
-    const dir = mkdtempSync(join(tmpdir(), "gen-room-do-migrations-"));
-    tempDirs.push(dir);
-    mkdirSync(join(dir, "scripts"), { recursive: true });
-    cpSync(
-      join(process.cwd(), "scripts/generate-room-do-migrations.mjs"),
-      join(dir, "scripts/generate-room-do-migrations.mjs"),
-    );
-    mkdirSync(join(dir, "workers/room-do-migrations"), { recursive: true });
-    writeFileSync(
-      join(dir, "workers/room-do-migrations/20260101000000-example.sql"),
-      "CREATE TABLE example (id TEXT);\n",
-    );
-    return dir;
-  }
-
-  function runScript(dir: string, ...args: string[]) {
-    // 絶対パスだと macOS の tmpdir シンボリックリンク（/var → /private/var）
-    // により process.argv[1] と import.meta.url が食い違い、main ガードが
-    // 実行をスキップしてしまう。cwd + 相対パスなら chdir が realpath を返す
-    // ため一致する（フック本体の呼び出し方とも同じ形になる）。
-    return spawnSync(
-      "node",
-      ["scripts/generate-room-do-migrations.mjs", ...args],
-      { cwd: dir, encoding: "utf8" },
-    );
-  }
-
-  it("index.ts が未生成でもスタックトレースではなく、生成手順の案内を出して失敗する", () => {
-    const dir = createProject();
-
-    const result = runScript(dir, "--check");
-
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain("gen:room-do-migrations");
-    expect(result.stderr).not.toContain("ENOENT");
-  });
-
-  it("生成直後の index.ts は検証を通過する", () => {
-    const dir = createProject();
-
-    expect(runScript(dir).status).toBe(0);
-    const result = runScript(dir, "--check");
-
-    expect(result.status).toBe(0);
   });
 });

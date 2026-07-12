@@ -14,9 +14,9 @@ esac
 
 REL="${FILE#"$PROJECT_DIR"/}"
 
-# workers/room-do-migrations/*.sql の追加・変更のたびに index.ts を自動再生成
-# する。複数人が並行でマイグレーションを追加しても npm run gen:room-do-migrations
-# を手で打つ必要がなくなる（CI は gen:room-do-migrations:check で最終確認する）。
+# workers/room-do-migrations/*.sql の追加・変更のたびに index.ts（gitignore
+# 済みの生成物）を自動再生成し、ローカルの型検査・テストを常に最新に保つ。
+# ファイル名規約違反や空SQLはここで即エラーにしてエージェントへ返す。
 case "$REL" in
   workers/room-do-migrations/*.sql) ;;
   *) exit 0 ;;

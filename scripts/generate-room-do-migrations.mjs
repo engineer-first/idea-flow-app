@@ -1,14 +1,11 @@
 #!/usr/bin/env node
 // workers/room-do-migrations/*.sql から workers/room-do-migrations/index.ts を
-// 生成する。複数人が同時にマイグレーションファイルを追加しても集約ファイル
-// （index.ts）を手で編集する必要がなくなり、コンフリクトが起きない。
+// 生成する。index.ts は gitignore 済みの生成物で、コミットしない。
+// postinstall / pretest:workers / predev:api などが自動実行するため、
+// 手動で叩く必要は通常ない（npm run gen:room-do-migrations で単体実行も可能）。
 // ファイル名の先頭14桁（YYYYMMDDHHmmss）が適用順序を決めるIDになる。タイム
 // スタンプなので複数人が同時に追加しても衝突しにくく、万一衝突したらこの
 // スクリプトがエラーで検出する。
-//
-// 実行:
-//   npm run gen:room-do-migrations         index.ts を生成して書き込む
-//   npm run gen:room-do-migrations:check   生成結果と現在の index.ts の一致を確認する（CI用）
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -84,13 +81,8 @@ function escapeForTemplateLiteral(sql) {
 
 export function renderIndexFile(migrations) {
   const header = `// このファイルは generate-room-do-migrations.mjs による自動生成です。
-// 手で編集しないでください。変更するときは workers/room-do-migrations/ の
-// *.sql を変更してから、以下を実行してください。
-//
-//   npm run gen:room-do-migrations
-//
-// CI は \`npm run gen:room-do-migrations:check\` でこのファイルが最新か検証
-// します（生成し忘れ・手編集によるズレを検出するため）。
+// gitignore 済みの生成物なので、コミットされません。手で編集しないでください
+// （npm ci / test:workers / dev:api などの実行時に上書きされます）。
 //
 // RoomDO 内蔵 SQLite のマイグレーション定義を集約する。D1 の migrations/ と
 // 違い、DO はルームごとに独立したストレージを持ち起床タイミングもバラバラ
@@ -101,8 +93,7 @@ export function renderIndexFile(migrations) {
 // 新しいマイグレーションを追加する手順:
 // 1. \`npm run new:room-do-migration -- 短い説明\` で
 //    YYYYMMDDHHmmss-短い説明.sql を作り、SQL を書く。
-// 2. \`npm run gen:room-do-migrations\` を実行し、このファイルを再生成する。
-// 3. 生成された差分ごとコミットする。
+// 2. .sql だけをコミットする（このファイルは自動再生成されるので不要）。
 //
 // develop にマージ済みの .sql は変更・削除せず、修正は新しい migration で
 // 行う（schema_migrations は ID しか記録しないため、適用済みIDの内容を
@@ -129,26 +120,7 @@ import type { RoomDoMigration } from "./apply";
 
 function main() {
   const migrations = collectMigrations({ readdirSync, readFileSync });
-  const output = renderIndexFile(migrations);
-
-  if (process.argv.includes("--check")) {
-    let current = null;
-    try {
-      current = readFileSync(OUTPUT_FILE, "utf8");
-    } catch {
-      // 未生成（ENOENT など）は「一致していない」として下の案内に合流させる。
-    }
-    if (current !== output) {
-      console.error(
-        "workers/room-do-migrations/index.ts が *.sql の内容と一致していません。`npm run gen:room-do-migrations` を実行してコミットしてください。",
-      );
-      process.exit(1);
-    }
-    console.log("OK: workers/room-do-migrations/index.ts is up to date.");
-    return;
-  }
-
-  writeFileSync(OUTPUT_FILE, output);
+  writeFileSync(OUTPUT_FILE, renderIndexFile(migrations));
   console.log(
     `Generated ${OUTPUT_FILE} from ${migrations.length} migration(s).`,
   );

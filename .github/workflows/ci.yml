@@ -39,9 +39,6 @@ jobs:
       - name: Check D1 migration numbers
         run: npm run check:migrations
 
-      - name: Check RoomDO migrations index is up to date
-        run: npm run gen:room-do-migrations:check
-
       # マイグレーションから組み立てた実スキーマに対する構造ルールの機械検査
       # （FK インデックス貼り忘れ・テーブル肥大化など）。ルールは .tbls/*.yml。
       - name: Lint database schemas (tbls)

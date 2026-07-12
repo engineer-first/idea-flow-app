@@ -89,6 +89,8 @@
   未マージの自分の `.sql` は自由に編集・整理してよい。内容を変えるときは
   ファイル名の秒（= ID）もずらすと、適用済みのローカル DO が fail-closed で
   落ちて気づける。新規作成は `npm run new:room-do-migration -- 短い説明`。
+  集約 `index.ts` は gitignore 済みの生成物（`npm ci`・`test:workers`・
+  `dev:api` などが自動再生成する）。コミットするのは `.sql` だけ。
 - D1 migration または `workers/room-do-migrations/`（RoomDO の `.sql`）を変更
   すると、Storybook の
   `Schema/SchemaDiagram`（ER 図）と `Schema/SchemaDetails`（カラム・

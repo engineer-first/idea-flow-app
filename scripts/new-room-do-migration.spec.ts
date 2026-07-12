@@ -99,8 +99,9 @@ describe("CLI", () => {
       "utf8",
     );
     expect(content).toContain("TODO");
-    // SQL を書いたあとの再生成手順を必ず案内する。
-    expect(result.stdout).toContain("gen:room-do-migrations");
+    // index.ts はコミットしない生成物（自動再生成）であることを案内する。
+    expect(result.stdout).toContain("自動");
+    expect(result.stdout).toContain("コミット");
   });
 
   it("説明が無いと使い方を出して失敗する", () => {
