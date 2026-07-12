@@ -83,8 +83,12 @@
   プロトコルのメッセージに含めない。認可チェックではなく形で塞ぐ。
 - D1 migration は意図として戻せる形にし、スコープを最小限に保つ。
   適用は `npm run db:migrate`（ローカル）。
-- RoomDO migration は新しい `.sql` の追加だけを許可する。既存ファイルの内容・
-  ファイル名を変更したり削除したりせず、修正も新しい migration で行う。
+- RoomDO migration: develop にマージ済みの `.sql` は変更・削除せず、修正は
+  新しい migration で行う（`schema_migrations` は ID しか記録しないため、
+  適用済み ID の内容を変えても再実行されず、DO 間でスキーマが黙って分岐する）。
+  未マージの自分の `.sql` は自由に編集・整理してよい。内容を変えるときは
+  ファイル名の秒（= ID）もずらすと、適用済みのローカル DO が fail-closed で
+  落ちて気づける。新規作成は `npm run new:room-do-migration -- 短い説明`。
 - D1 migration または `workers/room-do-migrations/`（RoomDO の `.sql`）を変更
   すると、Storybook の
   `Schema/SchemaDiagram`（ER 図）と `Schema/SchemaDetails`（カラム・

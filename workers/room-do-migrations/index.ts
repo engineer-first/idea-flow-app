@@ -1,7 +1,6 @@
 // このファイルは generate-room-do-migrations.mjs による自動生成です。
-// 手で編集しないでください。変更するときは workers/room-do-migrations/ に
-// 新しい *.sql を追加してから、以下を実行してください。既存の .sql は変更・削除しない
-// でください（適用済みIDの内容が変わると、DO間でスキーマが分岐するため）。
+// 手で編集しないでください。変更するときは workers/room-do-migrations/ の
+// *.sql を変更してから、以下を実行してください。
 //
 //   npm run gen:room-do-migrations
 //
@@ -15,14 +14,16 @@
 // を適用して収束させる（適用の実装は ./apply.ts。この仕組み自体は変更しない）。
 //
 // 新しいマイグレーションを追加する手順:
-// 1. workers/room-do-migrations/ に YYYYMMDDHHmmss-短い説明.sql を作る
-//    （タイムスタンプなので、複数人が同時に追加しても衝突しにくい）。
+// 1. `npm run new:room-do-migration -- 短い説明` で
+//    YYYYMMDDHHmmss-短い説明.sql を作り、SQL を書く。
 // 2. `npm run gen:room-do-migrations` を実行し、このファイルを再生成する。
 // 3. 生成された差分ごとコミットする。
 //
-// 2人が同時に同じ秒でファイルを作ってしまった場合は、このスクリプトが
-// timestamp の重複としてエラーを出す。解消は片方のファイル名の秒を
-// ずらすだけでよい。
+// develop にマージ済みの .sql は変更・削除せず、修正は新しい migration で
+// 行う（schema_migrations は ID しか記録しないため、適用済みIDの内容を
+// 変えても再実行されず、DO 間でスキーマが黙って分岐する）。未マージの
+// 自分の .sql は自由に編集してよい。内容を変えるときはファイル名の秒
+// （= ID）もずらすと、適用済みのローカル DO が fail-closed で落ちて気づける。
 import type { RoomDoMigration } from "./apply";
 
 export const ROOM_DO_MIGRATIONS: readonly RoomDoMigration[] = [

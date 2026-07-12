@@ -86,6 +86,19 @@ describe("collectMigrations", () => {
       });
     expect(result).toThrow(/not-a-migration\.sql/);
   });
+
+  it("SQL が空（コメントのみ）のファイルがあると、ファイル名を含むエラーを投げる", () => {
+    // workerd の sql.exec はコメントのみの SQL を実行できず不親切なエラーに
+    // なるため、生成段階で「書き忘れ」として分かる形で検出する
+    // （new:room-do-migration が作るスタブの書き忘れ対策）。
+    const result = () =>
+      collectMigrations({
+        readdirSync: () => ["20260101000000-todo.sql"],
+        readFileSync: () =>
+          "-- TODO: このマイグレーションの意図と SQL を書く。\n/* まだ */\n",
+      });
+    expect(result).toThrow(/20260101000000-todo\.sql/);
+  });
 });
 
 describe("renderIndexFile", () => {
@@ -136,7 +149,9 @@ describe("renderIndexFile", () => {
     const output = renderIndexFile([]);
     expect(output).toContain("自動生成");
     expect(output).toContain("gen:room-do-migrations");
-    expect(output).toContain("既存の .sql は変更・削除しない");
+    // 凍結の境界は「マージ済みか」。未マージの自分の .sql は編集してよい。
+    expect(output).toContain("マージ済みの .sql は変更・削除せず");
+    expect(output).toContain("未マージ");
   });
 });
 
