@@ -18,6 +18,7 @@ import {
   ensureUser,
   findRoomByCode,
   findRoomById,
+  findUserNameById,
   insertRoom,
   upsertUserFromAssertion,
 } from "./lib/db";
@@ -227,20 +228,18 @@ async function handleLookupRoom(
   if (!room) {
     return error(404, "ルームが見つかりませんでした。");
   }
-  // hostname を users.name から引く
-  const host = await env.DB.prepare("SELECT name FROM users WHERE id = ?1")
-    .bind(room.hostId)
-    .first<{ name: string | null }>();
+  const hostName = await findUserNameById(env.DB, room.hostId);
   return json({
     roomId: room.roomId,
     inviteCode: room.inviteCode,
-    hostName: host?.name ?? "ホスト",
+    hostName: hostName ?? "ホスト",
   });
 }
 
 // GET /api/rooms/:id/ws — メンバーのみ WebSocket 接続できる。
-// 認可はここで完結させ、DO へは検証済みユーザーIDと hostId をヘッダーで
-// 引き継ぐ。hostId は start_phase の認可で RoomDO が再判定に使う。
+// 認可はここで完結させ、DO へは検証済みユーザーIDと D1 rooms.host_id を
+// ヘッダーで引き継ぐ。入力された同名ヘッダーは必ず上書きし、hostId は
+// RoomDO の room_owner が未設定の旧ルームをバックフィルするシードにだけ使う。
 async function handleRoomWebSocket(
   request: Request,
   env: Env,

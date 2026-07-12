@@ -10,6 +10,17 @@ export type RoomRecord = {
   hostId: string;
 };
 
+export async function findUserNameById(
+  db: D1Database,
+  userId: string,
+): Promise<string | null> {
+  const row = await db
+    .prepare("SELECT name FROM users WHERE id = ?1")
+    .bind(userId)
+    .first<{ name: string | null }>();
+  return row?.name ?? null;
+}
+
 // セッションが指すユーザー行が存在することを保証する。
 // 通常はログイン時の /api/auth/sync が行を作るが、ローカルで D1 をリセットした後も
 // ブラウザの Cookie は生き残るため、その組み合わせで FK 違反にならないよう防御する。

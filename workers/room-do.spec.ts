@@ -21,6 +21,38 @@ function roomStub(name: string) {
   return env.ROOM_DO.get(env.ROOM_DO.idFromName(name));
 }
 
+async function connectDirectly(
+  roomName: string,
+  userId: string,
+  hostId: string,
+): Promise<WebSocket> {
+  const res = await roomStub(roomName).fetch("https://do/ws", {
+    headers: {
+      Upgrade: "websocket",
+      [USER_ID_HEADER]: userId,
+      [HOST_ID_HEADER]: hostId,
+    },
+  });
+  expect(res.status).toBe(101);
+  const ws = res.webSocket;
+  if (!ws) throw new Error("WebSocket 接続を確立できませんでした。");
+  ws.accept();
+  await new Promise<MessageEvent>((resolve) => {
+    ws.addEventListener("message", resolve, { once: true });
+  });
+  return ws;
+}
+
+function nextJson(ws: WebSocket): Promise<Record<string, unknown>> {
+  return new Promise((resolve) => {
+    ws.addEventListener(
+      "message",
+      (event) => resolve(JSON.parse(String(event.data))),
+      { once: true },
+    );
+  });
+}
+
 describe("RoomDO メンバーシップ", () => {
   it("upsertMember は冪等（複数回呼んでもメンバーは1件のまま）", async () => {
     const stub = roomStub("room-idempotent");
@@ -73,6 +105,25 @@ describe("RoomDO メンバーシップ", () => {
         name: "Beta",
         color: expect.stringMatching(NOTE_COLOR_PATTERN),
       },
+    ]);
+  });
+
+  it("listMembers は joined_at が同じメンバーを user_id 昇順で返す", async () => {
+    const roomId = "room-list-tie-break";
+    await runInRoomDO(roomId, (_instance, state) => {
+      const joinedAt = "2026-07-12T00:00:00.000Z";
+      state.storage.sql.exec(
+        `INSERT INTO members (user_id, joined_at, name, color)
+         VALUES (?1, ?3, 'Beta', 'blue'), (?2, ?3, 'Alpha', 'yellow')`,
+        USER_B,
+        USER_A,
+        joinedAt,
+      );
+    });
+
+    expect(await roomStub(roomId).listMembers()).toEqual([
+      { userId: USER_A, name: "Alpha", color: "yellow" },
+      { userId: USER_B, name: "Beta", color: "blue" },
     ]);
   });
 
@@ -140,15 +191,17 @@ describe("RoomDO 進行状態", () => {
 
   it("setPhase は phase を更新する（ホスト本人のみ）", async () => {
     const stub = roomStub("room-phase-set");
-    await stub.setPhase("phase1", USER_A, USER_A);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase("phase1", USER_A);
     expect(await stub.getPhase()).toBe("phase1");
   });
 
-  it("setPhase は byUserId !== expectedHostId なら reject（二重防御）", async () => {
+  it("setPhase は room_owner のホスト以外なら reject（二重防御）", async () => {
     // setPhase は async 関数で throw するため、rejects で受ける。
     // runInDurableObject 経由にすれば unhandled rejection として漏れない。
     await runInRoomDO("room-phase-guard", async (instance) => {
-      await expect(instance.setPhase("phase1", USER_B, USER_A)).rejects.toThrow(
+      await instance.initializeNewRoom(USER_A, "Host");
+      await expect(instance.setPhase("phase1", USER_B)).rejects.toThrow(
         "進行状態を変更する権限がありません。",
       );
     });
@@ -228,6 +281,41 @@ describe("RoomDO WebSocket の深層防御", () => {
     res.webSocket?.accept();
     res.webSocket?.close();
   });
+
+  it("非ホストは自分を HOST_ID_HEADER に指定しても start_phase できない", async () => {
+    const roomId = "room-guard-forged-host-start";
+    const stub = roomStub(roomId);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.upsertMember(USER_B, "Member");
+
+    const ws = await connectDirectly(roomId, USER_B, USER_B);
+    ws.send(JSON.stringify({ type: "start_phase" }));
+
+    await expect(nextJson(ws)).resolves.toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+    expect(await stub.getPhase()).toBe("lobby");
+    ws.close();
+  });
+
+  it("非ホストは自分を HOST_ID_HEADER に指定しても phase:next できない", async () => {
+    const roomId = "room-guard-forged-host-next";
+    const stub = roomStub(roomId);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.upsertMember(USER_B, "Member");
+    await stub.setPhase("phase1", USER_A);
+
+    const ws = await connectDirectly(roomId, USER_B, USER_B);
+    ws.send(JSON.stringify({ type: "phase:next" }));
+
+    await expect(nextJson(ws)).resolves.toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+    expect(await stub.getPhase()).toBe("phase1");
+    ws.close();
+  });
 });
 
 // start_phase の認可は WebSocket 経由の room-protocol.spec.ts で検証する
@@ -306,7 +394,7 @@ describe("RoomDO phase:next", () => {
     const stub = roomStub("room-phase-voting-incomplete");
     await stub.initializeNewRoom(USER_A, "Host");
     await stub.upsertMember(USER_B, "Member");
-    await stub.setPhase("phase3", USER_A, USER_A);
+    await stub.setPhase("phase3", USER_A);
 
     const res = await stub.fetch("https://do/ws", {
       headers: {
@@ -341,7 +429,7 @@ describe("RoomDO phase:next", () => {
 
     await stub.initializeNewRoom(USER_A, "Host");
     // 既定 phase1 のまま phase:next → phase2
-    await stub.setPhase("phase1", USER_A, USER_A);
+    await stub.setPhase("phase1", USER_A);
 
     const res = await stub.fetch("https://do/ws", {
       headers: {
@@ -380,7 +468,7 @@ describe("RoomDO phase:next", () => {
 
     await stub.initializeNewRoom(USER_A, "Host");
     await stub.upsertMember(USER_B, "Member");
-    await stub.setPhase("phase1", USER_A, USER_A);
+    await stub.setPhase("phase1", USER_A);
 
     const res = await stub.fetch("https://do/ws", {
       headers: {
@@ -420,7 +508,7 @@ describe("RoomDO phase:next", () => {
 
     await stub.initializeNewRoom(USER_A, "Host");
     await stub.upsertMember(USER_B, "Member");
-    await stub.setPhase("phase1", USER_A, USER_A);
+    await stub.setPhase("phase1", USER_A);
 
     const hostRes = await stub.fetch("https://do/ws", {
       headers: {
@@ -520,7 +608,7 @@ describe("RoomDO phase4 のボード凍結", () => {
     };
     expect(inserted.type).toBe("note:inserted");
 
-    await stub.setPhase("phase4", USER_A, USER_A);
+    await stub.setPhase("phase4", USER_A);
     ws.send(
       JSON.stringify({
         type: "note:publish",
@@ -580,7 +668,7 @@ describe("RoomDO phase4 のボード凍結", () => {
       ws.addEventListener("message", resolve, { once: true });
     });
 
-    await stub.setPhase("phase4", USER_A, USER_A);
+    await stub.setPhase("phase4", USER_A);
     ws.send(JSON.stringify({ type: "note:unpublish", noteId: draft.note.id }));
 
     const errorEvent = await new Promise<MessageEvent>((resolve) => {
@@ -623,7 +711,7 @@ describe("RoomDO phase4 のボード凍結", () => {
     };
     expect(inserted.type).toBe("note:inserted");
 
-    await stub.setPhase("phase4", USER_A, USER_A);
+    await stub.setPhase("phase4", USER_A);
     ws.send(
       JSON.stringify({
         type: "note:update-content",

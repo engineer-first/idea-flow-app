@@ -24,6 +24,7 @@ import {
   createRoomAs,
   joinRoomAs,
   type RoomSocket,
+  runInRoomDO,
   sessionCookieFor,
   type TestUser,
 } from "./test-helpers";
@@ -62,6 +63,15 @@ async function setupRoom(): Promise<{
 
 function send(socket: RoomSocket, message: unknown): void {
   socket.ws.send(JSON.stringify(message));
+}
+
+function storedHostId(roomId: string): Promise<string | null> {
+  return runInRoomDO(roomId, (_instance, state) => {
+    const row = state.storage.sql
+      .exec("SELECT host_id FROM room_owner WHERE id = 1")
+      .toArray()[0] as { host_id: string | null } | undefined;
+    return row?.host_id ?? null;
+  });
 }
 
 async function expectType<T extends ServerMessage["type"]>(
@@ -163,9 +173,7 @@ describe("snapshot（接続・再接続の復帰パス）", () => {
     send(owner, { type: "start_phase" });
     await expectType(owner, "phase:updated");
 
-    const reconnected = await connectRoomAs(MEMBER, roomId, {
-      hostId: OWNER.sub,
-    });
+    const reconnected = await connectRoomAs(MEMBER, roomId);
     const snapshot = await expectType(reconnected, "snapshot");
     expect(snapshot.phase).toBe("phase1");
 
@@ -204,9 +212,7 @@ describe("メンバー色と付箋色", () => {
       await joinRoomAs(user, inviteCode);
     }
 
-    const member = await connectRoomAs(MEMBER, roomId, {
-      hostId: OWNER.sub,
-    });
+    const member = await connectRoomAs(MEMBER, roomId);
     const memberSnapshot = await expectType(member, "snapshot");
     const colors = memberSnapshot.members.map((item) => item.color);
     expect(colors).toHaveLength(6);
@@ -303,9 +309,7 @@ describe("member_joined（Realtime 反映）", () => {
     await joinRoomAs(newcomer, await getInviteCode(roomId, OWNER));
 
     // newcomer の WS を開く
-    const newSocket = await connectRoomAs(newcomer, roomId, {
-      hostId: OWNER.sub,
-    });
+    const newSocket = await connectRoomAs(newcomer, roomId);
     // 自分の snapshot.members には自分が含まれる
     const newcomerSnapshot = await expectType(newSocket, "snapshot");
     expect(newcomerSnapshot.members).toEqual([
@@ -331,50 +335,47 @@ describe("member_joined（Realtime 反映）", () => {
     member.close();
   });
 
-  it("既存メンバーへの再 join（name 変更）は member_joined を再送しない（冪等）", async () => {
-    // 同じユーザが REST join を 2 回叩いても、新着イベントは 1 回だけ。
-    // 既にメンバー登録されているので 2 回目は name 更新のみで broadcast しない。
+  it("既存メンバーが表示名を変更して再 join すると他クライアントへ member_joined が届く", async () => {
     const { roomId, owner, member } = await setupRoom();
+    const renamedMember = { ...MEMBER, name: "Renamed Member" };
 
+    await joinRoomAs(renamedMember, await getInviteCode(roomId, OWNER));
+    const received = await Promise.race([
+      owner.next(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 50)),
+    ]);
+
+    expect(received).toEqual({
+      type: "member_joined",
+      member: {
+        userId: MEMBER.sub,
+        name: renamedMember.name,
+        color: expect.stringMatching(NOTE_COLOR_PATTERN),
+      },
+    });
+
+    owner.close();
+    member.close();
+  });
+
+  it("既存メンバーが同じ表示名で再 join しても member_joined は届かない", async () => {
+    const { roomId, owner, member } = await setupRoom();
     const newcomer: TestUser = {
       sub: "33333333-3333-4333-8333-333333333333",
       email: "newcomer@example.test",
       name: "Newcomer",
     };
-    // 1 回目: 新規
-    await joinRoomAs(newcomer, await getInviteCode(roomId, OWNER));
-    const joined = await expectType(owner, "member_joined");
-    expect(joined.member).toEqual({
+    const inviteCode = await getInviteCode(roomId, OWNER);
+
+    await joinRoomAs(MEMBER, inviteCode);
+    await joinRoomAs(newcomer, inviteCode);
+    const received = await expectType(owner, "member_joined");
+
+    expect(received.member).toEqual({
       userId: newcomer.sub,
       name: newcomer.name,
       color: expect.stringMatching(NOTE_COLOR_PATTERN),
     });
-    // 2 回目: 既存なので broadcast されない（member への到着も無し）
-    await joinRoomAs(newcomer, await getInviteCode(roomId, OWNER));
-    // member 側に member_joined が**追加で届かない**ことを確認。
-    // 一定時間内に何も届かないことを直接は確認しづらいので、
-    // member.next() を短いタイムアウトで呼んで何も来ないことを示す代わりに、
-    // ここでは member_joined のカウントが増えないことで検証する。
-    // → 直前に送った member_joined を member 側で消費済みという前提で、
-    // もう 1 個 member_joined は届かないことを「次に届いたメッセージの
-    // type は member_joined ではない」ことで表現する。
-    // 確実性のため、ここでは member_joined 以外のメッセージが次に来る
-    // ことを確認するかわりに、RoomDO の members 数が変わらないことを
-    // 別途確認する形に切り替える。
-    const beforeRes = await SELF.fetch(
-      `https://api.test/api/rooms/${roomId}/members`,
-      { headers: { Cookie: await sessionCookieFor(OWNER) } },
-    );
-    const before = (await beforeRes.json()) as {
-      members: { userId: string }[];
-    };
-    await joinRoomAs(newcomer, await getInviteCode(roomId, OWNER));
-    const afterRes = await SELF.fetch(
-      `https://api.test/api/rooms/${roomId}/members`,
-      { headers: { Cookie: await sessionCookieFor(OWNER) } },
-    );
-    const after = (await afterRes.json()) as { members: { userId: string }[] };
-    expect(after.members.length).toBe(before.members.length);
 
     owner.close();
     member.close();
@@ -494,6 +495,90 @@ describe("start_phase / phase:updated（ホストだけ進行状態を進めら�
     member.close();
   });
 
+  it("room_owner が NULL でも非ホストは start_phase できない", async () => {
+    const { roomId, inviteCode } = await createRoomAs(OWNER);
+    await joinRoomAs(MEMBER, inviteCode);
+    await runInRoomDO(roomId, (_instance, state) => {
+      state.storage.sql.exec(
+        "UPDATE room_owner SET host_id = NULL WHERE id = 1",
+      );
+    });
+
+    const member = await connectRoomAs(MEMBER, roomId);
+    const snapshot = await expectType(member, "snapshot");
+    expect(snapshot.isHost).toBe(false);
+
+    send(member, { type: "start_phase" });
+    const error = await expectType(member, "error");
+    expect(error.code).toBe("forbidden");
+
+    member.close();
+  });
+
+  it("room_owner が NULL でも非ホストは phase:next できない", async () => {
+    const { roomId, inviteCode } = await createRoomAs(OWNER);
+    await joinRoomAs(MEMBER, inviteCode);
+    await runInRoomDO(roomId, (_instance, state) => {
+      state.storage.sql.exec(
+        "UPDATE room_owner SET host_id = NULL WHERE id = 1",
+      );
+      state.storage.sql.exec(
+        "UPDATE room_state SET phase = 'phase1' WHERE id = 1",
+      );
+    });
+
+    const member = await connectRoomAs(MEMBER, roomId);
+    await expectType(member, "snapshot");
+
+    send(member, { type: "phase:next" });
+    const error = await expectType(member, "error");
+    expect(error.code).toBe("forbidden");
+
+    member.close();
+  });
+
+  it("room_owner が NULL の旧ルームへホストが接続するとバックフィルされ、開始できる", async () => {
+    const { roomId } = await createRoomAs(OWNER);
+    await runInRoomDO(roomId, (_instance, state) => {
+      state.storage.sql.exec(
+        "UPDATE room_owner SET host_id = NULL WHERE id = 1",
+      );
+    });
+
+    const owner = await connectRoomAs(OWNER, roomId);
+    const snapshot = await expectType(owner, "snapshot");
+    expect(snapshot.isHost).toBe(true);
+    expect(await storedHostId(roomId)).toBe(OWNER.sub);
+
+    send(owner, { type: "start_phase" });
+    const updated = await expectType(owner, "phase:updated");
+    expect(updated.phase).toBe("phase1");
+
+    owner.close();
+  });
+
+  it("room_owner が NULL の旧ルームへ非ホストが先に接続しても D1 のホストでバックフィルする", async () => {
+    const { roomId, inviteCode } = await createRoomAs(OWNER);
+    await joinRoomAs(MEMBER, inviteCode);
+    await runInRoomDO(roomId, (_instance, state) => {
+      state.storage.sql.exec(
+        "UPDATE room_owner SET host_id = NULL WHERE id = 1",
+      );
+    });
+
+    const member = await connectRoomAs(MEMBER, roomId);
+    const memberSnapshot = await expectType(member, "snapshot");
+    expect(memberSnapshot.isHost).toBe(false);
+    expect(await storedHostId(roomId)).toBe(OWNER.sub);
+
+    const owner = await connectRoomAs(OWNER, roomId);
+    const ownerSnapshot = await expectType(owner, "snapshot");
+    expect(ownerSnapshot.isHost).toBe(true);
+
+    member.close();
+    owner.close();
+  });
+
   it("start_phase 後の phase は永続化され、再接続後の /api/rooms/[id] でも phase1 のまま", async () => {
     const { roomId, owner, member } = await setupRoom();
 
@@ -537,9 +622,7 @@ describe("note:create", () => {
     expect(toOwner.note.content).toBe("");
     // 個人付箋は再接続時も作者だけに復元される。
     member.close();
-    const reconnected = await connectRoomAs(MEMBER, roomId, {
-      hostId: OWNER.sub,
-    });
+    const reconnected = await connectRoomAs(MEMBER, roomId);
     const privateSnapshot = await expectType(reconnected, "snapshot");
     expect(privateSnapshot.notes).toEqual([]);
     reconnected.close();
@@ -561,9 +644,7 @@ describe("note:create", () => {
       y: 240,
     });
     const publishedToOwner = await expectType(owner, "note:inserted");
-    const memberAfterPublish = await connectRoomAs(MEMBER, roomId, {
-      hostId: OWNER.sub,
-    });
+    const memberAfterPublish = await connectRoomAs(MEMBER, roomId);
     const sharedSnapshot = await expectType(memberAfterPublish, "snapshot");
     expect(publishedToOwner.note.visibility).toBe("shared");
     expect(sharedSnapshot.notes).toMatchObject([
@@ -712,9 +793,7 @@ describe("note:unpublish", () => {
     await expectType(member, "note:deleted");
 
     member.close();
-    const reconnected = await connectRoomAs(MEMBER, roomId, {
-      hostId: OWNER.sub,
-    });
+    const reconnected = await connectRoomAs(MEMBER, roomId);
     const snapshot = await expectType(reconnected, "snapshot");
     expect(snapshot.groups).toEqual([]);
 
@@ -775,9 +854,7 @@ describe("private note の永続化", () => {
     );
 
     member.close();
-    const memberAfterDelete = await connectRoomAs(MEMBER, roomId, {
-      hostId: OWNER.sub,
-    });
+    const memberAfterDelete = await connectRoomAs(MEMBER, roomId);
     expect((await expectType(memberAfterDelete, "snapshot")).notes).toEqual([]);
 
     reconnected.close();

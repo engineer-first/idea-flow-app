@@ -43,13 +43,12 @@ import { filterVisible, visibleTo } from "./visibility";
 // DO は外部から直接到達できないため、これは常に api-worker が設定する。
 export const USER_ID_HEADER = "X-Idea-Flow-User-Id";
 
-// ルーム作成者のユーザーID。start_phase の認可（ホスト判定）で使う。
-// api-worker が D1 rooms.host_id を解決してセットする。
+// ルーム作成者のユーザーID。api-worker が D1 rooms.host_id を解決してセットし、
+// room_owner が未設定の旧ルームを WS 接続時にバックフィルするシードにだけ使う。
 export const HOST_ID_HEADER = "X-Idea-Flow-Host-Id";
 
 type SocketAttachment = {
   userId: string;
-  hostId: string;
 };
 
 type NoteRow = {
@@ -103,7 +102,9 @@ export class RoomDO extends DurableObject {
     name: string | undefined,
   ): Promise<UpsertMemberResult> {
     const safeName = name ?? "";
-    const existed = this.isMember(userId);
+    const existing = this.ctx.storage.sql
+      .exec("SELECT name FROM members WHERE user_id = ?1", userId)
+      .toArray()[0] as { name: string } | undefined;
     const assigned = this.ctx.storage.sql
       .exec(
         "SELECT color FROM member_color_assignments WHERE user_id = ?1",
@@ -143,7 +144,7 @@ export class RoomDO extends DurableObject {
       color,
     );
 
-    if (!existed) {
+    if (!existing || existing.name !== safeName) {
       this.broadcastToAllExcept(
         {
           type: "member_joined",
@@ -161,6 +162,8 @@ export class RoomDO extends DurableObject {
     hostName: string | undefined,
   ): Promise<void> {
     await this.upsertMember(hostId, hostName);
+    // room_owner は api-worker が D1 rooms.host_id から渡した値だけで初期化する。
+    // 以後も WS 接続時の ensureHost 以外に独立して書き換える経路を持たない。
     this.ensureHost(hostId);
     this.savePhase("lobby");
   }
@@ -230,7 +233,9 @@ export class RoomDO extends DurableObject {
   // メンバー一覧を参加順（joined_at 昇順）で返す。snapshot 構築に使う。
   listMembers(): { userId: string; name: string; color: NoteColor }[] {
     const rows = this.ctx.storage.sql
-      .exec("SELECT user_id, name, color FROM members ORDER BY joined_at")
+      .exec(
+        "SELECT user_id, name, color FROM members ORDER BY joined_at, user_id",
+      )
       .toArray();
     return rows.map((row) => {
       const member = row as unknown as MemberRow;
@@ -265,12 +270,8 @@ export class RoomDO extends DurableObject {
     );
   }
 
-  async setPhase(
-    phase: Phase,
-    byUserId: string,
-    expectedHostId: string,
-  ): Promise<void> {
-    if (byUserId !== expectedHostId && !this.isHostUser(byUserId)) {
+  async setPhase(phase: Phase, byUserId: string): Promise<void> {
+    if (!this.isHostUser(byUserId)) {
       throw new Error("進行状態を変更する権限がありません。");
     }
     this.savePhase(phase);
@@ -310,12 +311,15 @@ export class RoomDO extends DurableObject {
     if (!hostId) {
       return new Response("forbidden", { status: 403 });
     }
+    // hostId は api-worker が D1 rooms.host_id で必ず上書きした値。
+    // 接続者本人ではなくこの値で、旧ルームの room_owner だけを補完する。
+    this.ensureHost(hostId);
 
     const pair = new WebSocketPair();
     const client = pair[0];
     const server = pair[1];
     this.ctx.acceptWebSocket(server);
-    const attachment: SocketAttachment = { userId, hostId };
+    const attachment: SocketAttachment = { userId };
     server.serializeAttachment(attachment);
 
     this.sendSnapshot(server, userId);
@@ -368,7 +372,7 @@ export class RoomDO extends DurableObject {
     attachment: SocketAttachment,
     message: ClientMessage,
   ): Promise<void> {
-    const { userId, hostId } = attachment;
+    const { userId } = attachment;
     // phase4 は投票結果を確認しながら既存ボードで話し合う工程。
     // WebSocket を直接送っても投票結果や付箋配置を変えられないよう、
     // 変更系メッセージを境界で一元的に拒否する。
@@ -739,7 +743,7 @@ export class RoomDO extends DurableObject {
 
       case "start_phase": {
         // ロビー → phase1（ボード開始）。ホストのみ。
-        if (userId !== hostId && !this.isHostUser(userId)) {
+        if (!this.isHostUser(userId)) {
           this.sendTo(ws, {
             type: "error",
             code: "forbidden",
@@ -755,14 +759,14 @@ export class RoomDO extends DurableObject {
           });
           return;
         }
-        await this.setPhase("phase1", userId, hostId);
+        await this.setPhase("phase1", userId);
         this.broadcastToAll({ type: "phase:updated", phase: "phase1" });
         return;
       }
 
       case "phase:next": {
         // phase1 → phase2 → phase3 → phase4。ホストのみ。lobby では不可。
-        if (userId !== hostId && !this.isHostUser(userId)) {
+        if (!this.isHostUser(userId)) {
           this.sendTo(ws, {
             type: "error",
             code: "forbidden",
