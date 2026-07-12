@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { CopyInviteButton } from "@/app/rooms/[id]/copy-invite-button";
+import { CopyInviteButton } from "./copy-invite-button";
 
 const meta = {
-  title: "Rooms/CopyInviteButton",
+  title: "Invite/CopyInviteButton",
   component: CopyInviteButton,
   parameters: {
     layout: "centered",

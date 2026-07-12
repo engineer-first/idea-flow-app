@@ -1,8 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { buildMembers } from "@/app/rooms/[id]/room-members.fixture";
-import type { Note } from "@/app/rooms/notes-reducer";
-import { buildNotes } from "@/components/room-board/templates/board-view.fixture";
+import type { ProtocolNote } from "@/contracts/room-protocol";
+import { buildMembers, buildNotes } from "@/contracts/room-protocol.fixture";
 import {
   calculateVoteTotaling,
   VoteTotalingPanel,
@@ -10,7 +9,11 @@ import {
 
 const ME = "11111111-1111-4111-8111-111111111111";
 
-function withVotes(note: Note, subjective: number, objective: number): Note {
+function withVotes(
+  note: ProtocolNote,
+  subjective: number,
+  objective: number,
+): ProtocolNote {
   return {
     ...note,
     dotVotes: {

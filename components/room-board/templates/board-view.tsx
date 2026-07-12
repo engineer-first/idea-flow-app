@@ -1,13 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CopyInviteButton } from "@/app/rooms/[id]/copy-invite-button";
 import { NoteGroupCard } from "@/app/rooms/[id]/note-group-card";
-import { RoomMembers } from "@/app/rooms/[id]/room-members";
 import { LeaveConfirmDialog } from "@/app/rooms/leave-confirm-dialog";
 import type { Note } from "@/app/rooms/notes-reducer";
 import type { Member } from "@/app/rooms/room-reducer";
-import { DotVoteSummary } from "@/components/dotvote/organisms/dot-vote-summary";
 import { NoteCard } from "@/components/room-board/molecules/note-card";
 import { StickyNote } from "@/components/room-board/molecules/sticky-note";
 import { PrivateNotesToolbar } from "@/components/room-board/organisms/private-notes-toolbar";
@@ -31,7 +28,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { VoteTotalingPanel } from "@/components/vote-totaling/organisms/vote-totaling-panel";
 // ルームボードの表示用コンポーネント。データ層には一切依存せず、
 // 付箋の配列と各種コールバックをpropsで受け取る。
 // WebSocket接続・スロットル・プロトコル送信はroom-board.tsx（コンテナ）の責務。
@@ -47,6 +43,10 @@ import {
   type Phase,
   type TimerState,
 } from "@/contracts/room-protocol";
+import { DotVoteSummary } from "@/features/dot-vote";
+import { CopyInviteButton } from "@/features/invite";
+import { RoomMembers } from "@/features/room-members";
+import { VoteTotalingPanel } from "@/features/vote-totaling";
 
 // WebSocket 接続の表示用状態。値の生成は room-board（コンテナ）の責務で、
 // ここでは受け取った状態を表示するだけ（このコンポーネントはデータ層に依存しない）。

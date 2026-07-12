@@ -1,11 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { fn } from "storybook/test";
-import { ROOM_MEMBERS_MAX_VISIBLE } from "@/app/rooms/[id]/room-members";
-import { buildMembers } from "@/app/rooms/[id]/room-members.fixture";
 import {
   StartRoomView,
   type StartRoomViewProps,
 } from "@/app/rooms/[id]/start/start-room-view";
+import { buildMembers } from "@/contracts/room-protocol.fixture";
+import { ROOM_MEMBERS_MAX_VISIBLE } from "@/features/room-members";
 
 const ME = "11111111-1111-4111-8111-111111111111";
 

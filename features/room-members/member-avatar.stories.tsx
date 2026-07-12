@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { Avatar } from "@/app/rooms/[id]/avatar";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { MemberAvatar } from "./member-avatar";
 
 const meta = {
-  title: "Rooms/Avatar",
-  component: Avatar,
+  title: "RoomMembers/MemberAvatar",
+  component: MemberAvatar,
   parameters: { layout: "centered" },
   args: {
     name: "Yuki Tanaka",
@@ -21,7 +21,7 @@ const meta = {
       </TooltipProvider>
     ),
   ],
-} satisfies Meta<typeof Avatar>;
+} satisfies Meta<typeof MemberAvatar>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

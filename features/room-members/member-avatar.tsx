@@ -6,13 +6,14 @@
 // 「あなた」マーカーは isMe で枠線（ring）として表現する。
 // ホバー時の名前表示は Radix Tooltip で行う。
 // TooltipProvider は一覧側（RoomMembers）に 1 つ置き、ここでは Tooltip のみ。
-import { NOTE_COLOR_STYLES } from "@/components/room-board/molecules/note-color";
+
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { NoteColor } from "@/contracts/room-protocol";
+import { NOTE_COLOR_STYLES } from "./note-color";
 
 // 名前の頭文字 2 文字を返す。仕様:
 // - 空白で分割し、先頭 2 トークンの先頭 1 文字ずつ
@@ -30,7 +31,7 @@ export function initialsOf(name: string): string {
   return (trimmed.slice(0, 2) || "??").toUpperCase();
 }
 
-export type AvatarProps = {
+export type MemberAvatarProps = {
   name: string;
   color: NoteColor;
   // 直径 (px)。既定は 36。
@@ -39,7 +40,12 @@ export type AvatarProps = {
   isMe?: boolean;
 };
 
-export function Avatar({ name, color, size = 36, isMe = false }: AvatarProps) {
+export function MemberAvatar({
+  name,
+  color,
+  size = 36,
+  isMe = false,
+}: MemberAvatarProps) {
   const initials = initialsOf(name);
   // 自分は ring（枠）で識別する。文言の「（あなた）」は付けない。
   const tooltipText = name || "不明なメンバー";

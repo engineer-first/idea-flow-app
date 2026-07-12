@@ -1,4 +1,4 @@
-import { VoteCountBadge } from "@/components/vote-totaling/molecules/vote-count-badge";
+import { VoteCountBadge } from "./vote-count-badge";
 
 export type VoteTotalingRowViewModel = {
   noteId: string;

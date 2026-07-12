@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { DotVoteButton } from "@/components/dotvote/molecules/dot-vote-button";
+import { DotVoteButton } from "./dot-vote-button";
 
 const meta = {
-  title: "DotVote/Molecules/DotVoteButton",
+  title: "DotVote/DotVoteButton",
   component: DotVoteButton,
   args: {
     kind: "subjective",

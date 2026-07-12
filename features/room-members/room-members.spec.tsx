@@ -4,12 +4,9 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
-import {
-  ROOM_MEMBERS_MAX_VISIBLE,
-  RoomMembers,
-} from "@/app/rooms/[id]/room-members";
-import { buildMembers } from "@/app/rooms/[id]/room-members.fixture";
-import { NOTE_COLOR_STYLES } from "@/components/room-board/molecules/note-color";
+import { buildMembers } from "@/contracts/room-protocol.fixture";
+import { NOTE_COLOR_STYLES } from "./note-color";
+import { ROOM_MEMBERS_MAX_VISIBLE, RoomMembers } from "./room-members";
 
 const ME = "11111111-1111-4111-8111-111111111111";
 

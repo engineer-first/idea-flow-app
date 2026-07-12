@@ -2,11 +2,6 @@
 
 import { DoorOpen, Link2, Play, Users } from "lucide-react";
 import { useState } from "react";
-// スタート画面（メンバー一覧 + 開始ボタン）のプレゼンテーション層。
-// ホーム画面と同じ shadcn ベースのレイアウト言語（背景・ヘッダー・Card 分割）。
-// WebSocket 接続やプロトコル送信は room-start-board.tsx（コンテナ）の責務。
-import { CopyInviteButton } from "@/app/rooms/[id]/copy-invite-button";
-import { RoomMembers } from "@/app/rooms/[id]/room-members";
 import { LeaveConfirmDialog } from "@/app/rooms/leave-confirm-dialog";
 import type { Member } from "@/app/rooms/room-reducer";
 import { Button } from "@/components/ui/button";
@@ -19,6 +14,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { Phase } from "@/contracts/room-protocol";
+// スタート画面（メンバー一覧 + 開始ボタン）のプレゼンテーション層。
+// ホーム画面と同じ shadcn ベースのレイアウト言語（背景・ヘッダー・Card 分割）。
+// WebSocket 接続やプロトコル送信は room-start-board.tsx（コンテナ）の責務。
+import { CopyInviteButton } from "@/features/invite";
+import { RoomMembers } from "@/features/room-members";
 
 // 接続状態は Container 側で生成し、ここでは表示するだけ。
 export type StartConnectionStatus = "connecting" | "open" | "closed";

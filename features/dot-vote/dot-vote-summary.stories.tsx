@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { DotVoteSummary } from "@/components/dotvote/organisms/dot-vote-summary";
+import { DotVoteSummary } from "./dot-vote-summary";
 
 const meta = {
-  title: "DotVote/Organisms/DotVoteSummary",
+  title: "DotVote/DotVoteSummary",
   component: DotVoteSummary,
   args: {
     voteRemaining: { subjective: 1, objective: 3 },

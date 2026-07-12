@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildInvitePath, buildInviteUrl } from "@/app/invite/invite-url";
+import { buildInvitePath, buildInviteUrl } from "./invite-url";
 
 describe("buildInvitePath", () => {
   it("招待コードから相対パスを作る", () => {

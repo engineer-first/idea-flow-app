@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { buildNote } from "@/components/room-board/molecules/note-card.fixture";
-import { NOTE_COLOR_STYLES } from "@/components/room-board/molecules/note-color";
 import { PrivateNotesToolbar } from "@/components/room-board/organisms/private-notes-toolbar";
+import { buildNote } from "@/contracts/room-protocol.fixture";
+import { NOTE_COLOR_STYLES } from "@/features/room-members";
 
 function setup(disabled = false) {
   const props = {

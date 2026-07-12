@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { fn } from "storybook/test";
-import { buildNote } from "@/components/room-board/molecules/note-card.fixture";
 import { PrivateNotesToolbar } from "@/components/room-board/organisms/private-notes-toolbar";
+import { buildNote } from "@/contracts/room-protocol.fixture";
 
 const meta = {
   title: "RoomBoard/Organisms/PrivateNotesToolbar",

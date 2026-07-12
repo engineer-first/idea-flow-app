@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { buildNote } from "@/components/room-board/molecules/note-card.fixture";
 import { StickyNote } from "@/components/room-board/molecules/sticky-note";
+import { buildNote } from "@/contracts/room-protocol.fixture";
 
 const note = buildNote();
 

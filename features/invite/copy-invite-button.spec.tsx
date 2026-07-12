@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CopyInviteButton } from "@/app/rooms/[id]/copy-invite-button";
+import { CopyInviteButton } from "./copy-invite-button";
 
 function stubClipboard(impl: () => Promise<void>) {
   const writeText = vi.fn(impl);

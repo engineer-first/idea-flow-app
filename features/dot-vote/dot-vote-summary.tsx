@@ -1,4 +1,4 @@
-import type { DotVoteRemaining } from "@/components/dotvote/molecules/dot-vote-controls";
+import type { DotVoteRemaining } from "./dot-vote-controls";
 
 type DotVoteSummaryProps = {
   voteRemaining: DotVoteRemaining;

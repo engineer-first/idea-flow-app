@@ -1,8 +1,8 @@
 import type * as React from "react";
 import { getNoteShadow } from "@/app/rooms/[id]/note-shadow";
-import { NOTE_COLOR_STYLES } from "@/components/room-board/molecules/note-color";
 import { NOTE_HEIGHT, NOTE_WIDTH } from "@/contracts/board";
 import type { NoteColor } from "@/contracts/room-protocol";
+import { NOTE_COLOR_STYLES } from "@/features/room-members";
 import { cn } from "@/lib/utils";
 
 export type StickyNoteProps = {

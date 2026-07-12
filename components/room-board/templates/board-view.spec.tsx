@@ -1,10 +1,12 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { buildMembers } from "@/app/rooms/[id]/room-members.fixture";
-import { buildNote } from "@/components/room-board/molecules/note-card.fixture";
 import { BoardView } from "@/components/room-board/templates/board-view";
-import { buildNotes } from "@/components/room-board/templates/board-view.fixture";
+import {
+  buildMembers,
+  buildNote,
+  buildNotes,
+} from "@/contracts/room-protocol.fixture";
 
 const ME = "11111111-1111-4111-8111-111111111111";
 

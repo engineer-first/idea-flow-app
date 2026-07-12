@@ -1,13 +1,11 @@
 "use client";
 
 // ルーム内メンバー一覧の表示用コンポーネント。
-// Avatar + 名前を 横 4 × 縦 3（最大 12 人）のグリッドで表示する。
+// MemberAvatar + 名前を 横 4 × 縦 3（最大 12 人）のグリッドで表示する。
 // 自分は ring で識別（「（あなた）」文言は付けない）。ホストは名前下にラベル。
 // 13 人以上は先頭 12 人 + +N（クリックで隠れメンバー Dialog）。
 // データ層に一切依存せず、members / currentUserId / hostUserId を props で受け取るだけ。
 import { useState } from "react";
-import { Avatar } from "@/app/rooms/[id]/avatar";
-import type { Member } from "@/app/rooms/room-reducer";
 import {
   Dialog,
   DialogContent,
@@ -15,7 +13,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import type { ProtocolMember } from "@/contracts/room-protocol";
 import { cn } from "@/lib/utils";
+import { MemberAvatar } from "./member-avatar";
 
 // 横 4 × 縦 3。これを超えると +N になる。
 export const ROOM_MEMBERS_COLS = 4;
@@ -23,7 +23,7 @@ export const ROOM_MEMBERS_ROWS = 3;
 export const ROOM_MEMBERS_MAX_VISIBLE = ROOM_MEMBERS_COLS * ROOM_MEMBERS_ROWS;
 
 export type RoomMembersProps = {
-  members: Member[];
+  members: ProtocolMember[];
   currentUserId: string;
   // ホストの userId。該当メンバーの名前下に「ホスト」を表示する。
   hostUserId?: string;
@@ -65,7 +65,11 @@ export function RoomMembers({
               data-host={isHostMember ? "true" : undefined}
               className="flex min-w-0 flex-col items-center gap-1 text-center"
             >
-              <Avatar name={member.name} color={member.color} isMe={isMe} />
+              <MemberAvatar
+                name={member.name}
+                color={member.color}
+                isMe={isMe}
+              />
               <span className="flex min-w-0 flex-col items-center">
                 <span
                   className={cn(
@@ -120,7 +124,7 @@ export function RoomMembers({
                 data-testid={`overflow-member-${member.userId}`}
                 className="flex min-w-0 items-center gap-2"
               >
-                <Avatar
+                <MemberAvatar
                   name={member.name}
                   color={member.color}
                   isMe={member.userId === currentUserId}

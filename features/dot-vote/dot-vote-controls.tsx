@@ -1,16 +1,15 @@
 "use client";
 
 import { X } from "lucide-react";
-import type { Note } from "@/app/rooms/notes-reducer";
-import { DotVoteButton } from "@/components/dotvote/molecules/dot-vote-button";
 import { Button } from "@/components/ui/button";
-import type { DotVoteKind } from "@/contracts/room-protocol";
+import type { DotVoteKind, ProtocolNote } from "@/contracts/room-protocol";
+import { DotVoteButton } from "./dot-vote-button";
 
 export type DotVoteRemaining = Record<DotVoteKind, number>;
 
 type DotVoteControlsProps = {
   noteId: string;
-  dotVotes: Note["dotVotes"];
+  dotVotes: ProtocolNote["dotVotes"];
   voteRemaining: DotVoteRemaining;
   disabled?: boolean;
   onVote: (noteId: string, kind: DotVoteKind) => void;

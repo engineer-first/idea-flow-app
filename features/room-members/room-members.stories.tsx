@@ -1,14 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import {
-  ROOM_MEMBERS_MAX_VISIBLE,
-  RoomMembers,
-} from "@/app/rooms/[id]/room-members";
-import { buildMembers } from "@/app/rooms/[id]/room-members.fixture";
+import { buildMembers } from "@/contracts/room-protocol.fixture";
+import { ROOM_MEMBERS_MAX_VISIBLE, RoomMembers } from "./room-members";
 
 const ME = "11111111-1111-4111-8111-111111111111";
 
 const meta = {
-  title: "Rooms/RoomMembers",
+  title: "RoomMembers/RoomMembers",
   component: RoomMembers,
   parameters: { layout: "padded" },
   args: {

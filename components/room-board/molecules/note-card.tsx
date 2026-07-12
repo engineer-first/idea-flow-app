@@ -12,14 +12,11 @@
 // 編集状態(isEditing)はこの付箋に閉じた関心事なのでローカルに持つ。
 import { useEffect, useRef, useState } from "react";
 import type { Note } from "@/app/rooms/notes-reducer";
-import {
-  DotVoteControls,
-  type DotVoteRemaining,
-} from "@/components/dotvote/molecules/dot-vote-controls";
 import { StickyNote } from "@/components/room-board/molecules/sticky-note";
 import { DRAG_THRESHOLD_PX } from "@/contracts/board";
 import type { DotVoteKind } from "@/contracts/room-protocol";
 import { NOTE_CONTENT_MAX_LENGTH } from "@/contracts/room-protocol";
+import { DotVoteControls, type DotVoteRemaining } from "@/features/dot-vote";
 
 export type NoteCardProps = {
   note: Note;

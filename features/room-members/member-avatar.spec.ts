@@ -1,7 +1,7 @@
-// Avatar（イニシャル丸）の純粋ロジックの単体テスト。
+// MemberAvatar（イニシャル丸）の純粋ロジックの単体テスト。
 // DOM を含む React コンポーネントの描画は testing-library ベースで別途検証する。
 import { describe, expect, it } from "vitest";
-import { initialsOf } from "@/app/rooms/[id]/avatar";
+import { initialsOf } from "./member-avatar";
 
 describe("initialsOf", () => {
   it("名と姓（スペース区切り）なら先頭2トークンの頭文字を返す", () => {

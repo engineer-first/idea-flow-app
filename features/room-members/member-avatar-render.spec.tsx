@@ -1,15 +1,15 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { Avatar } from "@/app/rooms/[id]/avatar";
-import { NOTE_COLOR_STYLES } from "@/components/room-board/molecules/note-color";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { NOTE_COLOR_PALETTE } from "@/contracts/room-protocol";
+import { MemberAvatar } from "./member-avatar";
+import { NOTE_COLOR_STYLES } from "./note-color";
 
-describe("Avatar", () => {
+describe("MemberAvatar", () => {
   it.each(NOTE_COLOR_PALETTE)("%s は付箋と同じ背景色を適用する", (color) => {
     render(
       <TooltipProvider>
-        <Avatar name={color} color={color} />
+        <MemberAvatar name={color} color={color} />
       </TooltipProvider>,
     );
 

@@ -1,11 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { buildMembers } from "@/app/rooms/[id]/room-members.fixture";
-import { buildNotes } from "@/components/room-board/templates/board-view.fixture";
-import { VoteTotalingPanel } from "@/components/vote-totaling/organisms/vote-totaling-panel";
+import { buildMembers, buildNotes } from "@/contracts/room-protocol.fixture";
+import { VoteTotalingPanel } from "./vote-totaling-panel";
 
 const ME = "11111111-1111-4111-8111-111111111111";
 const meta = {
-  title: "VoteTotaling/Organisms/VoteTotalingPanel",
+  title: "VoteTotaling/VoteTotalingPanel",
   component: VoteTotalingPanel,
   args: {
     members: buildMembers(2, ME),

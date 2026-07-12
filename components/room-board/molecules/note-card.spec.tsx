@@ -1,10 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { NoteCard } from "@/components/room-board/molecules/note-card";
-import { buildNote } from "@/components/room-board/molecules/note-card.fixture";
-import { NOTE_COLOR_STYLES } from "@/components/room-board/molecules/note-color";
 import type { NoteColor } from "@/contracts/room-protocol";
 import { NOTE_CONTENT_MAX_LENGTH } from "@/contracts/room-protocol";
+import { buildNote } from "@/contracts/room-protocol.fixture";
+import { NOTE_COLOR_STYLES } from "@/features/room-members";
 
 function setup(overrides: Partial<Parameters<typeof NoteCard>[0]> = {}) {
   const props = {

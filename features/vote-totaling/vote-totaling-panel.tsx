@@ -1,8 +1,10 @@
-import type { Note } from "@/app/rooms/notes-reducer";
-import type { Member } from "@/app/rooms/room-reducer";
-import type { VoteTotalingRowViewModel } from "@/components/vote-totaling/molecules/vote-totaling-row";
-import { VoteTotalingRow } from "@/components/vote-totaling/molecules/vote-totaling-row";
-import { DOT_VOTE_LIMITS } from "@/contracts/room-protocol";
+import {
+  DOT_VOTE_LIMITS,
+  type ProtocolMember,
+  type ProtocolNote,
+} from "@/contracts/room-protocol";
+import type { VoteTotalingRowViewModel } from "./vote-totaling-row";
+import { VoteTotalingRow } from "./vote-totaling-row";
 
 const SUBJECTIVE_POINT = 5;
 const OBJECTIVE_POINT = 1;
@@ -18,7 +20,7 @@ export function calculateVoteTotaling({
   memberCount,
   isVotingComplete,
 }: {
-  notes: Note[];
+  notes: ProtocolNote[];
   memberCount: number;
   isVotingComplete?: boolean;
 }): VoteTotalingResult {
@@ -81,8 +83,8 @@ export function VoteTotalingPanel({
   members,
   isVotingComplete,
 }: {
-  notes: Note[];
-  members: Member[];
+  notes: ProtocolNote[];
+  members: ProtocolMember[];
   // phase4 への遷移時に RoomDO が投票完了を保証する。以後にメンバーが
   // 退出しても、確定済み結果を待機状態へ戻さないための明示的な状態。
   isVotingComplete?: boolean;

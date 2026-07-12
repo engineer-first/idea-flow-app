@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { VoteTotalingRow } from "@/components/vote-totaling/molecules/vote-totaling-row";
+import { VoteTotalingRow } from "./vote-totaling-row";
 
 const meta = {
-  title: "VoteTotaling/Molecules/VoteTotalingRow",
+  title: "VoteTotaling/VoteTotalingRow",
   component: VoteTotalingRow,
   args: {
     rank: 1,

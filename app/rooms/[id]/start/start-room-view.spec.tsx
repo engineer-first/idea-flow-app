@@ -2,8 +2,8 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { buildMembers } from "@/app/rooms/[id]/room-members.fixture";
 import { StartRoomView } from "@/app/rooms/[id]/start/start-room-view";
+import { buildMembers } from "@/contracts/room-protocol.fixture";
 
 const ME = "11111111-1111-4111-8111-111111111111";
 

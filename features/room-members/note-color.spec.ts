@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NOTE_COLOR_STYLES } from "@/components/room-board/molecules/note-color";
+import { NOTE_COLOR_STYLES } from "./note-color";
 
 describe("NOTE_COLOR_STYLES", () => {
   it("FigJam風の20色を固定する", () => {
