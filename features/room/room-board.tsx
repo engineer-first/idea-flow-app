@@ -1,55 +1,27 @@
 "use client";
 
-// ルームボードのコンテナ（状態・副作用を持つ側）。
-// 表示は RoomBoardView / NoteCard / RoomMembers に委譲し、ここでは
-//   - RoomDO への WebSocket 接続（lib/room-client）とサーバーメッセージの適用
-//   - ドラッグ中イベントのスロットル送信
-//   - 操作のプロトコルメッセージ化（contracts/room-protocol.ts）
-//   - members / phase state の管理（room-reducer.ts）
-//   - 退出のトリガ
-//   - 次フェーズ（phase:next）
-// を担当する。関心の分離のため、room-client や notes/room-reducer への依存は
-// このファイルに閉じ込める。
+// ルームボードのコンテナ。関心ごとの hook を束ねて view に渡すだけにする。
+//   - WebSocket 接続と切断時の遷移: use-room-connection
+//   - 付箋の状態・楽観更新ポリシー・プロトコル化: use-room-notes
+//   - グループの状態とプロトコル化: use-note-groups
+//   - members / phase / timer の適用と入退出通知: use-room-state
+//   - 退出 / 解散フロー: use-leave-room
+// このファイルに残るのは「フェーズ進行の operation 化」と「エラー応答の
+// 画面反応（強制進行ダイアログ）」というボード画面固有の配線だけ。
 //
 // 確定状態の真実はサーバー（RoomDO）側にあり、再接続時は snapshot で復元される。
-// 削除は楽観更新しない: author 以外の削除はサーバーが forbidden で拒否するため、
-// 確定（note:deleted）を待ってから消すことで「消えたのに戻る」揺れを避ける。
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { DRAG_BROADCAST_THROTTLE_MS } from "@/contracts/board";
-import type { PersistentGroup } from "@/contracts/grouping";
-import type {
-  DotVoteKind,
-  Phase,
-  ServerMessage,
-} from "@/contracts/room-protocol";
+import { useCallback, useState } from "react";
+import type { Phase, ServerMessage } from "@/contracts/room-protocol";
 import { notify } from "@/lib/notify";
-import {
-  createRoomClient,
-  type RoomClient,
-  type RoomConnectionStatus,
-  type RoomSocketFactory,
-} from "@/lib/room-client/room-client";
-import { roomWebSocketUrl } from "@/lib/room-client/ws-url";
-import { createThrottled } from "@/lib/throttle";
-import { leaveRoom } from "./actions";
+import type { RoomSocketFactory } from "@/lib/room-client/room-client";
 import { ForceNextPhaseDialog } from "./force-next-phase-dialog";
-import {
-  applyServerMessage,
-  moveNoteLocally,
-  type Note,
-  resetNoteVoteLocally,
-  voteNoteLocally,
-} from "./notes-reducer";
 import { RoomBoardView } from "./room-board-view";
-import { roomNotify } from "./room-notify";
-import {
-  applyMemberServerMessage,
-  applyPhaseServerMessage,
-  applyTimerServerMessage,
-  type Member,
-  type TimerClientState,
-} from "./room-reducer";
+import type { Member } from "./room-reducer";
+import { useLeaveRoom } from "./use-leave-room";
+import { useNoteGroups } from "./use-note-groups";
+import { useRoomConnection } from "./use-room-connection";
+import { useRoomNotes } from "./use-room-notes";
+import { useRoomState } from "./use-room-state";
 
 export type RoomBoardProps = {
   roomId: string;
@@ -67,8 +39,6 @@ export type RoomBoardProps = {
   webSocketFactory?: RoomSocketFactory;
 };
 
-type NoteDragPayload = { id: string; x: number; y: number };
-
 export function RoomBoard({
   roomId,
   inviteCode,
@@ -80,373 +50,90 @@ export function RoomBoard({
   initialPhase,
   webSocketFactory,
 }: RoomBoardProps) {
-  const router = useRouter();
-  // 付箋の初期状態は空。確定状態の真実はサーバー（RoomDO）側にあり、
-  // 接続直後に送られてくる snapshot で復元される。
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [groups, setGroups] = useState<PersistentGroup[]>([]);
-  // メンバー一覧と進行状態は SSR で初期値を渡せるので、初回の白画面を防ぐ。
-  const [members, setMembers] = useState<Member[]>(initialMembers);
-  const [phase, setPhase] = useState<Phase>(initialPhase);
-  const [timerState, setTimerState] = useState<TimerClientState>({
-    timer: { status: "idle" },
-    serverOffsetMs: 0,
-  });
-  // createRoomClient が生成直後に "connecting" を通知するので初期値と一致する。
-  // ended / disbanded は set せずホームへ redirect する。
-  const [connectionStatus, setConnectionStatus] =
-    useState<Exclude<RoomConnectionStatus, "ended" | "disbanded">>(
-      "connecting",
-    );
-  const [draggingNoteId, setDraggingNoteId] = useState<string | null>(null);
-  const [isLeaving, setIsLeaving] = useState(false);
-  const [isLeavePending, startLeaveTransition] = useTransition();
-  const draggingNoteIdRef = useRef<string | null>(null);
-  const membersRef = useRef<Member[]>(members);
-  const notesRef = useRef<Note[]>(notes);
-  const clientRef = useRef<RoomClient | null>(null);
-  const sendDragRef = useRef<ReturnType<
-    typeof createThrottled<[NoteDragPayload]>
-  > | null>(null);
   const [isNextPhasePending, setIsNextPhasePending] = useState(false);
   const [isForceNextPhaseDialogOpen, setIsForceNextPhaseDialogOpen] =
     useState(false);
 
-  useEffect(() => {
-    draggingNoteIdRef.current = draggingNoteId;
-  }, [draggingNoteId]);
+  const { isLeaving, isLeavingRef, leave } = useLeaveRoom({ roomId, isHost });
+  // onMessage にはホイスティングされる関数宣言（下記）を渡す。
+  // useRoomConnection は常に最新のハンドラへ配送するため、
+  // ハンドラの再生成で再接続されることはない。
+  const { connectionStatus, send } = useRoomConnection({
+    roomId,
+    onMessage: handleServerMessage,
+    webSocketFactory,
+    isLeavingRef,
+  });
+  const notes = useRoomNotes({ send });
+  const noteGroups = useNoteGroups({ send });
+  const roomState = useRoomState({ initialMembers, initialPhase });
 
-  useEffect(() => {
-    membersRef.current = members;
-  }, [members]);
-
-  useEffect(() => {
-    notesRef.current = notes;
-  }, [notes]);
-
-  const updateNotes = useCallback((update: (current: Note[]) => Note[]) => {
-    const next = update(notesRef.current);
-    notesRef.current = next;
-    setNotes(next);
-    return next;
-  }, []);
-
-  const handleServerMessage = useCallback(
-    (message: ServerMessage) => {
-      const receivedAt = Date.now();
-      if (message.type === "error") {
-        // 投票未完了によるゲート拒否はホストの phase:next 起点なので、toast
-        // ではなく「強制的に進むか」の確認ダイアログで案内する。サーバーの
-        // 評価順が変わって非ホストに届いた場合は通常のエラー表示へ落とす。
-        if (message.code === "voting-incomplete" && isHost) {
-          setIsNextPhasePending(false);
-          setIsForceNextPhaseDialogOpen(true);
-          return;
-        }
-        console.warn(`ルーム操作エラー (${message.code}): ${message.message}`);
-        notify.error(message.message);
-        if (message.code === "forbidden") {
-          setIsNextPhasePending(false);
-        }
-        return;
-      }
-
-      if (message.type === "snapshot") {
-        setGroups(message.groups || []);
-      }
-
-      if (message.type === "group:updated") {
-        setGroups((current) => {
-          const index = current.findIndex((g) => g.id === message.group.id);
-          if (index >= 0) {
-            const next = [...current];
-            next[index] = message.group;
-            return next;
-          }
-          return [...current, message.group];
-        });
-      }
-
-      if (message.type === "group:deleted") {
-        setGroups((current) => current.filter((g) => g.id !== message.groupId));
-      }
-
-      setNotes((current) =>
-        applyServerMessage(current, message, {
-          draggingNoteId: draggingNoteIdRef.current,
-        }),
-      );
-      // member_joined / member_left は自分以外の参加者から届く通知。
-      // 自分自身の参加・退出はサーバから届かない（broadcastToAllExcept）。
-      if (message.type === "member_joined") {
-        roomNotify.memberJoined(message.member.name);
-      }
-      if (message.type === "member_left") {
-        // member_left は userId のみなので、除去前の members から名前を引く。
-        const left = membersRef.current.find(
-          (m) => m.userId === message.userId,
-        );
-        if (left) {
-          roomNotify.memberLeft(left.name);
-        }
-      }
-      if (message.type === "phase:updated" || message.type === "snapshot") {
+  function handleServerMessage(message: ServerMessage) {
+    const receivedAt = Date.now();
+    if (message.type === "error") {
+      // 投票未完了によるゲート拒否はホストの phase:next 起点なので、toast
+      // ではなく「強制的に進むか」の確認ダイアログで案内する。サーバーの
+      // 評価順が変わって非ホストに届いた場合は通常のエラー表示へ落とす。
+      if (message.code === "voting-incomplete" && isHost) {
         setIsNextPhasePending(false);
-        // 進行が確定（別タブ等）・復元（再接続）されたら、開いていた
-        // 強制進行の確認は phase3 のゲート前提が崩れているため閉じる。
-        setIsForceNextPhaseDialogOpen(false);
-      }
-      // ref を同期更新して、連続メッセージでも最新 members を引けるようにする。
-      const nextMembers = applyMemberServerMessage(membersRef.current, message);
-      membersRef.current = nextMembers;
-      setMembers(nextMembers);
-      setPhase((current) => applyPhaseServerMessage(current, message));
-      setTimerState((current) =>
-        applyTimerServerMessage(current, message, receivedAt),
-      );
-      // isHost はサーバー側で確定する不変の prop（再レンダーで変わらない）。
-    },
-    [isHost],
-  );
-
-  const isLeavingRef = useRef(false);
-  useEffect(() => {
-    isLeavingRef.current = isLeaving;
-  }, [isLeaving]);
-
-  const handleStatusChange = useCallback(
-    (status: RoomConnectionStatus) => {
-      // 退出・解散による意図的切断: 再接続せずホームへ戻す。
-      if (status === "ended" || status === "disbanded") {
-        // 他メンバーが解散されたときだけここで理由を出す。
-        // 自分の操作による通知は handleLeave 成功時に出す（二重 toast 防止）。
-        if (status === "disbanded" && !isLeavingRef.current) {
-          roomNotify.roomDisbanded();
-        }
-        router.replace("/home");
+        setIsForceNextPhaseDialogOpen(true);
         return;
       }
-      setConnectionStatus(status);
-    },
-    [router],
-  );
+      console.warn(`ルーム操作エラー (${message.code}): ${message.message}`);
+      notify.error(message.message);
+      if (message.code === "forbidden") {
+        setIsNextPhasePending(false);
+      }
+      return;
+    }
 
-  useEffect(() => {
-    const client = createRoomClient({
-      url: roomWebSocketUrl(roomId),
-      onMessage: handleServerMessage,
-      onStatusChange: handleStatusChange,
-      webSocketFactory,
-    });
-    clientRef.current = client;
+    if (message.type === "phase:updated" || message.type === "snapshot") {
+      setIsNextPhasePending(false);
+      // 進行が確定（別タブ等）・復元（再接続）されたら、開いていた
+      // 強制進行の確認は phase3 のゲート前提が崩れているため閉じる。
+      setIsForceNextPhaseDialogOpen(false);
+    }
 
-    sendDragRef.current = createThrottled((payload: NoteDragPayload) => {
-      client.send({
-        type: "note:drag",
-        noteId: payload.id,
-        x: payload.x,
-        y: payload.y,
-      });
-    }, DRAG_BROADCAST_THROTTLE_MS);
-
-    return () => {
-      sendDragRef.current?.cancel();
-      sendDragRef.current = null;
-      clientRef.current = null;
-      notesRef.current = [];
-      client.close();
-    };
-  }, [roomId, handleServerMessage, handleStatusChange, webSocketFactory]);
-
-  const handleAddNote = useCallback(() => {
-    // 新規付箋は個人ツールバーへだけ挿入される。ID生成と永続化はRoomDOに一本化する。
-    clientRef.current?.send({ type: "note:create" });
-  }, []);
-
-  const handlePrivateNotePublish = useCallback(
-    (noteId: string, x: number, y: number) => {
-      clientRef.current?.send({ type: "note:publish", noteId, x, y });
-    },
-    [],
-  );
-
-  const handlePrivateNoteUnpublish = useCallback((noteId: string) => {
-    setDraggingNoteId(null);
-    clientRef.current?.send({ type: "note:unpublish", noteId });
-  }, []);
+    notes.applyMessage(message);
+    noteGroups.applyMessage(message);
+    roomState.applyMessage(message, receivedAt);
+  }
 
   const handleNextPhase = useCallback(() => {
     if (isNextPhasePending) return;
-
     setIsNextPhasePending(true);
-
-    clientRef.current?.send({
-      type: "phase:next",
-    });
-  }, [isNextPhasePending]);
+    send({ type: "phase:next" });
+  }, [isNextPhasePending, send]);
 
   // 投票未完了ゲートの脱出ハッチ。ForceNextPhaseDialog の確認後に
   // force 付きで再送する（ホスト以外はサーバー側で拒否される）。
   const handleForceNextPhase = useCallback(() => {
     setIsForceNextPhaseDialogOpen(false);
     if (isNextPhasePending) return;
-
     setIsNextPhasePending(true);
+    send({ type: "phase:next", force: true });
+  }, [isNextPhasePending, send]);
 
-    clientRef.current?.send({
-      type: "phase:next",
-      force: true,
-    });
-  }, [isNextPhasePending]);
-
-  const handleTimerStart = useCallback((durationMs: number) => {
-    clientRef.current?.send({ type: "timer:start", durationMs });
-  }, []);
-  const handleTimerPause = useCallback(() => {
-    clientRef.current?.send({ type: "timer:pause" });
-  }, []);
-  const handleTimerResume = useCallback(() => {
-    clientRef.current?.send({ type: "timer:resume" });
-  }, []);
-  const handleTimerExtend = useCallback(() => {
-    clientRef.current?.send({ type: "timer:extend" });
-  }, []);
-  const handleTimerStop = useCallback(() => {
-    clientRef.current?.send({ type: "timer:stop" });
-  }, []);
-
-  const handleNoteDragStart = useCallback((noteId: string) => {
-    setDraggingNoteId(noteId);
-  }, []);
-
-  const handleNoteDragMove = useCallback(
-    (noteId: string, x: number, y: number) => {
-      // 自分自身の操作なので即座にローカル反映する。
-      updateNotes((current) => moveNoteLocally(current, noteId, x, y));
-      sendDragRef.current?.({ id: noteId, x, y });
-    },
-    [updateNotes],
+  const handleTimerStart = useCallback(
+    (durationMs: number) => send({ type: "timer:start", durationMs }),
+    [send],
   );
-
-  const handleNoteDragEnd = useCallback(
-    (noteId: string, x: number, y: number) => {
-      sendDragRef.current?.cancel();
-      setDraggingNoteId(null);
-      updateNotes((current) => moveNoteLocally(current, noteId, x, y));
-      // ドロップ確定だけを永続化する（ドラッグ中の座標はサーバーに残らない）。
-      clientRef.current?.send({ type: "note:move", noteId, x, y });
-    },
-    [updateNotes],
+  const handleTimerPause = useCallback(
+    () => send({ type: "timer:pause" }),
+    [send],
   );
-
-  const handleNoteContentChange = useCallback(
-    (noteId: string, content: string) => {
-      // 入力中の見た目を止めないため本文だけは楽観更新する。
-      updateNotes((current) =>
-        current.map((note) =>
-          note.id === noteId ? { ...note, content } : note,
-        ),
-      );
-      clientRef.current?.send({ type: "note:update-content", noteId, content });
-    },
-    [updateNotes],
+  const handleTimerResume = useCallback(
+    () => send({ type: "timer:resume" }),
+    [send],
   );
-
-  const handleNoteDelete = useCallback((noteId: string) => {
-    clientRef.current?.send({ type: "note:delete", noteId });
-  }, []);
-
-  const handleGroupCreate = useCallback((name: string, noteIds: string[]) => {
-    const newGroup = {
-      id: crypto.randomUUID(),
-      name,
-      noteIds,
-    };
-    setGroups((current) => [...current, newGroup]);
-    clientRef.current?.send({
-      type: "group:create",
-      group: {
-        ...newGroup,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-    });
-  }, []);
-
-  const handleGroupUpdateName = useCallback((groupId: string, name: string) => {
-    setGroups((current) =>
-      current.map((g) => (g.id === groupId ? { ...g, name } : g)),
-    );
-    clientRef.current?.send({
-      type: "group:update-name",
-      groupId,
-      name,
-    });
-  }, []);
-
-  const handleNoteVote = useCallback((noteId: string, kind: DotVoteKind) => {
-    const result = voteNoteLocally(notesRef.current, noteId, kind);
-    if (!result.accepted) return;
-    notesRef.current = result.notes;
-    setNotes(result.notes);
-    clientRef.current?.send({ type: "note:vote", noteId, kind });
-  }, []);
-
-  const handleNoteVoteReset = useCallback(
-    (noteId: string, kind: DotVoteKind) => {
-      const result = resetNoteVoteLocally(notesRef.current, noteId, kind);
-      if (!result.accepted) return;
-      notesRef.current = result.notes;
-      setNotes(result.notes);
-      clientRef.current?.send({ type: "note:vote-reset", noteId, kind });
-    },
-    [],
+  const handleTimerExtend = useCallback(
+    () => send({ type: "timer:extend" }),
+    [send],
   );
-
-  // 退出 / 解散。RoomBoardView 内の LeaveConfirmDialog から呼ばれる。
-  // API 成功後に redirect でホームへ戻る。失敗時は WS を維持し isLeaving を戻す。
-  // （先に close すると失敗時に再接続不能になるため、close は RoomDO に任せる）
-  // redirect は NEXT_REDIRECT を throw するので useTransition 内で握りつぶす。
-  const handleLeave = useCallback(() => {
-    if (isLeaving || isLeavePending) return;
-    // WS close(4001) が leave 完了前に届いても roomDisbanded を出さないよう、
-    // setState のコミットを待たず ref を同期で立てる。
-    isLeavingRef.current = true;
-    setIsLeaving(true);
-    startLeaveTransition(async () => {
-      const formData = new FormData();
-      formData.append("roomId", roomId);
-      try {
-        await leaveRoom(formData);
-      } catch (error) {
-        // redirect は NEXT_REDIRECT を throw する仕様（Next.js の内部）なので
-        // それを握りつぶす。next/navigation が router に遷移を通知する。
-        if (
-          error &&
-          typeof error === "object" &&
-          "digest" in error &&
-          typeof (error as { digest?: unknown }).digest === "string" &&
-          (error as { digest: string }).digest.startsWith("NEXT_REDIRECT")
-        ) {
-          // 自分の操作成功をトーストで伝える（ホーム遷移後も Toaster は root にある）。
-          if (isHost) {
-            roomNotify.roomDisbandedBySelf();
-          } else {
-            roomNotify.roomLeft();
-          }
-          return;
-        }
-        // 5xx 等: WS は開いたまま、操作可能に戻す。
-        isLeavingRef.current = false;
-        setIsLeaving(false);
-        const message =
-          error instanceof Error
-            ? error.message
-            : "ルームからの退出に失敗しました。";
-        notify.error(message);
-      }
-    });
-  }, [isLeaving, isLeavePending, roomId, isHost]);
+  const handleTimerStop = useCallback(
+    () => send({ type: "timer:stop" }),
+    [send],
+  );
 
   return (
     <>
@@ -456,42 +143,44 @@ export function RoomBoard({
         onConfirm={handleForceNextPhase}
       />
       <RoomBoardView
-        notes={notes.filter((note) => note.visibility === "shared")}
-        privateNotes={notes.filter((note) => note.visibility === "private")}
-        groups={groups}
+        notes={notes.notes.filter((note) => note.visibility === "shared")}
+        privateNotes={notes.notes.filter(
+          (note) => note.visibility === "private",
+        )}
+        groups={noteGroups.groups}
         inviteCode={inviteCode}
         inviteUrl={inviteUrl}
-        phase={phase}
-        timer={timerState.timer}
-        timerServerOffsetMs={timerState.serverOffsetMs}
+        phase={roomState.phase}
+        timer={roomState.timer}
+        timerServerOffsetMs={roomState.timerServerOffsetMs}
         isHost={isHost}
         connectionStatus={connectionStatus}
-        draggingNoteId={draggingNoteId}
-        members={members}
+        draggingNoteId={notes.draggingNoteId}
+        members={roomState.members}
         currentUserId={currentUserId}
         hostUserId={hostUserId}
         isNextPhasePending={isNextPhasePending}
-        onAddPrivateNote={handleAddNote}
-        onPrivateNoteContentChange={handleNoteContentChange}
-        onPrivateNoteDelete={handleNoteDelete}
-        onPrivateNotePublish={handlePrivateNotePublish}
-        onPrivateNoteUnpublish={handlePrivateNoteUnpublish}
+        onAddPrivateNote={notes.addNote}
+        onPrivateNoteContentChange={notes.changeNoteContent}
+        onPrivateNoteDelete={notes.deleteNote}
+        onPrivateNotePublish={notes.publishNote}
+        onPrivateNoteUnpublish={notes.unpublishNote}
         onNextPhase={handleNextPhase}
         onTimerStart={handleTimerStart}
         onTimerPause={handleTimerPause}
         onTimerResume={handleTimerResume}
         onTimerExtend={handleTimerExtend}
         onTimerStop={handleTimerStop}
-        onNoteDragStart={handleNoteDragStart}
-        onNoteDragMove={handleNoteDragMove}
-        onNoteDragEnd={handleNoteDragEnd}
-        onNoteContentChange={handleNoteContentChange}
-        onNoteDelete={handleNoteDelete}
-        onGroupCreate={handleGroupCreate}
-        onGroupUpdateName={handleGroupUpdateName}
-        onNoteVote={handleNoteVote}
-        onNoteVoteReset={handleNoteVoteReset}
-        onLeave={handleLeave}
+        onNoteDragStart={notes.startNoteDrag}
+        onNoteDragMove={notes.moveNote}
+        onNoteDragEnd={notes.endNoteDrag}
+        onNoteContentChange={notes.changeNoteContent}
+        onNoteDelete={notes.deleteNote}
+        onGroupCreate={noteGroups.createGroup}
+        onGroupUpdateName={noteGroups.renameGroup}
+        onNoteVote={notes.voteNote}
+        onNoteVoteReset={notes.resetNoteVote}
+        onLeave={leave}
         isLeaving={isLeaving}
       />
     </>

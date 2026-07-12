@@ -14,20 +14,15 @@ import {
 import type { Phase } from "@/contracts/room-protocol";
 // スタート画面（メンバー一覧 + 開始ボタン）のプレゼンテーション層。
 // ホーム画面と同じ shadcn ベースのレイアウト言語（背景・ヘッダー・Card 分割）。
-// WebSocket 接続やプロトコル送信は room-start-board.tsx（コンテナ）の責務。
+// WebSocket 接続やプロトコル送信は room-lobby.tsx（コンテナ）の責務。
 import { CopyInviteButton } from "@/features/invite";
 import { RoomMembers } from "@/features/room-members";
+import {
+  CONNECTION_STATUS_LABELS,
+  type RoomScreenConnectionStatus,
+} from "./connection-status";
 import { LeaveConfirmDialog } from "./leave-confirm-dialog";
 import type { Member } from "./room-reducer";
-
-// 接続状態は Container 側で生成し、ここでは表示するだけ。
-export type StartConnectionStatus = "connecting" | "open" | "closed";
-
-const CONNECTION_STATUS_LABELS: Record<StartConnectionStatus, string | null> = {
-  connecting: "接続中…",
-  open: null,
-  closed: "接続が切れました。再接続します…",
-};
 
 export type RoomLobbyViewProps = {
   members: Member[];
@@ -38,7 +33,8 @@ export type RoomLobbyViewProps = {
   phase: Phase;
   inviteCode: string;
   inviteUrl: string;
-  connectionStatus: StartConnectionStatus;
+  // 接続状態は Container 側で生成し、ここでは表示するだけ。
+  connectionStatus: RoomScreenConnectionStatus;
   // 開始ボタンが処理中のとき true（多重押下防止）。Container が setTimeout などで
   // 制御する想定。
   isStarting: boolean;

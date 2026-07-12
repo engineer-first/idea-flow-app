@@ -39,6 +39,10 @@ import { DotVoteSummary } from "@/features/dot-vote";
 import { CopyInviteButton } from "@/features/invite";
 import { RoomMembers } from "@/features/room-members";
 import { VoteTotalingPanel } from "@/features/vote-totaling";
+import {
+  CONNECTION_STATUS_LABELS,
+  type RoomScreenConnectionStatus,
+} from "./connection-status";
 import { LeaveConfirmDialog } from "./leave-confirm-dialog";
 import { NoteCard } from "./note-card";
 import { NoteGroupCard } from "./note-group-card";
@@ -47,16 +51,6 @@ import { PrivateNotesToolbar } from "./private-notes-toolbar";
 import type { Member } from "./room-reducer";
 import { RoomTimer } from "./room-timer";
 import { StickyNote } from "./sticky-note";
-
-// WebSocket 接続の表示用状態。値の生成は room-board（コンテナ）の責務で、
-// ここでは受け取った状態を表示するだけ（このコンポーネントはデータ層に依存しない）。
-export type BoardConnectionStatus = "connecting" | "open" | "closed";
-
-const CONNECTION_STATUS_LABELS: Record<BoardConnectionStatus, string | null> = {
-  connecting: "接続中…",
-  open: null,
-  closed: "接続が切れました。再接続します…",
-};
 
 const PHASE_LABELS: Record<Phase, string> = {
   lobby: "開始待ち",
@@ -75,7 +69,9 @@ export type RoomBoardViewProps = {
   timer: TimerState;
   timerServerOffsetMs: number;
   isHost: boolean;
-  connectionStatus: BoardConnectionStatus;
+  // WebSocket 接続の表示用状態。値の生成は room-board（コンテナ）の責務で、
+  // ここでは受け取った状態を表示するだけ（このコンポーネントはデータ層に依存しない）。
+  connectionStatus: RoomScreenConnectionStatus;
   draggingNoteId: string | null;
   members: Member[];
   currentUserId: string;
