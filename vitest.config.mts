@@ -25,6 +25,7 @@ export default defineConfig({
         "app/**/*.{ts,tsx}",
         "lib/**/*.{ts,tsx}",
         "contracts/**/*.{ts,tsx}",
+        "scripts/**/*.mjs",
       ],
       exclude: ["**/*.{test,spec}.{ts,tsx}"],
     },

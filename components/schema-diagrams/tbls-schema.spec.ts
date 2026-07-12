@@ -17,4 +17,16 @@ describe("TblsSchemaJson", () => {
   it("tables を持たない JSON は受け付けない", () => {
     expect(() => TblsSchemaJson.parse({ name: "x" })).toThrow();
   });
+
+  it("constraints キーが省略されたテーブルは空配列に正規化される", () => {
+    const parsed = TblsSchemaJson.parse({
+      tables: [
+        {
+          name: "members",
+          columns: [{ name: "user_id", type: "TEXT", nullable: false }],
+        },
+      ],
+    });
+    expect(parsed.tables[0]?.constraints).toEqual([]);
+  });
 });

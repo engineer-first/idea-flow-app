@@ -94,9 +94,20 @@ function convertLegacySchemaVersion(
   if (legacyTable.length === 0) return;
 
   const rows = storage.sql.exec("SELECT version FROM schema_version").toArray();
-  const count = rows.length > 0 ? Number(rows[0]?.version) : 0;
+  if (rows.length > 1) {
+    throw new Error(
+      "RoomDO の旧スキーマ版 schema_version は1行である必要があります",
+    );
+  }
+  const count = rows.length === 1 ? Number(rows[0]?.version) : 0;
 
-  if (count > legacyMigrationIds.length) {
+  if (
+    !Number.isSafeInteger(count) ||
+    count < 0 ||
+    count > legacyMigrationIds.length
+  ) {
+    // ロールバックされた古いコードが未来のスキーマを黙って触って壊すより、
+    // 明示的に落とす（同ファイルの fail-closed 方針と揃える）。
     throw new Error(
       `RoomDO の旧スキーマ版 v${count} はこのコードが知る v${legacyMigrationIds.length} より新しい`,
     );

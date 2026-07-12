@@ -135,6 +135,56 @@ describe("旧・件数方式（schema_version）からの変換", () => {
     });
   });
 
+  it("旧・件数が負数だと明示的に失敗する（fail-closed）", async () => {
+    // count が負数のまま legacyMigrationIds.slice(0, count) に渡ると、
+    // 末尾からの相対指定になり「実行していないマイグレーション」を適用済みとして
+    // 記録してしまう（末尾以外を無条件で「適用済み」扱いにする）。
+    await runInRoomDO("mig-legacy-negative", (_instance, state) => {
+      dropAllTables(state.storage);
+      state.storage.sql.exec(
+        "CREATE TABLE schema_version (version INTEGER NOT NULL)",
+      );
+      state.storage.sql.exec(
+        "INSERT INTO schema_version (version) VALUES (-1)",
+      );
+
+      expect(() =>
+        migrateRoomStorage(state.storage, [A, B, C], LEGACY_IDS),
+      ).toThrow();
+    });
+  });
+
+  it("旧・件数が数値でないと明示的に失敗する（fail-closed）", async () => {
+    await runInRoomDO("mig-legacy-nan", (_instance, state) => {
+      dropAllTables(state.storage);
+      state.storage.sql.exec(
+        "CREATE TABLE schema_version (version INTEGER NOT NULL)",
+      );
+      state.storage.sql.exec(
+        "INSERT INTO schema_version (version) VALUES ('not-a-number')",
+      );
+
+      expect(() =>
+        migrateRoomStorage(state.storage, [A, B, C], LEGACY_IDS),
+      ).toThrow();
+    });
+  });
+
+  it("旧・件数テーブルが複数行だと明示的に失敗する（fail-closed）", async () => {
+    await runInRoomDO("mig-legacy-multi-row", (_instance, state) => {
+      dropAllTables(state.storage);
+      state.storage.sql.exec(
+        "CREATE TABLE schema_version (version INTEGER NOT NULL)",
+      );
+      state.storage.sql.exec("INSERT INTO schema_version (version) VALUES (1)");
+      state.storage.sql.exec("INSERT INTO schema_version (version) VALUES (2)");
+
+      expect(() =>
+        migrateRoomStorage(state.storage, [A, B, C], LEGACY_IDS),
+      ).toThrow();
+    });
+  });
+
   it("現在の配列に古いIDが割り込んでも、旧版番号を当時のIDへ変換する", async () => {
     await runInRoomDO("mig-legacy-interleaved", (_instance, state) => {
       dropAllTables(state.storage);

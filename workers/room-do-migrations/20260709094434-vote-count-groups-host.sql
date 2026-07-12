@@ -10,8 +10,6 @@ CREATE TABLE IF NOT EXISTS groups (
   updated_at TEXT NOT NULL
 );
 ALTER TABLE note_votes ADD COLUMN vote_count INTEGER NOT NULL DEFAULT 1;
-CREATE INDEX IF NOT EXISTS idx_note_votes_user_note_kind
-  ON note_votes (user_id, note_id, kind);
 CREATE TABLE IF NOT EXISTS room_owner (
   id INTEGER PRIMARY KEY CHECK(id = 1),
   host_id TEXT

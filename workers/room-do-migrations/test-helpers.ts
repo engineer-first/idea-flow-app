@@ -29,6 +29,7 @@ export function appliedMigrationIds(storage: DurableObjectStorage): string[] {
 // マイグレーションと適用記録を含めてすべて破棄する）。
 export function dropAllTables(storage: DurableObjectStorage): void {
   for (const name of tableNames(storage)) {
-    storage.sql.exec(`DROP TABLE IF EXISTS "${name}"`);
+    const quotedName = name.replace(/"/g, '""');
+    storage.sql.exec(`DROP TABLE IF EXISTS "${quotedName}"`);
   }
 }
