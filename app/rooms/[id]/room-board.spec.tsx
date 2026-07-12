@@ -285,6 +285,61 @@ describe("サーバーメッセージ → 画面反映", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("強制進行の確認ダイアログは phase:updated の受信で閉じる", () => {
+    // 別タブなど他の経路で進行が確定したら、開いていた確認は根拠が古い。
+    const { socket } = connectWithSnapshot([], {
+      isHost: true,
+      phase: "phase3",
+    });
+
+    act(() =>
+      socket.simulateServerMessage({
+        type: "error",
+        code: "voting-incomplete",
+        message: "全員の主観・客観投票が完了していません。",
+      }),
+    );
+    expect(screen.getByText(FORCE_NEXT_PHASE_COPY.title)).toBeInTheDocument();
+
+    act(() =>
+      socket.simulateServerMessage({ type: "phase:updated", phase: "phase4" }),
+    );
+
+    expect(
+      screen.queryByText(FORCE_NEXT_PHASE_COPY.title),
+    ).not.toBeInTheDocument();
+  });
+
+  it("強制進行の確認ダイアログは再接続の snapshot 受信で閉じる", () => {
+    const { socket } = connectWithSnapshot([], {
+      isHost: true,
+      phase: "phase3",
+    });
+
+    act(() =>
+      socket.simulateServerMessage({
+        type: "error",
+        code: "voting-incomplete",
+        message: "全員の主観・客観投票が完了していません。",
+      }),
+    );
+    expect(screen.getByText(FORCE_NEXT_PHASE_COPY.title)).toBeInTheDocument();
+
+    act(() =>
+      socket.simulateServerMessage({
+        type: "snapshot",
+        notes: [],
+        members: [],
+        phase: "phase4",
+        isHost: true,
+      }),
+    );
+
+    expect(
+      screen.queryByText(FORCE_NEXT_PHASE_COPY.title),
+    ).not.toBeInTheDocument();
+  });
+
   it("強制進行の確認をキャンセルすると force 付き phase:next は送信されない", () => {
     const { socket } = connectWithSnapshot([], {
       isHost: true,

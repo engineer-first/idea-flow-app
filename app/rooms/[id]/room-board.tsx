@@ -182,8 +182,11 @@ export function RoomBoard({
           notify.memberLeft(left.name);
         }
       }
-      if (message.type === "phase:updated") {
+      if (message.type === "phase:updated" || message.type === "snapshot") {
         setIsNextPhasePending(false);
+        // 進行が確定（別タブ等）・復元（再接続）されたら、開いていた
+        // 強制進行の確認は phase3 のゲート前提が崩れているため閉じる。
+        setIsForceNextPhaseDialogOpen(false);
       }
       // ref を同期更新して、連続メッセージでも最新 members を引けるようにする。
       const nextMembers = applyMemberServerMessage(membersRef.current, message);
