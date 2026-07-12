@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { HomeErrorAlert } from "@/components/home/molecules/home-error-alert";
+import { HomeErrorAlert } from "./home-error-alert";
 
 const meta = {
-  title: "Home/Molecules/HomeErrorAlert",
+  title: "Home/HomeErrorAlert",
   component: HomeErrorAlert,
   parameters: { layout: "padded" },
   args: {

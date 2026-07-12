@@ -3,7 +3,7 @@ import { fn } from "storybook/test";
 import {
   JoinRoomSectionView,
   type JoinRoomSectionViewProps,
-} from "@/components/home/organisms/join-room-section-view";
+} from "./join-room-section-view";
 
 const baseArgs: JoinRoomSectionViewProps = {
   code: "",
@@ -20,7 +20,7 @@ const baseArgs: JoinRoomSectionViewProps = {
 };
 
 const meta = {
-  title: "Home/Organisms/JoinRoomSection",
+  title: "RoomLifecycle/JoinRoomSection",
   component: JoinRoomSectionView,
   parameters: { layout: "padded" },
   args: baseArgs,

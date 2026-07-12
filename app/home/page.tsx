@@ -1,7 +1,6 @@
 // ホーム（/home）の Server Component。
-// 認証・searchParams・Server Action 配線のみ。UI は components/home/templates。
+// 認証・searchParams・Server Action 配線のみ。UI は同ディレクトリの home-view。
 import { redirect } from "next/navigation";
-import { HomeView } from "@/components/home/templates/home-view";
 import {
   Card,
   CardContent,
@@ -11,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/session/current-user";
 import { isAuthConfigured } from "@/lib/session/env";
+import { HomeView } from "./home-view";
 
 export const dynamic = "force-dynamic";
 

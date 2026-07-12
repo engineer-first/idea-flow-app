@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { HomeErrorAlert } from "@/components/home/molecules/home-error-alert";
+import { HomeErrorAlert } from "./home-error-alert";
 
 describe("HomeErrorAlert", () => {
   it("role=alert でメッセージを表示する", () => {

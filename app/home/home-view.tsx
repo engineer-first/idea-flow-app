@@ -3,9 +3,9 @@
 // アプリ名 IdeaFlow は root layout の AppHeader のみが担う。
 //
 // UX: 2 つの明確な入口（作成 / 参加）を並列に置き、視線誘導と行動の選択を最短にする。
-import { HomeErrorAlert } from "@/components/home/molecules/home-error-alert";
-import { CreateRoomSection } from "@/components/home/organisms/create-room-section";
-import { JoinRoomSection } from "@/components/home/organisms/join-room-section";
+
+import { CreateRoomSection, JoinRoomSection } from "@/features/room-lifecycle";
+import { HomeErrorAlert } from "./home-error-alert";
 
 export type HomeViewProps = {
   error?: string;

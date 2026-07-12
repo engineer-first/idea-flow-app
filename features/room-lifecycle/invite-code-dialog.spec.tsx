@@ -9,7 +9,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 const JOIN_ROOM = vi.fn();
-vi.mock("@/app/rooms/actions", () => ({
+vi.mock("./actions", () => ({
   joinRoom: (...args: unknown[]) => JOIN_ROOM(...args),
 }));
 
@@ -17,14 +17,14 @@ const notifyMocks = vi.hoisted(() => ({
   joinedAsGuest: vi.fn(),
   error: vi.fn(),
 }));
-vi.mock("@/app/_lib/notify", () => ({
-  notify: {
-    joinedAsGuest: notifyMocks.joinedAsGuest,
-    error: notifyMocks.error,
-  },
+vi.mock("@/lib/notify", () => ({
+  notify: { error: notifyMocks.error },
+}));
+vi.mock("./lifecycle-notify", () => ({
+  lifecycleNotify: { joinedAsGuest: notifyMocks.joinedAsGuest },
 }));
 
-import { InviteCodeDialog } from "@/app/invite/[inviteCode]/invite-code-dialog";
+import { InviteCodeDialog } from "./invite-code-dialog";
 
 function renderDialog() {
   return render(<InviteCodeDialog inviteCode="ABC234" hostName="田中太郎" />);

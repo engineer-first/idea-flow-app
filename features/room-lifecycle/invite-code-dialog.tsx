@@ -6,8 +6,6 @@
 // hostName は page 側の lookup 成功後に必ず渡る。
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { notify } from "@/app/_lib/notify";
-import { joinRoom } from "@/app/rooms/actions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,6 +16,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/dialog";
+import { notify } from "@/lib/notify";
+import { joinRoom } from "./actions";
+import { lifecycleNotify } from "./lifecycle-notify";
 
 export type InviteCodeDialogProps = {
   inviteCode: string;
@@ -49,7 +50,7 @@ export function InviteCodeDialog({
         notify.error(result.error);
         return;
       }
-      notify.joinedAsGuest();
+      lifecycleNotify.joinedAsGuest();
       // open を false にすると useEffect が /home へ飛ばすため、成功時は開いたまま遷移する。
       router.push(`/rooms/${result.roomId}/start`);
     });

@@ -1,7 +1,10 @@
 "use client";
 
 import { KeyRound, ShieldAlert } from "lucide-react";
-import { DEV_AUTH_DEFAULT_EMAIL, DEV_AUTH_DEFAULT_PASSWORD } from "./constants";
+import {
+  DEV_AUTH_DEFAULT_EMAIL,
+  DEV_AUTH_DEFAULT_PASSWORD,
+} from "./dev-auth-defaults";
 
 export type LoginCardProps = {
   error?: string;
@@ -11,7 +14,7 @@ export type LoginCardProps = {
   passwordAction: (formData: FormData) => void | Promise<void>;
 };
 
-export default function LoginCard({
+export function LoginCard({
   error,
   isConfigured,
   showDevAuth,

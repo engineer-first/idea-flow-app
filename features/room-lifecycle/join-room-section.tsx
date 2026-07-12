@@ -1,16 +1,16 @@
 "use client";
 
-// ホーム画面の「招待コードで参加」フォーム（コンテナ）。
-// 招待コードを入力 → lookup でホスト名を解決 → 確認 Dialog → joinRoom。
-// 成功時は toast → スタート画面へ遷移（作成と同じ経路）。
-// 表示は JoinRoomFormView に委譲する。
+// ホーム「ルームに参加」セクション（organism / コンテナ）。
+// 見た目は JoinRoomSectionView、フォームの副作用は JoinRoomForm 相当のロジックを内包。
+// JoinRoomForm は単体でも使えるため、ここでは View + コンテナの配線に寄せる。
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { notify } from "@/app/_lib/notify";
-import { joinRoom, lookupInviteRoom } from "@/app/rooms/actions";
-import { JoinRoomFormView } from "@/app/rooms/join-room-form-view";
+import { notify } from "@/lib/notify";
+import { joinRoom, lookupInviteRoom } from "./actions";
+import { JoinRoomSectionView } from "./join-room-section-view";
+import { lifecycleNotify } from "./lifecycle-notify";
 
-export function JoinRoomForm() {
+export function JoinRoomSection() {
   const router = useRouter();
   const [code, setCode] = useState("");
   const [hostName, setHostName] = useState("");
@@ -18,9 +18,6 @@ export function JoinRoomForm() {
   const [lookingUp, startLookup] = useTransition();
   const [joining, startJoin] = useTransition();
 
-  // 6 桁英数字のみを許可。生成時の曖昧文字（0/O, 1/I）は除外されているが、
-  // 入力側は「過去に発行されたコード」を受け入れられるよう英数字全体を許容する
-  // （contracts/invite-code.ts の INVITE_CODE_PATTERN と合わせる）。
   const isValidCode = /^[A-Z0-9]{6}$/.test(code);
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -47,14 +44,14 @@ export function JoinRoomForm() {
         notify.error(result.error);
         return;
       }
-      notify.joinedAsGuest();
+      lifecycleNotify.joinedAsGuest();
       setDialogOpen(false);
       router.push(`/rooms/${result.roomId}/start`);
     });
   }
 
   return (
-    <JoinRoomFormView
+    <JoinRoomSectionView
       code={code}
       onCodeChange={setCode}
       lookingUp={lookingUp}

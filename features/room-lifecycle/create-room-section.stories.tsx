@@ -3,10 +3,10 @@ import { fn } from "storybook/test";
 import {
   CreateRoomSectionView,
   type CreateRoomSectionViewProps,
-} from "@/components/home/organisms/create-room-section-view";
+} from "./create-room-section-view";
 
 const meta = {
-  title: "Home/Organisms/CreateRoomSection",
+  title: "RoomLifecycle/CreateRoomSection",
   component: CreateRoomSectionView,
   parameters: { layout: "padded" },
   args: {

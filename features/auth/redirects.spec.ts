@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getLoginPath, sanitizeNextPath } from "@/app/auth/redirects";
+import { getLoginPath, sanitizeNextPath } from "./redirects";
 
 describe("sanitizeNextPath", () => {
   it("アプリ内の相対パスはそのまま通す", () => {

@@ -6,12 +6,10 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
-vi.mock("@/app/rooms/actions", () => ({
-  createRoom: vi.fn(),
-  joinRoom: vi.fn(),
-}));
+// CreateRoomSection / JoinRoomSection の Server Actions は描画だけでは
+// 呼ばれないため、ここではモックせずそのまま import する。
 
-import { HomeView } from "@/components/home/templates/home-view";
+import { HomeView } from "./home-view";
 
 function renderView(
   overrides: Partial<React.ComponentProps<typeof HomeView>> = {},

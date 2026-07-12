@@ -1,12 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { fn } from "storybook/test";
-import { HomeErrorAlert } from "@/components/home/molecules/home-error-alert";
-import { CreateRoomSectionView } from "@/components/home/organisms/create-room-section-view";
-import { JoinRoomSectionView } from "@/components/home/organisms/join-room-section-view";
-import { HomeView } from "@/components/home/templates/home-view";
+import {
+  CreateRoomSectionView,
+  JoinRoomSectionView,
+} from "@/features/room-lifecycle";
+import { HomeErrorAlert } from "./home-error-alert";
+import { HomeView } from "./home-view";
 
 const meta = {
-  title: "Home/Templates/HomeView",
+  title: "Home/HomeView",
   component: HomeView,
   parameters: { layout: "fullscreen" },
   args: {},

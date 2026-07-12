@@ -11,7 +11,6 @@
 // 値は必ず sanitizeNextPath でアプリ内相対パスに限定する（オープンリダイレクト防止）。
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { getLoginPath, sanitizeNextPath } from "@/app/auth/redirects";
 import { clearSessionCookie, OAUTH_STATE_COOKIE } from "@/lib/session/cookie";
 import { DEV_PASSWORD, findDevUser } from "@/lib/session/dev-users";
 import {
@@ -21,6 +20,7 @@ import {
   isGoogleAuthConfigured,
 } from "@/lib/session/env";
 import { establishSession } from "@/lib/session/establish";
+import { getLoginPath, sanitizeNextPath } from "./redirects";
 
 function loginError(message: string, next?: string): never {
   const base = getLoginPath(next);

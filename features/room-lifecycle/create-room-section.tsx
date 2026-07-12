@@ -5,9 +5,10 @@
 // 表示は CreateRoomSectionView に委譲する。
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import { notify } from "@/app/_lib/notify";
-import { createRoom } from "@/app/rooms/actions";
-import { CreateRoomSectionView } from "@/components/home/organisms/create-room-section-view";
+import { notify } from "@/lib/notify";
+import { createRoom } from "./actions";
+import { CreateRoomSectionView } from "./create-room-section-view";
+import { lifecycleNotify } from "./lifecycle-notify";
 
 export function CreateRoomSection() {
   const router = useRouter();
@@ -20,7 +21,7 @@ export function CreateRoomSection() {
         notify.error(result.error);
         return;
       }
-      notify.roomCreated();
+      lifecycleNotify.roomCreated();
       router.push(`/rooms/${result.roomId}/start`);
     });
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isEmailVerified } from "@/app/auth/google-claims";
+import { isEmailVerified } from "./google-claims";
 
 describe("isEmailVerified", () => {
   it("email_verified が true のとき検証済みとみなす", () => {

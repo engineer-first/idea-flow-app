@@ -26,7 +26,7 @@ vi.mock("@/lib/session/current-user", () => ({
 }));
 vi.mock("next/navigation", () => ({ redirect: redirectMock }));
 
-import { createRoom, joinRoom, lookupInviteRoom } from "@/app/rooms/actions";
+import { createRoom, joinRoom, lookupInviteRoom } from "./actions";
 
 // 実物の redirect() は例外を投げて以降の処理を打ち切る。同じ制御フローを再現する。
 class RedirectSignal extends Error {

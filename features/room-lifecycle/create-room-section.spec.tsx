@@ -8,7 +8,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 const CREATE_ROOM = vi.fn();
-vi.mock("@/app/rooms/actions", () => ({
+vi.mock("./actions", () => ({
   createRoom: (...args: unknown[]) => CREATE_ROOM(...args),
 }));
 
@@ -16,14 +16,14 @@ const notifyMocks = vi.hoisted(() => ({
   roomCreated: vi.fn(),
   error: vi.fn(),
 }));
-vi.mock("@/app/_lib/notify", () => ({
-  notify: {
-    roomCreated: notifyMocks.roomCreated,
-    error: notifyMocks.error,
-  },
+vi.mock("@/lib/notify", () => ({
+  notify: { error: notifyMocks.error },
+}));
+vi.mock("./lifecycle-notify", () => ({
+  lifecycleNotify: { roomCreated: notifyMocks.roomCreated },
 }));
 
-import { CreateRoomSection } from "@/components/home/organisms/create-room-section";
+import { CreateRoomSection } from "./create-room-section";
 
 describe("CreateRoomSection", () => {
   beforeEach(() => {
