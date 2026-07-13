@@ -16,6 +16,7 @@
       "!public",
       "!docs/site",
       "!.open-next",
+      "!.claude/worktrees",
       "!.wrangler",
       "!**/.wrangler",
       "!workers/worker-configuration.d.ts"
