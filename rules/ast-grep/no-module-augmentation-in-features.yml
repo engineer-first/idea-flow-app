@@ -1,0 +1,38 @@
+# 境界ルール: features で declare module によるモジュール拡張を書かない。
+#
+# `declare module "../containers/x" { ... }` は、import 文でも import() でも
+# ないコンパイル時のモジュール拡張で、下帯から上帯パスへ型レベルの結合を
+# 作れる（攻撃的検証で実証済み。has:{field:source} の帯規則は届かない）。
+# feature 内でのモジュール拡張の正当な用途は無いため、文字列名の
+# declare module を禁止する（外部パッケージの型拡張が必要なら、その旨を
+# レビューできる root の *.d.ts で行う）。
+# 検知の regression テストは scripts/band-import-rules.spec.ts。
+id: no-module-augmentation-in-features
+language: typescript
+severity: error
+files:
+  - features/**
+message: features で declare module（モジュール拡張）を書かない（import 境界検査の死角になる）
+note: |
+  型の共有は各層の通常の export で行う。外部パッケージの型拡張は
+  リポジトリ root の *.d.ts に置く。
+rule:
+  kind: module
+  has:
+    field: name
+    kind: string
+---
+id: no-module-augmentation-in-features-tsx
+language: tsx
+severity: error
+files:
+  - features/**
+message: features で declare module（モジュール拡張）を書かない（import 境界検査の死角になる）
+note: |
+  型の共有は各層の通常の export で行う。外部パッケージの型拡張は
+  リポジトリ root の *.d.ts に置く。
+rule:
+  kind: module
+  has:
+    field: name
+    kind: string

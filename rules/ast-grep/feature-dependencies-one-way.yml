@@ -8,6 +8,14 @@
 # room-lifecycle / auth）は他の feature を import しない「葉」。
 # 新しいエッジが必要になったら、循環にならないことを確認した上で
 # このルールを更新する（= 依存の追加をレビュー可能な明示的変更にする）。
+#
+# 登録済み 8 feature は下記の per-feature / leaf 規則で守られる。未登録の
+# 新 feature を fail-closed にするため、末尾に既定拒否ルール
+# （unregistered-feature-must-not-import-features）を置く: 未登録 feature が
+# feature import（裸の自 feature alias @/features/<self> を含む）を行うと
+# 落ちる。攻撃的検証で、未登録 feature は自 feature の公開境界 index.ts を
+# alias 経由で import して上帯へロンダリングできることが実証されたため。
+# 新 feature を足したら、その ignores 行を追加してから per-feature 規則を書く。
 id: leaf-features-must-not-import-features
 language: typescript
 severity: error
@@ -243,3 +251,61 @@ rule:
   any:
     - kind: jsx_element
     - kind: jsx_self_closing_element
+---
+# 既定拒否（fail-closed）: 上の per-feature / leaf 規則で明示的に扱われて
+# いない feature（= 未登録の新 feature）が feature を import すると落ちる。
+# ignores に登録済み 8 feature を列挙し、それ以外を既定拒否にする。
+# regex は連続スラッシュ（@//features・@/features//）も捕まえるよう /+ にする。
+# これで「新 feature の登録漏れ」が穴ではなく CI エラーとして顕在化し、
+# 裸の自 feature alias（@/features/<self> → 公開境界 → 上帯）も塞がる。
+id: unregistered-feature-must-not-import-features
+language: typescript
+severity: error
+files:
+  - features/**
+ignores:
+  - "features/room/**"
+  - "features/notes/**"
+  - "features/dot-vote/**"
+  - "features/vote-totaling/**"
+  - "features/room-members/**"
+  - "features/invite/**"
+  - "features/room-lifecycle/**"
+  - "features/auth/**"
+message: 未登録の feature は feature を import できない。先に feature-dependencies-one-way.yml に登録する
+note: |
+  新 feature の依存はまずこのファイルに明示する（葉なら leaf 規則の files に
+  追加、エッジを持つなら per-feature 規則を追加）。自 feature 内は相対 import。
+rule:
+  any:
+    - kind: import_statement
+    - kind: export_statement
+  has:
+    field: source
+    regex: "[.@]/+features/+"
+---
+id: unregistered-feature-must-not-import-features-tsx
+language: tsx
+severity: error
+files:
+  - features/**
+ignores:
+  - "features/room/**"
+  - "features/notes/**"
+  - "features/dot-vote/**"
+  - "features/vote-totaling/**"
+  - "features/room-members/**"
+  - "features/invite/**"
+  - "features/room-lifecycle/**"
+  - "features/auth/**"
+message: 未登録の feature は feature を import できない。先に feature-dependencies-one-way.yml に登録する
+note: |
+  新 feature の依存はまずこのファイルに明示する（葉なら leaf 規則の files に
+  追加、エッジを持つなら per-feature 規則を追加）。自 feature 内は相対 import。
+rule:
+  any:
+    - kind: import_statement
+    - kind: export_statement
+  has:
+    field: source
+    regex: "[.@]/+features/+"

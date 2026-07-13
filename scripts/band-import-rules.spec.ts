@@ -71,9 +71,16 @@ function expectEachDetected(
 ) {
   const fileFindings = findingsFor(findings, path);
   for (const source of sources) {
-    const hit = fileFindings.find((finding) => finding.text.includes(source));
-    expect(hit, `${path} の "${source}" が検知されていない`).toBeDefined();
-    expect(hit?.ruleId).toMatch(ruleIdPattern);
+    // 1 つの import が複数規則に一致することはある（防御の二重化）。
+    // 「期待する種別の finding が少なくとも 1 つある」ことを確認する。
+    const hit = fileFindings.find(
+      (finding) =>
+        finding.text.includes(source) && ruleIdPattern.test(finding.ruleId),
+    );
+    expect(
+      hit,
+      `${path} の "${source}" が ${ruleIdPattern} で検知されていない`,
+    ).toBeDefined();
   }
 }
 
@@ -294,6 +301,139 @@ describe("動的 import() の禁止（features / app）", () => {
       "app/zz-poc/lazy.ts",
       ["import(path)"],
       DYNAMIC_RULE,
+    );
+  });
+});
+
+// 帯規則を独立レビューに攻撃的検証させて実証された、import 境界検査の
+// 追加の死角。いずれも「静的 import 文以外の経路で上帯 / 公開境界へ到達
+// できる」もので、fail-closed に塞ぐ。ここが検知の regression になる。
+const COMMONJS_RULE = /^no-commonjs/;
+const DOUBLE_SLASH_RULE = /^no-double-slash/;
+const JS_ZONE_RULE = /^no-js-family/;
+const MODULE_AUG_RULE = /^no-module-augmentation/;
+const UNREGISTERED_RULE = /^unregistered-feature/;
+
+describe("攻撃的検証で実証された死角の封鎖", () => {
+  it("CommonJS require() は帯規則の死角なので features / app で禁止する", () => {
+    const dir = createProject({
+      "features/zz-poc/molecules/require-evil.ts": [
+        `const secret = require("../containers/board");`,
+        `export const leaked = secret.SECRET;`,
+      ].join("\n"),
+      "app/zz-poc/require-evil.ts": `const x = require("node:fs");\n`,
+    });
+
+    const findings = scan(dir);
+    expectEachDetected(
+      findings,
+      "features/zz-poc/molecules/require-evil.ts",
+      [`require("../containers/board")`],
+      COMMONJS_RULE,
+    );
+    expectEachDetected(
+      findings,
+      "app/zz-poc/require-evil.ts",
+      [`require("node:fs")`],
+      COMMONJS_RULE,
+    );
+  });
+
+  it("import 〜 = require(...)（import-equals）も禁止する", () => {
+    const dir = createProject({
+      "features/zz-poc/molecules/import-equals-evil.ts": [
+        `import Mod = require("../containers/board");`,
+        `export const x = Mod.SECRET;`,
+      ].join("\n"),
+    });
+
+    expectEachDetected(
+      scan(dir),
+      "features/zz-poc/molecules/import-equals-evil.ts",
+      [`import Mod = require("../containers/board")`],
+      COMMONJS_RULE,
+    );
+  });
+
+  it("import 指定子内の連続スラッシュ（非正規化 alias）を検知する", () => {
+    const dir = createProject({
+      "features/zz-poc/molecules/double-slash-evil.ts": [
+        // no-deep-import の regex をすり抜けた 2 形（feature 名前後の // ）
+        `import { a } from "@//features/zz-poc/containers/board";`,
+        `import { b } from "@/features/zz-poc//containers/board";`,
+      ].join("\n"),
+    });
+
+    expectEachDetected(
+      scan(dir),
+      "features/zz-poc/molecules/double-slash-evil.ts",
+      [
+        `@//features/zz-poc/containers/board`,
+        `@/features/zz-poc//containers/board`,
+      ],
+      DOUBLE_SLASH_RULE,
+    );
+  });
+
+  it("JS ファミリ拡張子（.js/.jsx/.mjs/.cjs）は ts/tsx 規則の死角なので features / app で禁止する", () => {
+    const dir = createProject({
+      "features/zz-poc/molecules/evil.js": `const s = require("../containers/board");\n`,
+      "features/zz-poc/molecules/evil.mjs": `import { s } from "../containers/board";\n`,
+      "app/zz-poc/evil.jsx": `export const x = 1;\n`,
+    });
+
+    const findings = scan(dir);
+    for (const path of [
+      "features/zz-poc/molecules/evil.js",
+      "features/zz-poc/molecules/evil.mjs",
+      "app/zz-poc/evil.jsx",
+    ]) {
+      const hit = findingsFor(findings, path).find((f) =>
+        JS_ZONE_RULE.test(f.ruleId),
+      );
+      expect(
+        hit,
+        `${path} が TS-only ゾーン規則で検知されていない`,
+      ).toBeDefined();
+    }
+  });
+
+  it("declare module によるモジュール拡張（上帯パスへのコンパイル時結合）を検知する", () => {
+    const dir = createProject({
+      "features/zz-poc/molecules/augment-evil.ts": [
+        `declare module "../containers/board" {`,
+        `  export const INJECTED: number;`,
+        `}`,
+        `export const marker = 1;`,
+      ].join("\n"),
+    });
+
+    const findings = findingsFor(
+      scan(dir),
+      "features/zz-poc/molecules/augment-evil.ts",
+    );
+    expect(
+      findings.find((f) => MODULE_AUG_RULE.test(f.ruleId)),
+      "declare module が検知されていない",
+    ).toBeDefined();
+  });
+
+  it("規約に未登録の feature からの feature import を既定拒否する（裸の自 feature alias を含む）", () => {
+    // zz-poc は feature-dependencies-one-way.yml に未登録。登録済み 8 feature は
+    // 各自の規則で守られているが、新 feature は既定拒否で「登録漏れ = CI エラー」に
+    // 顕在化させる（公開境界 index.ts 経由で上帯へ届くロンダリングを塞ぐ）。
+    const dir = createProject({
+      "features/zz-poc/molecules/self-alias-evil.ts": [
+        `import { pub } from "@/features/zz-poc";`,
+        `export const stolen = pub;`,
+      ].join("\n"),
+    });
+
+    expectEachDetected(
+      scan(dir),
+      "features/zz-poc/molecules/self-alias-evil.ts",
+      [`@/features/zz-poc`],
+      UNREGISTERED_RULE,
     );
   });
 });
