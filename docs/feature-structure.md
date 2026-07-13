@@ -5,6 +5,11 @@ PR #128 で採用した「feature 縦割り + feature 内 ui / logic 2 層」の
 レビュー観点への回答を兼ねる。規約そのもの（何をどこに置くか）は
 [AGENTS.md](../AGENTS.md) が真実で、このドキュメントは「なぜそうしたか」だけを持つ。
 
+「Atomic を採らない」には独立した 2 つの問いが含まれる。本ドキュメントが主に
+扱うのは問い 1（リポジトリ**全体**を粒度で切るか機能で切るか）。問い 2
+（feature の**中**を Atomic 階層にするか ui / logic にするか）は
+[feature-internal-structure.md](feature-internal-structure.md) に切り出した。
+
 ## TL;DR
 
 | 欲しかったもの | 採用した装置 | Atomic Design で得られるか |

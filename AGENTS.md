@@ -72,8 +72,9 @@ app  →  features  →  components/ui・lib  →  contracts
   フラットのまま。spec / stories / fixture は実装と同居させる。
 - 役割の細分は階層ではなくファイル名のサフィックスで表現する
   （`-view`, `-card`, `-dialog`, `-section`, `use-`）。粒度分類ディレクトリ
-  （`atoms/` など）は使わない。背景は
-  [`docs/feature-structure.md`](docs/feature-structure.md)。
+  （`atoms/` など）は使わない。背景: feature 内 2 層は
+  [`docs/feature-internal-structure.md`](docs/feature-internal-structure.md)、
+  feature 縦割りは [`docs/feature-structure.md`](docs/feature-structure.md)。
 - コンテナと view はステムを揃える（例: `room-board.tsx` と
   `room-board-view.tsx`）。
 
