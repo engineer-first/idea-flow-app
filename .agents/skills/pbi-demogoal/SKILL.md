@@ -1,31 +1,31 @@
 ---
 name: pbi-demogoal
-description: Create idea-flow-app PBI and consolidated DemoGoal GitHub Issues only. Use when adding one product backlog item and one PBI-linked demo goal issue to engineer-first/idea-flow-app, placing them in the GitHub Project with the correct Issue Type, milestone, and Status board column. Do not use for sprint task or bug issue creation.
+description: idea-flow-app の PBI issue と、それに紐づく DemoGoal issue のみを作成する。プロダクトバックログアイテム（PBI）と、それに対応するデモゴール issue を engineer-first/idea-flow-app に追加し、正しい Issue Type・milestone・Status で GitHub Project に配置したいときに使う。スプリントタスクやバグ issue の作成には使わない。
 ---
 
 # PBI DemoGoal
 
-Use this skill to create one PBI issue and one consolidated DemoGoal issue for `engineer-first/idea-flow-app`.
+`engineer-first/idea-flow-app` に PBI issue 1件と、それに紐づく DemoGoal issue 1件を作成するスキル。
 
-Do not use this skill for sprint task or bug issues. Sprint tasks and bugs are usually created through the GitHub GUI from their issue templates; the Project auto-add workflow imports `Task` and `Bug` issue types and the default workflow places them in `Todo`.
+スプリントタスクやバグ issue にはこのスキルを使わない。スプリントタスク・バグは通常 GitHub の GUI から issue テンプレートで作成され、Project の自動追加ワークフローが `Task` / `Bug` の Issue Type を取り込み、デフォルトのワークフローで `Todo` に配置する。
 
-## Workflow
+## 手順
 
-1. Inspect the current repository and existing issues before choosing IDs.
-   - Use `gh issue list --state all --json number,title,issueType,projectItems`.
-   - Keep the existing naming pattern: `PBI-XX` and `DEMO-XX`.
-2. Turn the user's request into one JSON spec.
-3. Run `create_planning_issues.py --dry-run <spec.json>` and review the rendered issue titles and bodies.
-4. Run `create_planning_issues.py <spec.json>` to create the issues.
-5. Verify both created issues have:
-   - Issue Type: `PBI` or `DemoGoal`
+1. ID を決める前に、リポジトリの現状と既存 issue を確認する。
+   - `gh issue list --state all --json number,title,issueType,projectItems` を使う。
+   - 既存の命名パターン（`PBI-XX` / `DEMO-XX`）を踏襲する。
+2. ユーザーの依頼を1つの JSON spec に変換する。
+3. `create_planning_issues.py --dry-run <spec.json>` を実行し、生成される issue タイトル・本文を確認する。
+4. `create_planning_issues.py <spec.json>` を実行して issue を作成する。
+5. 作成した2件の issue が以下を満たすことを確認する:
+   - Issue Type: `PBI` または `DemoGoal`
    - Project: `idea-flow-app`
-   - Status: `PBI` for PBI, `Demo Goal` for demo goals
-6. Report the created issue URLs and the Project field verification.
+   - Status: PBI は `PBI`、デモゴールは `Demo Goal`
+6. 作成した issue の URL と、Project フィールドの確認結果を報告する。
 
-## Spec Format
+## Spec のフォーマット
 
-Create a temporary JSON file outside the skill folder, for example under `/tmp`.
+一時的な JSON ファイルをスキルフォルダの外（例: `/tmp` 配下）に作成する。
 
 ```json
 {
@@ -56,24 +56,24 @@ Create a temporary JSON file outside the skill folder, for example under `/tmp`.
 }
 ```
 
-Notes:
+補足:
 
-- Omit `milestone` only when the user explicitly wants no sprint milestone.
-- Put the human-readable title without the ID in `pbi.title`; the script prefixes `PBI-XX`.
-- The demo issue title is derived from the PBI: `DEMO-<PBI番号> <PBIタイトル>`.
-- Put each reviewable outcome inside `demo_goals`; the script renders all of them into one DemoGoal issue.
-- Use `memo` for implementation-task candidates, unresolved notes, or whiteboard context.
-- Omit `demo_overview` to fall back to the default sentence (`<PBIタイトル> として、以下の状態をスプリントレビューでデモする。`); set it only when the demo needs different framing.
-- Use `not_doing` for items explicitly out of scope; it renders as a `## やらないこと` section after all demo goals.
-- Use `risks` inside a `demo_goals` entry for goal-specific caveats; it renders as a `リスク:` list under that goal only.
+- `milestone` を省略するのは、ユーザーが明示的にスプリント milestone なしを望む場合のみ。
+- `pbi.title` には ID を含まない人間可読なタイトルだけを入れる。ID（`PBI-XX`）はスクリプト側が接頭辞として付与する。
+- デモ issue のタイトルは PBI から導出される: `DEMO-<PBI番号> <PBIタイトル>`。
+- レビュー可能な成果はそれぞれ `demo_goals` に入れる。スクリプトがそれらをすべて1つの DemoGoal issue にまとめてレンダリングする。
+- `memo` は実装タスク候補・未解決事項・ホワイトボード上のメモなどに使う。
+- `demo_overview` を省略すると既定文（`<PBIタイトル> として、以下の状態をスプリントレビューでデモする。`）にフォールバックする。デモの見せ方を変えたいときだけ指定する。
+- `not_doing` は明示的にスコープ外とする項目に使う。全デモゴールの後に `## やらないこと` セクションとしてレンダリングされる。
+- `demo_goals` 内の `risks` はそのゴール固有の注意点に使う。該当ゴールの下にだけ `リスク:` リストとしてレンダリングされる。
 
-## Script
+## スクリプト
 
-This skill and the Codex skill (`.codex/skills/pbi-demogoal/`) share the same script so a fix only needs to happen once. Run from the repository root:
+このスキルと Codex スキル（`.codex/skills/pbi-demogoal/`）は同じスクリプトを共有しているため、修正は1箇所で済む。リポジトリのルートから実行する:
 
 ```bash
 python3 .agents/skills/pbi-demogoal/scripts/create_planning_issues.py --dry-run /tmp/idea-flow-spec.json
 python3 .agents/skills/pbi-demogoal/scripts/create_planning_issues.py /tmp/idea-flow-spec.json
 ```
 
-The script uses Issue Type instead of labels. Ensure `gh auth status` has `repo` and `project` scopes.
+このスクリプトはラベルではなく Issue Type を使う。`gh auth status` が `repo` と `project` の scope を持っていることを確認しておく。
