@@ -8,7 +8,7 @@ import { useTransition } from "react";
 import { notify } from "@/lib/notify";
 import { createRoom } from "../logic/actions";
 import { lifecycleNotify } from "../logic/lifecycle-notify";
-import { CreateRoomSectionView } from "./create-room-section-view";
+import { CreateRoomSectionView } from "../templates/create-room-section-view";
 
 export function CreateRoomSection() {
   const router = useRouter();

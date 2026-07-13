@@ -8,4 +8,4 @@ export {
 } from "./logic/actions";
 export { isEmailVerified } from "./logic/google-claims";
 export { getLoginPath, sanitizeNextPath } from "./logic/redirects";
-export { LoginCard } from "./ui/login-card";
+export { LoginCard } from "./molecules/login-card";

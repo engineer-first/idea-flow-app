@@ -130,7 +130,8 @@ rule:
     field: source
     regex: "[.@]/features/(notes|room|vote-totaling|invite|room-lifecycle|auth)[\"'/]"
 ---
-# feature 内の構成は「ルート（index.ts 等）+ ui/ / logic/ の 1 段」まで。
+# feature 内の構成は「ルート（index.ts）+ 5 箱（containers/ templates/
+# organisms/ molecules/ logic/）の 1 段」まで。
 # 相対 import で親をさかのぼって features/ 直下を越えると、alias 規約
 # （@/features/<name>）をすり抜けて他 feature / 他レイヤーの内部へ直接依存
 # できてしまうため、「feature の外に届く深さの ../」を形で塞ぐ。
@@ -148,7 +149,6 @@ severity: error
 files:
   - features/**
 ignores:
-  - "**/ui/**"
   - "**/containers/**"
   - "**/templates/**"
   - "**/organisms/**"
@@ -172,7 +172,6 @@ severity: error
 files:
   - features/**
 ignores:
-  - "**/ui/**"
   - "**/containers/**"
   - "**/templates/**"
   - "**/organisms/**"
@@ -197,7 +196,7 @@ files:
   - features/*/*/**
 message: feature のサブディレクトリから "../../" で feature の外に出ない（"../" は feature 内のみ）
 note: |
-  同一 feature 内の別層は "../ui" / "../logic"、他 feature は
+  同一 feature 内の下の箱は "../<箱>/xxx"（帯規則の許可内）、他 feature は
   @/features/<name>（公開境界）、共有インフラは @/lib を import する。
 rule:
   any:
@@ -214,7 +213,7 @@ files:
   - features/*/*/**
 message: feature のサブディレクトリから "../../" で feature の外に出ない（"../" は feature 内のみ）
 note: |
-  同一 feature 内の別層は "../ui" / "../logic"、他 feature は
+  同一 feature 内の下の箱は "../<箱>/xxx"（帯規則の許可内）、他 feature は
   @/features/<name>（公開境界）、共有インフラは @/lib を import する。
 rule:
   any:
@@ -224,7 +223,8 @@ rule:
     field: source
     regex: "\\.\\./\\.\\./"
 ---
-# 2 層構成の判定器「JSX を返すなら ui/、返さないなら logic/」を機械検査にする。
+# 5 箱構成の判定器「JSX を返すなら箱（既定は molecules/）、返さないなら logic/」
+# を機械検査にする。
 # logic/ に UI が混ざると ui → logic の一方通行が崩れ、hook・reducer のテストが
 # DOM 環境を要求し始める。spec は renderHook のラッパー等で JSX を使うため除外。
 id: feature-logic-layer-must-not-render-jsx
@@ -234,10 +234,11 @@ files:
   - features/*/logic/**
 ignores:
   - "**/*.spec.tsx"
-message: logic/ に JSX（UI）を置かない。コンポーネントは ui/ へ
+message: logic/ に JSX（UI）を置かない。コンポーネントは箱（既定は molecules/）へ
 note: |
   logic/ は hook・reducer・Server Action・純関数・定数の置き場。
-  JSX を返すものは ui/ に置く（spec / stories / fixture は実装と同居）。
+  JSX を返すものは箱（既定は最下帯の molecules/）に置く（spec / stories /
+  fixture は実装と同居）。
 rule:
   any:
     - kind: jsx_element

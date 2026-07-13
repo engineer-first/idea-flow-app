@@ -19,8 +19,8 @@ import type { Member } from "../logic/room-reducer";
 import { useLeaveRoom } from "../logic/use-leave-room";
 import { useRoomConnection } from "../logic/use-room-connection";
 import { useRoomState } from "../logic/use-room-state";
-import { ForceNextPhaseDialog } from "./force-next-phase-dialog";
-import { RoomBoardView } from "./room-board-view";
+import { ForceNextPhaseDialog } from "../molecules/force-next-phase-dialog";
+import { RoomBoardView } from "../templates/room-board-view";
 
 export type RoomBoardProps = {
   roomId: string;

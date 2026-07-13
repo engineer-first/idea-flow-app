@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { Note } from "../logic/notes-reducer";
-import { NoteCard } from "./note-card";
+import { NoteCard } from "../molecules/note-card";
 
 export type PrivateNotesToolbarProps = {
   notes: Note[];

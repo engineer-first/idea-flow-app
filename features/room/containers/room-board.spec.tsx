@@ -38,7 +38,7 @@ vi.mock("../logic/room-notify", () => ({
 }));
 
 import type { ProtocolNote } from "@/contracts/room-protocol";
-import { FORCE_NEXT_PHASE_COPY } from "./force-next-phase-dialog";
+import { FORCE_NEXT_PHASE_COPY } from "../molecules/force-next-phase-dialog";
 import { RoomBoard } from "./room-board";
 
 const ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";

@@ -1,9 +1,9 @@
 // feature 内ディレクトリ構成の機械検査（CI: check:feature-layout）。
 // ast-grep は import 文の検査器でありファイル配置の検査器ではないため、
 // 配置の不変条件はこのスクリプトが持つ:
-// 1. feature 単位で「フラット or 5 箱」の二択。旧層 ui/ と新箱の共存
-//    （= 移行の 2 流派併存）を fail させる。
-// 2. サブディレクトリは規約の語彙のみ（fail-closed）。
+// 1. feature 単位で「フラット or 5 箱」の二択。サブディレクトリは 5 箱の
+//    語彙のみ（fail-closed。旧層 ui/ も C′ 移行完了により規約外）。
+// 2. 箱を使う feature の root に置けるのは index.ts（公開境界）だけ。
 // 3. 箱の中に入れ子ディレクトリを作らない（深さ 2 まで）。帯規則
 //    （rules/ast-grep/feature-band-imports.yml）の regex はこの前提に依存する。
 // 検査は checkFeatureLayout（純関数）に置き、走査と報告だけを main が持つ。
@@ -21,7 +21,6 @@ export type FeatureLayout = {
 export type LayoutViolation = {
   feature: string;
   kind:
-    | "mixed-old-and-band"
     | "unknown-subdirectory"
     | "root-file-beside-layers"
     | "nested-subdirectory";
@@ -29,8 +28,6 @@ export type LayoutViolation = {
   message: string;
 };
 
-// 旧 2 層。C′ 移行が完了して ui/ が消えたら "ui" を落とす（過渡期の許可）。
-const OLD_LAYERS: ReadonlySet<string> = new Set(["ui", "logic"]);
 // C′ の 5 箱（依存権の帯）。
 const BAND_BOXES: ReadonlySet<string> = new Set([
   "containers",
@@ -60,7 +57,7 @@ export function checkFeatureLayout(feature: FeatureLayout): LayoutViolation[] {
   }
 
   for (const dir of subdirs) {
-    if (!OLD_LAYERS.has(dir) && !BAND_BOXES.has(dir)) {
+    if (!BAND_BOXES.has(dir)) {
       violations.push({
         feature: feature.name,
         kind: "unknown-subdirectory",
@@ -68,19 +65,6 @@ export function checkFeatureLayout(feature: FeatureLayout): LayoutViolation[] {
         message: `規約外のサブディレクトリ "${dir}/"。使える箱は containers / templates / organisms / molecules / logic だけ`,
       });
     }
-  }
-
-  const hasOldUi = subdirs.includes("ui");
-  const hasBandBox = subdirs.some(
-    (dir) => dir !== "logic" && BAND_BOXES.has(dir),
-  );
-  if (hasOldUi && hasBandBox) {
-    violations.push({
-      feature: feature.name,
-      kind: "mixed-old-and-band",
-      message:
-        "旧層 ui/ と新箱が共存している。C′ 移行は全 feature 一括で行う（2 流派の併存を作らない）",
-    });
   }
 
   if (subdirs.length > 0) {

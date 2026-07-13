@@ -15,7 +15,7 @@ import type { Member } from "../logic/room-reducer";
 import { useLeaveRoom } from "../logic/use-leave-room";
 import { useRoomConnection } from "../logic/use-room-connection";
 import { useRoomState } from "../logic/use-room-state";
-import { RoomLobbyView } from "./room-lobby-view";
+import { RoomLobbyView } from "../templates/room-lobby-view";
 
 export type RoomLobbyProps = {
   roomId: string;

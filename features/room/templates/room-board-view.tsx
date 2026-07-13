@@ -51,8 +51,8 @@ import {
   type RoomScreenConnectionStatus,
 } from "../logic/connection-status";
 import type { Member } from "../logic/room-reducer";
-import { LeaveConfirmDialog } from "./leave-confirm-dialog";
-import { RoomTimer } from "./room-timer";
+import { LeaveConfirmDialog } from "../molecules/leave-confirm-dialog";
+import { RoomTimer } from "../organisms/room-timer";
 
 const PHASE_LABELS: Record<Phase, string> = {
   lobby: "開始待ち",

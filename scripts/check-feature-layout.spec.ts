@@ -5,23 +5,13 @@ import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { checkFeatureLayout } from "./check-feature-layout.mts";
 
-// feature 内ディレクトリ構成の機械検査。C′ 移行の前提となる 2 つの不変条件を
-// 固定する:
-// 1. feature 単位で「フラット or 5 箱」の二択（混在禁止）。旧層 ui/ と
-//    新箱が同一 feature に共存する過渡状態は、ここで fail させて作らせない。
-// 2. 箱は ui/ の置き換えであって入れ子ではない（深さ 2 まで）。帯規則
+// feature 内ディレクトリ構成の機械検査。C′ 移行後の 2 つの不変条件を固定する:
+// 1. feature 単位で「フラット or 5 箱」の二択（規約外ディレクトリは fail-closed。
+//    旧層 ui/ も移行完了により規約外）。
+// 2. 箱は入れ子にしない（feature 内は深さ 2 まで）。帯規則
 //    （feature-band-imports.yml）の files glob と regex はこの前提に依存する。
 
 describe("checkFeatureLayout（純関数）", () => {
-  it("旧 2 層構成（ui/ + logic/ + root index.ts）は合法", () => {
-    expect(
-      checkFeatureLayout({
-        name: "room",
-        paths: ["index.ts", "ui/room-board.tsx", "logic/room-reducer.ts"],
-      }),
-    ).toEqual([]);
-  });
-
   it("5 箱構成（箱の一部だけ使うのも合法）", () => {
     expect(
       checkFeatureLayout({
@@ -52,7 +42,7 @@ describe("checkFeatureLayout（純関数）", () => {
     ).toEqual([]);
   });
 
-  it("logic/ だけの feature は合法（旧・新どちらの語彙でも valid）", () => {
+  it("logic/ だけの feature は合法", () => {
     expect(
       checkFeatureLayout({
         name: "invite",
@@ -61,18 +51,15 @@ describe("checkFeatureLayout（純関数）", () => {
     ).toEqual([]);
   });
 
-  it("旧層 ui/ と新箱の共存は fail（全 feature 一斉移行を強制する）", () => {
+  it("旧層 ui/ は規約外として fail（C′ 移行完了後の語彙は 5 箱のみ）", () => {
     const violations = checkFeatureLayout({
       name: "room",
-      paths: [
-        "index.ts",
-        "ui/room-board.tsx",
-        "molecules/leave-confirm-dialog.tsx",
-      ],
+      paths: ["index.ts", "ui/room-board.tsx"],
     });
     expect(violations).toHaveLength(1);
-    expect(violations[0]?.kind).toBe("mixed-old-and-band");
+    expect(violations[0]?.kind).toBe("unknown-subdirectory");
     expect(violations[0]?.feature).toBe("room");
+    expect(violations[0]?.path).toBe("ui/room-board.tsx");
   });
 
   it("規約外のサブディレクトリは fail（fail-closed）", () => {
@@ -126,8 +113,8 @@ describe("checkFeatureLayout（純関数）", () => {
       ],
     });
     expect(violations.map((v) => v.kind).sort()).toEqual([
-      "mixed-old-and-band",
       "nested-subdirectory",
+      "unknown-subdirectory",
       "unknown-subdirectory",
     ]);
   });
@@ -190,6 +177,6 @@ describe("check-feature-layout CLI", () => {
 
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("room");
-    expect(result.stderr).toContain("mixed-old-and-band");
+    expect(result.stderr).toContain("unknown-subdirectory");
   });
 });

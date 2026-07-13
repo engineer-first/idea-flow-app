@@ -15,7 +15,7 @@ import {
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { ProtocolMember } from "@/contracts/room-protocol";
 import { cn } from "@/lib/utils";
-import { MemberAvatar } from "./member-avatar";
+import { MemberAvatar } from "../molecules/member-avatar";
 
 // 横 4 × 縦 3。これを超えると +N になる。
 export const ROOM_MEMBERS_COLS = 4;

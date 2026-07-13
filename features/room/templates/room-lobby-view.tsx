@@ -22,7 +22,7 @@ import {
   type RoomScreenConnectionStatus,
 } from "../logic/connection-status";
 import type { Member } from "../logic/room-reducer";
-import { LeaveConfirmDialog } from "./leave-confirm-dialog";
+import { LeaveConfirmDialog } from "../molecules/leave-confirm-dialog";
 
 export type RoomLobbyViewProps = {
   members: Member[];
