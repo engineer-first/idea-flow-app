@@ -36,6 +36,11 @@ status: **決定・移行済み**（決定 2026-07-13、移行完了 2026-07-14�
 | ------------------------------------------ | ----------------------------------------------------------- |
 | 帯規則（上向き import 禁止）               | `rules/ast-grep/feature-band-imports.yml`（ホワイトリスト型）|
 | 動的 import() の死角                       | `rules/ast-grep/no-dynamic-import-in-features-and-app.yml`  |
+| CommonJS（require / import-equals）の死角  | `rules/ast-grep/no-commonjs-in-features-and-app.yml`        |
+| 非正規化 alias（連続スラッシュ）           | `rules/ast-grep/no-double-slash-import-specifier.yml`       |
+| JS ファミリ（検査対象外ファイル）の混入    | `rules/ast-grep/no-js-family-in-ts-only-zones.yml`          |
+| declare module（モジュール拡張）の死角     | `rules/ast-grep/no-module-augmentation-in-features.yml`     |
+| 未登録 feature の feature import（既定拒否）| `unregistered-feature-must-not-import-features`（同 one-way）|
 | 配置（フラット or 5 箱・入れ子禁止など）   | `npm run check:feature-layout`（CI）                         |
 | logic/ への JSX 混入                       | `feature-logic-layer-must-not-render-jsx`                   |
 | 検知能力そのものの regression              | `scripts/band-import-rules.spec.ts`                          |
@@ -43,7 +48,11 @@ status: **決定・移行済み**（決定 2026-07-13、移行完了 2026-07-14�
 帯規則は「許可プレフィックス以外の相対 import を全禁止」のホワイトリスト型。
 ブラックリスト regex では `../index` ロンダリング・`.././` 等の非正規化
 パス・barrel 経由の `"../organisms"`・動的 import() が素通りすることが
-攻撃的検証で実証されたため（詳細は options doc）。
+攻撃的検証で実証されたため（詳細は options doc）。この初期 4 種に加え、
+25 体のレッドチームによる攻撃的検証で `require()` / `import X = require()` /
+連続スラッシュ alias（`@//features`）/ JS ファミリ拡張子 / `declare module` /
+未登録 feature の裸の自 feature alias の 6 種の死角が実証され、上表の
+専用規則で fail-closed に塞いだ。
 
 ## なぜ素朴な Atomic（本質分類）を拒否したか — 当初の分析は今も有効
 
