@@ -1,0 +1,40 @@
+# 境界ルール: features / app では動的 import() を使わない。
+#
+# import 境界の機械検査（帯規則・feature 間一方通行・deep import 禁止）は
+# import 文（import_statement / export_statement）しか見ていないため、
+# 動的 import() は全ルールの共通の死角になる（攻撃的検証で実証済み）。
+# 変数を渡す形（import(path)）は静的検査そのものが不可能なので、
+# 引数の形を問わず禁止して塞ぐ（fail-closed。現状の実使用はゼロ）。
+# 遅延読み込みが必要になったら、「文字列リテラル限定で許可プレフィックスを
+# 検査する形」への緩和をレビューを通して決める。
+id: no-dynamic-import-in-features-and-app
+language: typescript
+severity: error
+files:
+  - features/**
+  - app/**
+message: features / app では動的 import() を使わない（import 境界検査の死角になる）
+note: |
+  静的 import に書き換える。コード分割が本当に必要な場合は、このルールの
+  コメントにある緩和方針に沿ってルールごと変更する。
+rule:
+  kind: call_expression
+  has:
+    field: function
+    kind: import
+---
+id: no-dynamic-import-in-features-and-app-tsx
+language: tsx
+severity: error
+files:
+  - features/**
+  - app/**
+message: features / app では動的 import() を使わない（import 境界検査の死角になる）
+note: |
+  静的 import に書き換える。コード分割が本当に必要な場合は、このルールの
+  コメントにある緩和方針に沿ってルールごと変更する。
+rule:
+  kind: call_expression
+  has:
+    field: function
+    kind: import

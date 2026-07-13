@@ -135,11 +135,13 @@ rule:
 # （@/features/<name>）をすり抜けて他 feature / 他レイヤーの内部へ直接依存
 # できてしまうため、「feature の外に届く深さの ../」を形で塞ぐ。
 # - feature 直下のファイル: "../" 1 つで feature の外に出るので全面禁止
-# - サブディレクトリ（ui/ logic/）のファイル: "../" は feature 内なので合法、
+# - サブディレクトリ（5 箱）のファイル: "../" は feature 内なので合法、
 #   "../../" で feature の外に出るので禁止
-# root ルールの適用除外は ui/ logic/ だけなので、規約外の名前のサブディレクトリ
-# （molecules/ など）を作るとそこからの "../" が全てエラーになる（fail-closed）。
-# 許可する層を増やすときはこの ignores を更新する。
+# root ルールの適用除外は 5 箱（containers/ templates/ organisms/ molecules/
+# logic/）だけなので、規約外の名前のサブディレクトリ（helpers/ など）を作ると
+# そこからの "../" が全てエラーになる（fail-closed）。箱の中の帯方向は
+# feature-band-imports.yml が検査する。許可する箱を増やすときはこの ignores を
+# 更新する。
 id: features-root-must-not-escape-with-relative-imports
 language: typescript
 severity: error
@@ -147,6 +149,10 @@ files:
   - features/**
 ignores:
   - "**/ui/**"
+  - "**/containers/**"
+  - "**/templates/**"
+  - "**/organisms/**"
+  - "**/molecules/**"
   - "**/logic/**"
 message: feature 直下で "../" import を使わない（@/ alias か feature 内の "./" を使う）
 note: |
@@ -167,6 +173,10 @@ files:
   - features/**
 ignores:
   - "**/ui/**"
+  - "**/containers/**"
+  - "**/templates/**"
+  - "**/organisms/**"
+  - "**/molecules/**"
   - "**/logic/**"
 message: feature 直下で "../" import を使わない（@/ alias か feature 内の "./" を使う）
 note: |
