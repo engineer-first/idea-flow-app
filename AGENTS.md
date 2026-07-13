@@ -83,6 +83,8 @@ app  →  features  →  components/ui・lib  →  contracts
   使わない（粒度の境界は主観的で維持できないため廃止済み。JSX を返すか
   否かは中身の事実なので維持できる — logic/ への JSX 混入・規約外
   サブディレクトリ・feature 外への相対 import は ast-grep が機械検査する）。
+  この構成の背景・Atomic Design を採らない理由は
+  [`docs/feature-structure.md`](docs/feature-structure.md)。
 - コンテナと view はステムを揃える（例: `room-board.tsx` と
   `room-board-view.tsx`）。
 
