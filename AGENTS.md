@@ -31,7 +31,9 @@
   クライアントとサーバーの両方がここを import する。実装より先にここを変える。
   `*.fixture.ts` はスキーマ準拠のテストデータビルダー（テスト専用）。
 - `workers/` — Cloudflare Workers 側。`api-worker.ts`（D1 + RoomDO への唯一の入口）、
-  `room-do.ts`（1ルーム = 1 Durable Object の権威サーバー）、`migrations/`（D1）。
+  `room/`（1ルーム = 1 Durable Object の権威サーバー。`room-do.ts` が
+  エントリポイントの façade で、ドメインロジックは同ディレクトリの
+  モジュールに分割）、`migrations/`（D1）。
 - `lib/` — ドメイン非依存インフラ。React コンポーネントを置かない。
   `api-client.ts`（Next サーバーから api-worker を呼ぶ唯一のクライアント）、
   `session/`（HS256 JWT Cookie の発行・検証）、`room-client/`（ルーム

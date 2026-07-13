@@ -24,8 +24,8 @@ argument-hint: <変更内容>
      先に書き、red を確認する
    - 可視性に関わる変更なら `workers/visibility.spec.ts` のテーブルに行を追加する
 3. **サーバー実装を追従させる**
-   - `workers/room-do.ts` / `workers/api-worker.ts`。可視性の判定は
-     `visibleTo()` に一点集約し、迂回する送信経路を作らない
+   - `workers/room/`（WS プロトコル）/ `workers/api-worker.ts`（REST）。
+     可視性の判定は `visibleTo()` に一点集約し、迂回する送信経路を作らない
 4. **クライアント実装を追従させる**
    - `lib/room-client/` と `app/`。UI の状態遷移が変わるなら spec と stories も更新する
 5. **green を確認する**
