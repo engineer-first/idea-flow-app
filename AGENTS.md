@@ -20,11 +20,9 @@
   解決・データ取得の配線に徹し、資産は `features/` に置く。
   `app/mocks/` に MSW ハンドラ（開発・テスト用インフラ）。
 - `features/` — ドメイン UI の唯一の置き場。機能（ユーザーに見える能力）単位。
-  feature 内の層構成は「命名規則」の節を参照。各 feature の公開境界は
-  `index.ts`（外から使えるのはそこに並ぶものだけ）。現在: `room`（ロビー + ボードのルーム内体験の
-  オーケストレーション）、`notes`（付箋の作成・編集・移動・グルーピング）、
-  `room-members`、`dot-vote`、`vote-totaling`、`invite`、
-  `room-lifecycle`（作成・参加）、`auth`。
+  各 feature の公開境界は `index.ts`（外から使えるのはそこに並ぶものだけ）。
+  現在: `room`（ルーム内体験）、`notes`（付箋）、`room-members`、`dot-vote`、
+  `vote-totaling`、`invite`、`room-lifecycle`（作成・参加）、`auth`。
 - `components/ui/` — shadcn 汎用部品のみ。ドメイン（contracts / features /
   app）を知らないことがこの層の価値。`components/schema-diagrams/` は
   Storybook 専用ドキュメント部品。
@@ -53,10 +51,8 @@ app  →  features  →  components/ui・lib  →  contracts
 
 - `contracts/` は何も import しない。`components/ui/` はドメインを知らない。
 - feature 間は `index.ts`（公開境界）経由のみ。同一 feature 内は相対 import。
-  許可エッジは `room → notes / dot-vote / vote-totaling / room-members / invite`
-  と `notes → dot-vote / room-members` のみで、それ以外の feature は他 feature を
-  import しない（循環禁止）。エッジを増やすときは
-  `rules/ast-grep/feature-dependencies-one-way.yml` を更新する。
+  許可エッジの一覧は `rules/ast-grep/feature-dependencies-one-way.yml` が真実。
+  エッジを増やすときは、循環にならないことを確認してそこを更新する。
 - `app/` 配下を import してよいのは `app/` 配下だけ。2 ルート以上から
   使われるようになったら features へ昇格する。
 
@@ -71,19 +67,12 @@ app  →  features  →  components/ui・lib  →  contracts
 
 - Next.js の予約ファイル名は App Router の規約に従う。
 - 例: `page.tsx`、`layout.tsx`、`route.ts`、`loading.tsx`、`error.tsx`。
-- feature 内は `ui/` / `logic/` の 2 層まで。判定器は「JSX を返すか」：
-  返すもの（コンポーネント）は `ui/`、返さないもの（hook・reducer・
-  Server Action・純関数・定数）は `logic/`。spec / stories / fixture は
-  実装と同居させる。両層が揃った feature だけ 2 層に分け、片側しかない
-  feature（例: 表示部品だけの `dot-vote`）はフラットのまま
-  （フラット = 単層、という構造自体を情報にする）。
+- feature 内は `ui/`（JSX を返すもの）と `logic/`（hook・reducer・
+  Server Action・純関数・定数）の 2 層まで。片側しかない feature は
+  フラットのまま。spec / stories / fixture は実装と同居させる。
 - 役割の細分は階層ではなくファイル名のサフィックスで表現する
-  （`-view`, `-card`, `-dialog`, `-section`, `use-`）。
-  `atoms/` `molecules/` `organisms/` `templates/` という粒度分類ディレクトリは
-  使わない（粒度の境界は主観的で維持できないため廃止済み。JSX を返すか
-  否かは中身の事実なので維持できる — logic/ への JSX 混入・規約外
-  サブディレクトリ・feature 外への相対 import は ast-grep が機械検査する）。
-  この構成の背景・Atomic Design を採らない理由は
+  （`-view`, `-card`, `-dialog`, `-section`, `use-`）。粒度分類ディレクトリ
+  （`atoms/` など）は使わない。背景は
   [`docs/feature-structure.md`](docs/feature-structure.md)。
 - コンテナと view はステムを揃える（例: `room-board.tsx` と
   `room-board-view.tsx`）。
