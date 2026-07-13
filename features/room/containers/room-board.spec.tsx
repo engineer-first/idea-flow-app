@@ -516,7 +516,7 @@ describe("サーバーメッセージ → 画面反映", () => {
     expect(socket.sent).toContain(
       JSON.stringify({ type: "note:unpublish", noteId: NOTE_ID }),
     );
-    expect(socket.sent).not.toContain(
+    expect(socket.sent).not.toContainEqual(
       expect.stringContaining('"type":"note:move"'),
     );
   });
@@ -608,7 +608,7 @@ describe("サーバーメッセージ → 画面反映", () => {
     fireEvent.pointerCancel(root, { pointerId: 1, clientX: 600, clientY: 20 });
     fireEvent.pointerMove(root, { pointerId: 1, clientX: 100, clientY: 120 });
 
-    expect(socket.sent).not.toContain(
+    expect(socket.sent).not.toContainEqual(
       expect.stringContaining('"type":"note:publish"'),
     );
   });
@@ -643,7 +643,7 @@ describe("サーバーメッセージ → 画面反映", () => {
     expect(socket.sent).toContain(
       JSON.stringify({ type: "note:unpublish", noteId: NOTE_ID }),
     );
-    expect(socket.sent).not.toContain(
+    expect(socket.sent).not.toContainEqual(
       expect.stringContaining('"type":"note:move"'),
     );
   });
@@ -785,7 +785,7 @@ describe("サーバーメッセージ → 画面反映", () => {
       clientY: 120,
     });
 
-    expect(socket.sent).not.toContain(
+    expect(socket.sent).not.toContainEqual(
       expect.stringContaining('"type":"note:unpublish"'),
     );
   });

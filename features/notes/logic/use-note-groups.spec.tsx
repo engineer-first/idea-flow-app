@@ -1,28 +1,8 @@
 // useNoteGroups（永続グループの状態とプロトコル化）の単体テスト。
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { buildGroup } from "@/contracts/room-protocol.fixture";
 import { useNoteGroups } from "./use-note-groups";
-
-// group:updated / snapshot が運ぶワイヤ上のグループ（PersistentGroup +
-// createdAt / updatedAt）。
-type WireGroup = {
-  id: string;
-  name: string;
-  noteIds: string[];
-  createdAt: string;
-  updatedAt: string;
-};
-
-function group(overrides: Partial<WireGroup> = {}): WireGroup {
-  return {
-    id: "group-1",
-    name: "グループ",
-    noteIds: ["note-1", "note-2"],
-    createdAt: "2026-07-03T00:00:00.000Z",
-    updatedAt: "2026-07-03T00:00:00.000Z",
-    ...overrides,
-  };
-}
 
 describe("useNoteGroups", () => {
   const send = vi.fn();
@@ -46,7 +26,7 @@ describe("useNoteGroups", () => {
         isHost: true,
         timer: { status: "idle" },
         serverNow: Date.now(),
-        groups: [group()],
+        groups: [buildGroup()],
       }),
     );
     expect(result.current.groups).toHaveLength(1);
@@ -70,13 +50,13 @@ describe("useNoteGroups", () => {
     act(() =>
       result.current.applyMessage({
         type: "group:updated",
-        group: group({ id: "g1", name: "A" }),
+        group: buildGroup({ id: "g1", name: "A" }),
       }),
     );
     act(() =>
       result.current.applyMessage({
         type: "group:updated",
-        group: group({ id: "g1", name: "B" }),
+        group: buildGroup({ id: "g1", name: "B" }),
       }),
     );
     expect(result.current.groups).toEqual([
@@ -89,7 +69,7 @@ describe("useNoteGroups", () => {
     act(() =>
       result.current.applyMessage({
         type: "group:updated",
-        group: group({ id: "g1" }),
+        group: buildGroup({ id: "g1" }),
       }),
     );
     act(() =>
@@ -126,7 +106,7 @@ describe("useNoteGroups", () => {
     act(() =>
       result.current.applyMessage({
         type: "group:updated",
-        group: group({ id: "g1", name: "旧名" }),
+        group: buildGroup({ id: "g1", name: "旧名" }),
       }),
     );
 

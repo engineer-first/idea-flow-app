@@ -3,7 +3,12 @@
 // contracts 自身の spec が同じ既定値を共有し、レイヤー間の逆流 import
 // （かつて contracts/grouping.spec.ts が components の fixture に依存していた）を防ぐ。
 // 本番コードからは import しない（テスト・カタログ専用）。
-import type { NoteColor, ProtocolMember, ProtocolNote } from "./room-protocol";
+import type {
+  NoteColor,
+  ProtocolGroup,
+  ProtocolMember,
+  ProtocolNote,
+} from "./room-protocol";
 
 export function buildNote(overrides: Partial<ProtocolNote> = {}): ProtocolNote {
   return {
@@ -34,6 +39,22 @@ export function buildNotes(count = 3): ProtocolNote[] {
       y: 60 + index * 40,
     }),
   );
+}
+
+// 永続グループ（group:updated / snapshot が運ぶワイヤ上の形。
+// PersistentGroup + createdAt / updatedAt）。既定値は buildNote と同じく
+// 読みやすい非 uuid 値にする（spec は zod 検証を通さないため）。
+export function buildGroup(
+  overrides: Partial<ProtocolGroup> = {},
+): ProtocolGroup {
+  return {
+    id: "group-1",
+    name: "グループ",
+    noteIds: ["note-1", "note-2"],
+    createdAt: "2026-07-03T00:00:00.000Z",
+    updatedAt: "2026-07-03T00:00:00.000Z",
+    ...overrides,
+  };
 }
 
 const MEMBER_COLORS: NoteColor[] = [
