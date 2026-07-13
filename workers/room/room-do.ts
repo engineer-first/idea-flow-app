@@ -54,8 +54,12 @@ import { getTimerState, timerHandlers } from "./timer";
 // DO は外部から直接到達できないため、これは常に api-worker が設定する。
 export const USER_ID_HEADER = "X-Idea-Flow-User-Id";
 
-// ルーム作成者のユーザーID。api-worker が D1 rooms.host_id を解決してセットし、
-// room_owner が未設定の旧ルームを WS 接続時にバックフィルするシードにだけ使う。
+// ルーム作成者のユーザーID。api-worker が D1 rooms.host_id を解決してセットする。
+// 認可判定（isHostUser）はこのヘッダーを参照せず、常に room_owner だけを見る。
+// それでもヘッダーが残るのはブートストラップ順序のため: room_owner テーブルを
+// 追加した DO migration は D1 に到達できないため host_id を埋められず、
+// それ以前に作られた旧ルームは WS 接続時にこの値でバックフィルしないと
+// ホスト不在（誰もフェーズを進められない）のまま固定される。
 export const HOST_ID_HEADER = "X-Idea-Flow-Host-Id";
 
 // 全 ClientMessage を網羅するハンドラ表。メッセージ型を追加すると、

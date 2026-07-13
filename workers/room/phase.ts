@@ -70,6 +70,9 @@ export function isBoardMutation(message: ClientMessage): boolean {
   }
 }
 
+// フェーズ進行の認可は room_owner（isHostUser）に一本化している。
+// D1 由来の hostId ヘッダーを認可ソースに加えない（旧ルームのバックフィル
+// シードにすぎない。room-do.ts の HOST_ID_HEADER 参照）。
 export const phaseHandlers: MessageHandlers<"start_phase" | "phase:next"> = {
   // ロビー → phase1（ボード開始）。ホストのみ。
   start_phase: (ctx) => {
