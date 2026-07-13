@@ -25,6 +25,7 @@
     "db:schema:room-do": "node --no-warnings scripts/build-room-do-schema.mts",
     "db:schema:diagrams": "npm run db:schema:d1 && npm run db:schema:room-do && tbls doc --config .tbls/d1.yml --rm-dist && tbls doc --config .tbls/room-do.yml --rm-dist",
     "db:schema:lint": "npm run db:schema:d1 && npm run db:schema:room-do && tbls lint --config .tbls/d1.yml && tbls lint --config .tbls/room-do.yml",
+    "deps:diagrams": "node --no-warnings scripts/build-dependency-diagrams.mts",
     "postinstall": "npm run gen:room-do-migrations",
     "gen:room-do-migrations": "node scripts/generate-room-do-migrations.mjs",
     "new:room-do-migration": "node scripts/new-room-do-migration.mjs",
@@ -35,8 +36,8 @@
     "preview:cf": "opennextjs-cloudflare build && wrangler dev -c wrangler.jsonc -c workers/wrangler.jsonc",
     "presmoke": "npm run gen:room-do-migrations",
     "smoke": "bash scripts/smoke-test.sh",
-    "storybook": "npm run db:schema:diagrams && storybook dev -p 6006",
-    "build-storybook": "npm run db:schema:diagrams && storybook build"
+    "storybook": "npm run db:schema:diagrams && npm run deps:diagrams && storybook dev -p 6006",
+    "build-storybook": "npm run db:schema:diagrams && npm run deps:diagrams && storybook build"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
@@ -72,6 +73,7 @@
     "@vitest/coverage-v8": "^4.1.9",
     "chromatic": "^18.0.1",
     "jsdom": "^29.1.1",
+    "mermaid": "^11.16.0",
     "msw": "^2.14.6",
     "storybook": "^10.4.6",
     "tailwindcss": "^4",

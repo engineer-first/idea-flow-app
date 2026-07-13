@@ -67,6 +67,10 @@ workers/.wrangler/
 /tmp/*.sqlite
 /schema-diagrams/
 
+# 依存図生成の成果物（scripts/build-dependency-diagrams.mts が生成）。
+# storybook / build-storybook が自動再生成するためコミットしない。
+/dependency-diagrams/
+
 # RoomDO マイグレーション集約（generate-room-do-migrations.mjs が生成）。
 # postinstall / pretest:workers / predev:api などで自動再生成されるため
 # コミットしない（レビュー対象は *.sql のみ）。

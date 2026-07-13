@@ -11,6 +11,7 @@ const config: StorybookConfig = {
   staticDirs: [
     "../public",
     { from: "../schema-diagrams", to: "/schema-diagrams" },
+    { from: "../dependency-diagrams", to: "/dependency-diagrams" },
   ],
   viteFinal: (config) => ({
     ...config,
