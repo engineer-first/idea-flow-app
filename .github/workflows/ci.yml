@@ -41,6 +41,11 @@ jobs:
       - name: Check import boundaries (ast-grep)
         run: npm run lint:boundaries
 
+      # feature 内の配置規約（フラット or 5 箱の二択・規約外ディレクトリ禁止・
+      # 深さ 2 まで）。ast-grep は import 文しか見ないため、配置はここで検査する。
+      - name: Check feature directory layout
+        run: npm run check:feature-layout
+
       - name: Type check
         run: npm run typecheck
 
