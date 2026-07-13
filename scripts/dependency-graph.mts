@@ -125,13 +125,21 @@ export function buildFeatureDiagram(feature: FeatureInput): string {
   for (const path of [...rootPaths].sort()) {
     lines.push(`  ${pathToNodeId(path)}["${nodeLabel(path)}"]`);
   }
-  // 層は依存の流れ（ui → logic）に合わせて ui を先に置く。規約外の層が
-  // 現れた場合は名前順で後ろに続ける。
+  // 層は依存権の帯順（containers → templates → organisms → molecules →
+  // logic。上の帯ほど先）に並べる。規約外の層が現れた場合は名前順で
+  // 後ろに続ける（配置自体は check:feature-layout が別途 fail させる）。
+  const BAND_ORDER = [
+    "containers",
+    "templates",
+    "organisms",
+    "molecules",
+    "logic",
+  ];
   const layerOrder = [...layerPaths.keys()].sort((a, b) => {
-    const rank = (layer: string): number =>
-      ["ui", "logic"].indexOf(layer) === -1
-        ? 2
-        : ["ui", "logic"].indexOf(layer);
+    const rank = (layer: string): number => {
+      const index = BAND_ORDER.indexOf(layer);
+      return index === -1 ? BAND_ORDER.length : index;
+    };
     return rank(a) - rank(b) || a.localeCompare(b);
   });
   for (const layer of layerOrder) {

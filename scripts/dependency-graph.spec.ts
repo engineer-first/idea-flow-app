@@ -24,12 +24,12 @@ describe("extractImportPaths", () => {
       "  BOARD_HEIGHT,",
       "  BOARD_WIDTH,",
       '} from "@/contracts/board";',
-      'export { StickyNote } from "./ui/sticky-note";',
+      'export { StickyNote } from "./molecules/sticky-note";',
     ].join("\n");
     expect(extractImportPaths(source)).toEqual([
       "../logic/notes-reducer",
       "@/contracts/board",
-      "./ui/sticky-note",
+      "./molecules/sticky-note",
     ]);
   });
 
@@ -50,55 +50,67 @@ describe("extractImportPaths", () => {
 
 describe("isImplementationFile", () => {
   it.each([
-    ["ui/note-card.tsx", true],
+    ["molecules/note-card.tsx", true],
     ["logic/notes-reducer.ts", true],
     ["index.ts", true],
-    ["ui/note-card.spec.tsx", false],
-    ["ui/note-card.stories.tsx", false],
-    ["ui/room-timer.fixture.ts", false],
+    ["molecules/note-card.spec.tsx", false],
+    ["molecules/note-card.stories.tsx", false],
+    ["organisms/room-timer.fixture.ts", false],
   ])("%s -> %s", (path, expected) => {
     expect(isImplementationFile(path)).toBe(expected);
   });
 });
 
 describe("buildFeatureDiagram", () => {
-  it("2 層 feature を subgraph 付きで決定的にレンダリングする", () => {
+  it("5 箱 feature を帯順（containers → templates → organisms → molecules → logic）の subgraph でレンダリングする", () => {
     const diagram = buildFeatureDiagram({
-      name: "notes",
+      name: "room",
       files: [
         {
           path: "index.ts",
-          source: 'export { NoteCard } from "./ui/note-card";\n',
+          source: 'export { RoomBoard } from "./containers/room-board";\n',
         },
         {
-          path: "ui/note-card.tsx",
+          path: "containers/room-board.tsx",
+          source: 'import { RoomBoardView } from "../templates/room-board-view";',
+        },
+        {
+          path: "templates/room-board-view.tsx",
           source: [
-            'import { DotVoteControls } from "@/features/dot-vote";',
-            'import { NOTE_CONTENT_MAX_LENGTH } from "@/contracts/room-protocol";',
-            'import type { Note } from "../logic/notes-reducer";',
-            'import { StickyNote } from "./sticky-note";',
+            'import { LeaveConfirmDialog } from "../molecules/leave-confirm-dialog";',
+            'import { RoomTimer } from "../organisms/room-timer";',
+            'import type { Member } from "../logic/room-reducer";',
           ].join("\n"),
         },
-        { path: "ui/sticky-note.tsx", source: "" },
-        { path: "logic/notes-reducer.ts", source: "" },
+        { path: "organisms/room-timer.tsx", source: "" },
+        { path: "molecules/leave-confirm-dialog.tsx", source: "" },
+        { path: "logic/room-reducer.ts", source: "" },
       ],
     });
     expect(diagram).toBe(
       [
         "flowchart LR",
         '  index["index.ts"]',
-        '  subgraph ui["ui/"]',
-        '    ui_note_card["note-card"]',
-        '    ui_sticky_note["sticky-note"]',
+        '  subgraph containers["containers/"]',
+        '    containers_room_board["room-board"]',
+        "  end",
+        '  subgraph templates["templates/"]',
+        '    templates_room_board_view["room-board-view"]',
+        "  end",
+        '  subgraph organisms["organisms/"]',
+        '    organisms_room_timer["room-timer"]',
+        "  end",
+        '  subgraph molecules["molecules/"]',
+        '    molecules_leave_confirm_dialog["leave-confirm-dialog"]',
         "  end",
         '  subgraph logic["logic/"]',
-        '    logic_notes_reducer["notes-reducer"]',
+        '    logic_room_reducer["room-reducer"]',
         "  end",
-        '  feat_dot_vote{{"dot-vote"}}',
-        "  index --> ui_note_card",
-        "  ui_note_card --> feat_dot_vote",
-        "  ui_note_card --> logic_notes_reducer",
-        "  ui_note_card --> ui_sticky_note",
+        "  containers_room_board --> templates_room_board_view",
+        "  index --> containers_room_board",
+        "  templates_room_board_view --> logic_room_reducer",
+        "  templates_room_board_view --> molecules_leave_confirm_dialog",
+        "  templates_room_board_view --> organisms_room_timer",
         "",
       ].join("\n"),
     );
@@ -130,15 +142,15 @@ describe("buildFeatureDiagram", () => {
     const diagram = buildFeatureDiagram({
       name: "notes",
       files: [
-        { path: "ui/note-card.tsx", source: "" },
+        { path: "molecules/note-card.tsx", source: "" },
         {
-          path: "ui/note-card.spec.tsx",
+          path: "molecules/note-card.spec.tsx",
           source: 'import { NoteCard } from "./note-card";',
         },
       ],
     });
     expect(diagram).not.toContain("spec");
-    expect(diagram).toContain('ui_note_card["note-card"]');
+    expect(diagram).toContain('molecules_note_card["note-card"]');
   });
 
   it("解決できない相対 import はエッジを作らない", () => {
@@ -146,7 +158,7 @@ describe("buildFeatureDiagram", () => {
       name: "notes",
       files: [
         {
-          path: "ui/note-card.tsx",
+          path: "molecules/note-card.tsx",
           source: 'import { Gone } from "./deleted-file";',
         },
       ],
@@ -159,7 +171,7 @@ describe("buildFeatureDiagram", () => {
       name: "invite",
       files: [
         {
-          path: "ui/copy-invite-button.tsx",
+          path: "molecules/copy-invite-button.tsx",
           source: [
             'import { Button } from "@/components/ui/button";',
             'import { notify } from "@/lib/notify";',
@@ -181,7 +193,7 @@ describe("buildOverviewDiagram", () => {
           name: "room",
           files: [
             {
-              path: "ui/room-board.tsx",
+              path: "containers/room-board.tsx",
               source: [
                 'import { useRoomNotes } from "@/features/notes";',
                 'import { NoteCard } from "@/features/notes";',
@@ -193,7 +205,7 @@ describe("buildOverviewDiagram", () => {
           name: "notes",
           files: [
             {
-              path: "ui/note-card.tsx",
+              path: "molecules/note-card.tsx",
               source: 'import { DotVoteControls } from "@/features/dot-vote";',
             },
           ],
