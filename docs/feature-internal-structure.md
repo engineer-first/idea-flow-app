@@ -1,174 +1,131 @@
-# feature 内部の設計判断 — なぜ Atomic 階層ではなく ui / logic の 2 層か
+# feature 内部の設計判断 — 5 箱「依存権の帯」（C′）
+
+status: **決定・移行済み**（決定 2026-07-13、移行完了 2026-07-14）。
+検討の全文（案の比較・攻撃的検証・先行事例）は
+[feature-ui-directory-options.md](feature-ui-directory-options.md) が真実。
+本ドキュメントは決定の要点と、当初の分析のうち今も有効な部分の記録。
 
 「Atomic Design を採らない」という判断は、実は独立した 2 つの問いの答えである。
 
-| 問い                             | 選択肢                                              | 採用と文書                                                    |
-| -------------------------------- | --------------------------------------------------- | ------------------------------------------------------------- |
-| 1. リポジトリ全体を何で縦に切るか | 粒度（Atomic ツリー）か、機能（feature）か          | feature 縦割り → [feature-structure.md](feature-structure.md) |
-| 2. feature の**中**を何で分けるか | 粒度（molecules / organisms / …）か、役割（ui / logic）か | ui / logic 2 層 → 本ドキュメント                              |
+| 問い                              | 選択肢                                                     | 採用と文書                                                    |
+| --------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------- |
+| 1. リポジトリ全体を何で縦に切るか | 粒度（Atomic ツリー）か、機能（feature）か                 | feature 縦割り → [feature-structure.md](feature-structure.md) |
+| 2. feature の**中**を何で分けるか | 本質の粒度分類か、役割 2 層か、**依存権の帯（5 箱）**か    | C′「依存権の帯」→ 本ドキュメント                              |
 
-問い 1 で feature 縦割りを選んでも、問い 2 で「feature 内を Atomic 階層に
-する」案は成立する（チームで実際に検討された案）。本ドキュメントはその案と
-ui / logic 2 層の比較**だけ**を扱う。2026-07 のチーム議論
-（スカスカ問題は許容できる、という意見を含む）を反映している。
+## 決定（2026-07-13）
 
-## TL;DR
+- feature 内は 5 箱: `containers / templates / organisms / molecules / logic`。
+  上 4 箱が JSX を返すもの、`logic/` は hook・reducer・Server Action・
+  純関数・定数（JSX 禁止は従来どおり ast-grep 強制）。
+- **箱は「本質の分類」ではなく「依存権の宣言」**。規則は 3 つだけ:
+  **上向き import 禁止・skip 合法・同帯合法**。molecules に置くことは
+  「organisms / templates / containers に依存しない」という宣言であり、
+  宣言の真偽（上向き import の有無）だけを機械検査する。
+- 新規コンポーネントの既定は**最下帯（molecules/）**。上の帯の部品が
+  必要になった瞬間に CI が落ちて昇格を教える。直感で最初から上の箱に
+  置くのも合法（帯は権利であって義務ではない）。
+- atoms は作らない。リポジトリ全体の atoms は `components/ui/`。
+- feature 単位で「フラット or 5 箱」の二択。混在・規約外ディレクトリ・
+  箱の入れ子（深さ 3 以上）・箱がある feature の root 実装ファイルは fail。
+- container / view 分離・stories 必須・衛星（spec / stories / fixture）の
+  実装同居は従来どおり。
 
-1. **feature 内を Atomic にしても `logic/` は消えない。** Atomic は UI
-   コンポーネントの分類法で、hook・reducer・Server Action・定数の置き場を
-   定義しない。結果は「Atomic 階層 **+** logic/」の 2 重分類になり、
-   ファイルを 1 つ作るたびに必要な分類判断が 1 回から 2 回に増える。
+### 強制する機械検査（プロンプトではなく CI）
+
+| 不変条件                                   | 装置                                                        |
+| ------------------------------------------ | ----------------------------------------------------------- |
+| 帯規則（上向き import 禁止）               | `rules/ast-grep/feature-band-imports.yml`（ホワイトリスト型）|
+| 動的 import() の死角                       | `rules/ast-grep/no-dynamic-import-in-features-and-app.yml`  |
+| 配置（フラット or 5 箱・入れ子禁止など）   | `npm run check:feature-layout`（CI）                         |
+| logic/ への JSX 混入                       | `feature-logic-layer-must-not-render-jsx`                   |
+| 検知能力そのものの regression              | `scripts/band-import-rules.spec.ts`                          |
+
+帯規則は「許可プレフィックス以外の相対 import を全禁止」のホワイトリスト型。
+ブラックリスト regex では `../index` ロンダリング・`.././` 等の非正規化
+パス・barrel 経由の `"../organisms"`・動的 import() が素通りすることが
+攻撃的検証で実証されたため（詳細は options doc）。
+
+## なぜ素朴な Atomic（本質分類）を拒否したか — 当初の分析は今も有効
+
+1. **Atomic は logic の置き場を定義しない。** 導入しても「Atomic 階層 +
+   logic/」の 2 重分類になる（実測: room は当時 UI 実装 7 に対し logic 7）。
+   FSD が Atomic を採らない公式理由と同じ診断。
 2. **molecule / organism の境界は、人間は直感で引けるが機械判定できない。**
    このリポジトリはルールを lint / ast-grep で強制する方針で、コードの多くを
-   AI エージェントが書く。直感にしか宿らない規約は CI でもエージェントの
-   プロンプトでも強制する手段がなく、黙って腐る。
-3. **「ui/ の見通しが悪い」の実体は分類ではなく衛星ファイルの倍率。**
-   `features/room/ui` は実装 7 に対し spec / stories / fixture 込みで
-   19 ファイル（×2.7）。この倍率はどんな分類法でも変わらないので、
-   対策は分類ではなくエディタのファイルネスティングと Storybook で行う。
+   AI エージェントが書く。直感にしか宿らない規約は強制手段がなく黙って腐る。
+   「所属の判定」を静的解析で機械化した先行事例も見つかっていない。
+3. **「箱の階段 = 流れ」は import 実測と矛盾する。** room-board-view の実物は
+   molecules 直 import・shadcn 生 import が混在し、階段を順に通る import は
+   1 本もなかった（そしてそれは Brad Frost 的にも正しい形）。
 
-## 1. 実測: 最大の feature（room）を Atomic 階層に分類し直す
+C′ はこの急所を**判定対象のすり替え**で外した:「これは本当に molecule か」
+（答えのない主観の問い）を「この import は宣言に違反していないか」（機械の
+問い）に変換する。skip 合法なので実測の import とも矛盾しない。分類クイズで
+答えが割れても、どちらの答えも合法——主観は「間違えると腐る分類」から
+「どちらでもよい配置の好み」に格下げされた。
 
-現在の room（実装 14 ファイル）をそのまま Atomic の箱に入れ直すと:
+## 衛星ファイル倍率（×2.7）の扱い
 
-| 箱               | 入るファイル                                                        | 数 |
-| ---------------- | ------------------------------------------------------------------- | -- |
-| molecules        | force-next-phase-dialog, leave-confirm-dialog                       | 2  |
-| organisms        | room-timer                                                          | 1  |
-| templates        | room-board-view, room-lobby-view                                    | 2  |
-| **（箱がない）** | room-board, room-lobby（container）                                 | 2  |
-| logic（結局必要） | room-reducer, use-room-state, use-room-connection, use-leave-room, actions, room-notify, connection-status | 7  |
+「ui/ の見通しが悪い」の実体は衛星ファイルの倍率で、これはどんな分類でも
+不変（当初の分析どおり）。採用時の判断は「**5 箱に分散すれば 1 箱あたりの
+衛星ノイズは許容範囲**」。エディタの fileNesting は削除済みで、GitHub の
+素のファイル一覧で衛星が畳まれないことは**受容した**（ここが案 B
+= コンポーネントごとのディレクトリ、との最終分岐だった）。
 
-最大の feature ですらこうなる。読み取れることが 3 つある。
+実装ファイル自体が育ったときの処方箋は箱ではなく従来どおり 2 つ:
 
-1. **一番大きい箱が logic になる。** Atomic を導入しても、feature 内の
-   半分のファイルには何の語彙も与えられない。「Atomic にしたらロジックは
-   どこに置くのか」の答えは「結局 logic/ を併設する」以外にない。
-   PR #128 以前は、この置き場のなさが `note-color.ts` を molecules/ に
-   押し込む形で現れていた。
-2. **container に箱がない。** container / view 分離（このリポジトリの必須
-   規約）は Atomic の語彙の外にあり、room-board.tsx をどの箱に入れるかは
-   毎回の発明になる。
-3. **dialog 2 つの分類に事実の根拠がない。** 状態と確認フローを持つ dialog
-   を molecule と呼ぶか organism と呼ぶかは判定者の直感次第で、どちらの
-   答えにも「中身の事実」による裏付けがない。
+- **view の分割**。判定器は「その部分だけ Storybook に載せたいか /
+  4 状態テストを独立に書きたいか」（実例: room-board-view 613 行 →
+  header / canvas / dialog ×2 / use-board-drag への分割）。
+- **feature 切り出し**（room から notes を切り出した前例）。タイミングは
+  Storybook の `Dependencies/*` 実測依存図で「相互にしか import されない
+  クラスタ」が見えたとき。
 
-## 2. 判定器の性質 — 直感の規約は AI にも CI にも強制できない
+## 再検討のトリガー（蒸し返し防止の明文化）
 
-「人間の方が直感的に Atomic の大きさが分かる」は正しい。問題は、その直感を
-**強制する装置がこのリポジトリに存在しない**ことにある。
+次のいずれかが**実際に起きたら**、そのときだけ再検討する。
 
-- このリポジトリの方針は「静的検査可能なルールはプロンプトではなく linter か
-  ast-grep で記述する」。だが「このファイルは molecule である」という前提を
-  静的検査で判定できないため、「molecules は organisms を import しない」
-  という規則は書けても空振りする。
-- コードを書く主体に AI エージェントが含まれる前提では、機械判定できない
-  分類は毎 PR の再交渉になる。エージェントは境界基準の文書を読んでも、
-  人間同士ですら割れる判定を安定して再現できない。
-- 「JSX を返すか」は中身の**事実**なので、人間にもエージェントにも同じ答えを
-  返し、ast-grep が fail-closed で強制済み（`logic/` への JSX 混入、規約外
-  サブディレクトリからの import は CI で落ちる）。
-- 粒度の機械化自体は原理的には可能である（例: 「同一 feature 内の他 UI を
-  import する数」を合成度とみなす）。しかしこの判定器は依存を 1 本足すたびに
-  所属の箱が変わるため、ファイル移動と import 書き換えの churn を生む。
-  分類が変更に追従するのではなく、**変更のたびに分類へ課金される**。
+- **昇格 churn の常態化**: 箱の移動（昇格）とそれに伴う import 書き換えが
+  1 か月に 5 回を超える状態が 2 か月続く → 箱の数を減らす方向
+  （containers + molecules + logic の 3 箱など）で再検討。
+- **衛星ノイズの実害**: GitHub Web レビューで衛星に埋もれた見落としが
+  原因の差し戻しが複数回起きる → 案 B（コンポーネントごとのディレクトリ）を
+  再検討（options doc の実装メモが出発点）。
+- **1 箱の実装ファイルが 15 を超える**（feature 切り出しでは分けられない
+  まま）→ 箱の再設計ではなく、まず切り出し漏れを疑う（従来どおり）。
 
-## 3. 「見通しが悪い」の実体と、それを直接殺す装置
-
-`features/room/ui` の 19 ファイルの内訳は「実装 7 / spec 7 / stories 4 /
-fixture 1」。見通しの悪さの実体は実装ファイルの数ではなく、この
-**衛星ファイル倍率（×2.7）**である。
-
-Atomic の箱に割れば 1 箱あたりのファイル数は減るが、それは「何で割っても」
-減る。spec / stories は実装と同居させる規約（変更の局所性のため）なので
-倍率そのものは不変で、箱を増やした分のクリック数と分類判断コストだけが
-純増する。倍率を直接殺す装置はこの 2 つ:
-
-- **エディタのファイルネスティング**（`.vscode/settings.json` で設定済み）。
-  エクスプローラー上で spec / stories / fixture が実装ファイルの配下に
-  畳まれ、`room/ui` は実装 7 件だけが並んで見える。ただし効くのは
-  VS Code の画面だけで、GitHub の Web 表示や他エディタでは 19 ファイルの
-  まま。IDE 非依存の代替（コンポーネントごとのディレクトリ）との比較は
-  [feature-ui-directory-options.md](feature-ui-directory-options.md)（未決・
-  話し合い用）へ。
-- **Storybook**。部品の「大きさ」はディレクトリ名の解読ではなく、実物の
-  レンダリングで見る（全 UI に stories 必須の規約はこのため）。
-
-それでも実装ファイル自体が育ったときの処方箋は、粒度の箱ではなく
-**feature 切り出し**（52 ファイル時代の room から notes を切り出した前例）。
-切り出しのタイミングは主観ではなく、Storybook の `Dependencies/*`
-実測依存図で「ui/ 内で相互にしか import されないクラスタ」が見えたとき、
-と機械的に判断できる。今後のホワイトボード UI 化・ツールバー分割も
-この手で受ける。
-
-## 4. スカスカ問題の位置づけ
-
-チーム議論では「箱あたり 1〜2 個でも許容できる」という意見があった。
-これは妥当な感覚で、スカスカは決定打ではなく数あるコストの 1 つに
-位置づけ直す。ui / logic 2 層を採る決定打はスカスカではなく、
-§1（分類が 2 重になる）と §2（境界を機械検査できない）である。
-
-## 5. 再検討のトリガー
-
-次の両方が成立したら、feature 内 Atomic 階層を再検討する価値がある。
-
-- 1 つの feature の `ui/` の実装ファイルが、feature 切り出しでは分けられない
-  まま 15 を超える（現状最大は room の 7）。
-- molecule / organism の境界に、churn を生まない機械判定器が見つかる。
-
-片方だけなら答えは変わらない: 前者だけなら切り出し漏れを疑い、
-後者だけなら分ける動機がない。
-
-## 6. 補足 Q&A（2026-07-13 の議論から）
+## 補足 Q&A（2026-07 の議論から、今も有効なもの）
 
 ### Q. container / view 分離とは何か
 
-`room-board.tsx`（container）と `room-board-view.tsx`（view）のペアが実例。
-view は「props でデータを受け取って描き、起きたことは callback で報告する」
-だけの部品で、サーバーにも WebSocket にも触らない。container は hook
-（`use-room-connection`、`use-room-notes` 等）を束ねて view の props に
-流し込む配線係。判定器は「**Storybook に単体で載せられるか**」——view は
-偽の props だけで描画できるから stories と 4 状態テストが書ける。分けないと
-描画と通信が癒着し、Storybook に載せるには通信ごとモックする羽目になる。
+`room-board.tsx`（containers/）と `room-board-view.tsx`（templates/）の
+ペアが実例。view は「props でデータを受け取って描き、起きたことは callback
+で報告する」だけの部品で、サーバーにも WebSocket にも触らない。container は
+hook を束ねて view の props に流し込む配線係。判定器は「**Storybook に単体で
+載せられるか**」。C′ で containers が第 4 の箱（Atomic 語彙の外の方言）と
+して明示されたことで、「container の箱がない」問題は解消した。
 
 ### Q. logic/ は Next.js を使う限り不可避なのか
 
-不可避だが、主語は Next.js ではなく UI 開発全般。logic/ の中身のうち
-Next.js 固有なのは Server Action（`actions.ts`）だけで、reducer・純関数・
-定数はただの TypeScript、hook は React を使う限り生まれる。フレームワークを
-替えても logic の大半は残る。Atomic がこの層に語彙を持たないのは、Atomic が
-「UI コンポーネントの分類法」だから。
+不可避だが、主語は Next.js ではなく UI 開発全般。Next.js 固有なのは
+Server Action だけで、reducer・純関数・定数はただの TypeScript、hook は
+React を使う限り生まれる。C′ が logic/ を 5 箱の最下帯として残すのは
+このため（Atomic は UI コンポーネントの分類法で、この層に語彙を持たない）。
 
-### Q. logic を分けずに Atomic だけにしたらどうなるか
+### Q. logic を分けずに箱だけにしたらどうなるか
 
-このリポジトリの過去に実例がある（`note-color.ts` が molecules/ に押し
-込まれていた）。ロジックが tsx に埋まると、2 つ目の利用者が現れたとき
-「コンポーネントごと import する」か「コピーする」かの二択になり、重複と
-散在が始まる。テストも純関数の入出力テストから DOM レンダリング必須の
-テストに劣化する（logic/ への JSX 禁止ルールの動機そのもの）。
-
-### Q. コンポーネントの切り出し方・.ts への分離の仕方は別途規約が要るか
-
-大部分は決定済みで AGENTS.md に記載がある（container / view 分離必須、
-view は props in・callback out、container 肥大は関心ごとの `use-*` に分割、
-JSX を返さないものは logic/ = ast-grep 強制、全 UI に stories 必須）。
-未決なのは「肥大した view からいつ子コンポーネントを切り出すか」だけで、
-これは行数の閾値ではなく既存の判定器の流用で足りる:
-「その部分だけ Storybook に載せたい・4 状態テストを独立に書きたく
-なったら切り出す」。
-
-### Q. 衛星ファイルの見通しは、コンポーネントごとのディレクトリでも解決できるのでは
-
-できる。しかも判定器が機械的（ディレクトリ名 = コンポーネントのステム）で、
-Atomic と違い主観判断を持ち込まない。IDE 非依存という点でファイル
-ネスティングより強い。ただし ast-grep の境界ルールが「feature 内は深さ 2
-まで」を前提に書かれているため改修が要る。選択肢の比較と論点は
-[feature-ui-directory-options.md](feature-ui-directory-options.md) へ。
+過去に実例がある（`note-color.ts` が molecules/ に押し込まれていた）。
+ロジックが tsx に埋まると重複と散在が始まり、テストも純関数の入出力
+テストから DOM レンダリング必須のテストに劣化する（logic/ への JSX 禁止
+ルールの動機そのもの）。
 
 ## 参考
 
+- [feature-ui-directory-options.md](feature-ui-directory-options.md) —
+  案 A/B/C/C′ の比較・攻撃的検証・先行事例調査の全文（決定記録）
 - [feature-structure.md](feature-structure.md) — 問い 1（feature 縦割り）の
   判断。PR #128 以前に全体 Atomic ツリーで実際に起きたことの記録を含む
-- `rules/ast-grep/feature-dependencies-one-way.yml` — ui / logic 境界の
-  機械検査（logic/ への JSX 混入、規約外サブディレクトリの fail-closed）
+- `rules/ast-grep/feature-band-imports.yml` — 帯規則の実装とコメント
+- `scripts/check-feature-layout.mts` — 配置の不変条件の実装とコメント
 - `scripts/dependency-graph.mts` — 切り出し判断に使う実測依存図の生成
+  （subgraph は帯順で描画）

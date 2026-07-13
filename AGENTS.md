@@ -67,12 +67,18 @@ app  →  features  →  components/ui・lib  →  contracts
 
 - Next.js の予約ファイル名は App Router の規約に従う。
 - 例: `page.tsx`、`layout.tsx`、`route.ts`、`loading.tsx`、`error.tsx`。
-- feature 内は `ui/`（JSX を返すもの）と `logic/`（hook・reducer・
-  Server Action・純関数・定数）の 2 層まで。片側しかない feature は
-  フラットのまま。spec / stories / fixture は実装と同居させる。
-- 役割の細分は階層ではなくファイル名のサフィックスで表現する
-  （`-view`, `-card`, `-dialog`, `-section`, `use-`）。粒度分類ディレクトリ
-  （`atoms/` など）は使わない。背景: feature 内 2 層は
+- feature 内は 5 箱まで: `containers / templates / organisms / molecules`
+  （JSX を返すもの）と `logic`（hook・reducer・Server Action・純関数・定数）。
+  箱は「本質の分類」ではなく「依存権の帯」で、規則は上向き import 禁止・
+  skip 合法・同帯合法の 3 つ（ast-grep `feature-band-imports.yml` が機械検査）。
+  新規コンポーネントの既定は最下帯（`molecules/`）。上の帯の部品が必要に
+  なったら CI が昇格を教える。atoms は作らない（リポジトリ全体の atoms は
+  `components/ui/`）。
+- feature 単位で「フラット or 5 箱」の二択。混在・規約外ディレクトリ・箱の
+  入れ子は `npm run check:feature-layout`（CI）が fail させる。
+  spec / stories / fixture は実装と同居させる。
+- 役割の細分はファイル名のサフィックスで表現する
+  （`-view`, `-card`, `-dialog`, `-section`, `use-`）。背景: feature 内 5 箱は
   [`docs/feature-internal-structure.md`](docs/feature-internal-structure.md)、
   feature 縦割りは [`docs/feature-structure.md`](docs/feature-structure.md)。
 - コンテナと view はステムを揃える（例: `room-board.tsx` と
@@ -94,7 +100,7 @@ app  →  features  →  components/ui・lib  →  contracts
 - container / view 分離を必須にする。view は「props in、コールバック out」だけ。
   view の判定器は「Storybook に単体で載せられるか」。
 - container が肥大したら関心ごとの hook（`use-*`）に分割し、container は
-  hooks を束ねて view に渡すだけにする（例: `features/room/use-*.ts`）。
+  hooks を束ねて view に渡すだけにする（例: `features/room/logic/use-*.ts`）。
   楽観更新の可否のようなポリシーは hook 単位で spec を書く。
 - 状態は「純関数 reducer + サーバー権威（RoomDO）」を維持する。グローバル
   ストア（Zustand / Redux 等）は導入しない。RoomDO と並ぶ第二の真実が生まれ、
