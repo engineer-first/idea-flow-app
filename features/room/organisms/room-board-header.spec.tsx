@@ -1,0 +1,157 @@
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { buildMembers } from "@/contracts/room-protocol.fixture";
+import { RoomBoardHeader } from "./room-board-header";
+
+const ME = "11111111-1111-4111-8111-111111111111";
+
+function setup(overrides: Partial<Parameters<typeof RoomBoardHeader>[0]> = {}) {
+  const props = {
+    inviteCode: "AB12CD",
+    inviteUrl: "https://idea-flow.example/invite/AB12CD",
+    phase: "phase1" as const,
+    timer: { status: "idle" } as const,
+    timerServerOffsetMs: 0,
+    isHost: false,
+    isDisconnected: false,
+    connectionStatus: "open" as const,
+    members: buildMembers(2, ME),
+    currentUserId: ME,
+    hostUserId: ME,
+    isNextPhasePending: false,
+    voteRemaining: { subjective: 5, objective: 10 },
+    isLeaving: false,
+    onShowVoteResult: vi.fn(),
+    onLeaveClick: vi.fn(),
+    onNextPhase: vi.fn(),
+    onTimerStart: vi.fn(),
+    onTimerPause: vi.fn(),
+    onTimerResume: vi.fn(),
+    onTimerExtend: vi.fn(),
+    onTimerStop: vi.fn(),
+    ...overrides,
+  };
+  render(<RoomBoardHeader {...props} />);
+  return props;
+}
+
+describe("RoomBoardHeader", () => {
+  describe("招待情報（host 限定）", () => {
+    it("host には招待URLと招待コードのコピー操作を表示する", () => {
+      setup({ isHost: true });
+
+      expect(screen.getByText("招待URL")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "招待コードをコピー" }),
+      ).toHaveTextContent("AB12CD");
+    });
+
+    it("非 host には招待情報を表示しない", () => {
+      setup({ isHost: false });
+
+      expect(screen.queryByText("招待URL")).not.toBeInTheDocument();
+    });
+  });
+
+  it("現在フェーズのラベルと残り投票数を表示する", () => {
+    setup({ phase: "phase2" });
+
+    expect(screen.getByText("フェーズ2")).toBeInTheDocument();
+    expect(screen.getByText("主観 残り5")).toBeInTheDocument();
+  });
+
+  describe("フェーズ移行", () => {
+    it("host のみ「次のフェーズへ」を表示する", () => {
+      setup({ isHost: false });
+      expect(
+        screen.queryByRole("button", { name: "次のフェーズへ" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("未接続・pending・phase4 では「次のフェーズへ」が無効になる", () => {
+      setup({ isHost: true, isDisconnected: true });
+      expect(
+        screen.getByRole("button", { name: "次のフェーズへ" }),
+      ).toBeDisabled();
+    });
+
+    it("確認ダイアログの確定で onNextPhase を呼ぶ", () => {
+      const onNextPhase = vi.fn();
+      setup({ isHost: true, onNextPhase });
+
+      fireEvent.click(screen.getByRole("button", { name: "次のフェーズへ" }));
+      fireEvent.click(screen.getByRole("button", { name: "移行する" }));
+
+      expect(onNextPhase).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("接続状態の表示（loading / error / success）", () => {
+    it("接続確立中は接続中の表示を出す", () => {
+      setup({ connectionStatus: "connecting" });
+      expect(screen.getByRole("status")).toHaveTextContent("接続中");
+    });
+
+    it("切断中は再接続中の表示を出す", () => {
+      setup({ connectionStatus: "closed" });
+      expect(screen.getByRole("status")).toHaveTextContent("再接続");
+    });
+
+    it("接続済みならインジケータを出さない", () => {
+      setup({ connectionStatus: "open" });
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("投票結果ボタン（phase4 限定）", () => {
+    it("phase4 で表示され、押下で onShowVoteResult を呼ぶ", () => {
+      const onShowVoteResult = vi.fn();
+      setup({ phase: "phase4", onShowVoteResult });
+
+      fireEvent.click(screen.getByRole("button", { name: "投票結果を表示" }));
+
+      expect(onShowVoteResult).toHaveBeenCalledTimes(1);
+    });
+
+    it("phase4 以外では表示しない", () => {
+      setup({ phase: "phase1" });
+      expect(
+        screen.queryByRole("button", { name: "投票結果を表示" }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("退出・解散", () => {
+    it("host は「ルームを解散」、非 host は「退出する」の文言になる", () => {
+      setup({ isHost: true });
+      expect(
+        screen.getByRole("button", { name: "ルームを解散" }),
+      ).toBeInTheDocument();
+    });
+
+    it("押下で onLeaveClick を呼ぶ", () => {
+      const onLeaveClick = vi.fn();
+      setup({ onLeaveClick });
+
+      fireEvent.click(screen.getByRole("button", { name: "退出する" }));
+
+      expect(onLeaveClick).toHaveBeenCalledTimes(1);
+    });
+
+    it("isLeaving 中はボタンが無効になり進行中の文言になる", () => {
+      setup({ isLeaving: true });
+      const button = screen.getByRole("button", { name: /退出/ });
+      expect(button).toBeDisabled();
+      expect(button).toHaveTextContent("退出中…");
+    });
+  });
+
+  it("メンバー一覧とタイマーを表示する", () => {
+    setup({
+      timer: { status: "paused", remainingMs: 30_000, durationMs: 60_000 },
+    });
+
+    expect(screen.getByText("Yuki Tanaka")).toBeInTheDocument();
+    expect(screen.getByRole("timer")).toHaveTextContent("00:30");
+  });
+});
