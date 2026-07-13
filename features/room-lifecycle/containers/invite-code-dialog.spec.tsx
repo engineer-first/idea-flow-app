@@ -1,4 +1,6 @@
-// InviteCodeDialog の単体テスト。
+// InviteCodeDialog（コンテナ）の配線テスト。表示は
+// templates/invite-code-dialog-view に分離済みで、ここでは joinRoom・
+// 遷移・toast・キャンセル時の /home 復帰の配線を検証する。
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";

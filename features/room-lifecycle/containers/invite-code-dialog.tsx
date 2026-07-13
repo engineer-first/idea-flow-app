@@ -1,24 +1,16 @@
 "use client";
 
-// 招待URL (/invite/[code]) で開かれる確認画面。
+// 招待URL (/invite/[code]) で開かれる確認画面のコンテナ。
 // 招待コードを Dialog で表示し、確定で joinRoom Server Action を呼ぶ。
 // 成功時は toast → スタート画面へ遷移（ホーム参加・作成と同じ経路）。
-// hostName は page 側の lookup 成功後に必ず渡る。
+// hostName は page 側の lookup 成功後に必ず渡る。表示は
+// templates/invite-code-dialog-view が担い、ここは配線に徹する。
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/dialog";
 import { notify } from "@/lib/notify";
 import { joinRoom } from "../logic/actions";
 import { lifecycleNotify } from "../logic/lifecycle-notify";
+import { InviteCodeDialogView } from "../templates/invite-code-dialog-view";
 
 export type InviteCodeDialogProps = {
   inviteCode: string;
@@ -57,32 +49,13 @@ export function InviteCodeDialog({
   }
 
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogContent data-testid="invite-dialog">
-        <AlertDialogHeader>
-          <AlertDialogTitle>
-            {hostName} さんが作成したルームに参加しますか？
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            招待コード{" "}
-            <span className="font-mono font-semibold">{inviteCode}</span>{" "}
-            のルームに参加します。
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>キャンセル</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={(event) => {
-              event.preventDefault();
-              handleConfirm();
-            }}
-            disabled={pending}
-            data-testid="invite-join-action"
-          >
-            {pending ? "参加中…" : "参加する"}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <InviteCodeDialogView
+      inviteCode={inviteCode}
+      hostName={hostName}
+      open={open}
+      pending={pending}
+      onOpenChange={setOpen}
+      onConfirm={handleConfirm}
+    />
   );
 }

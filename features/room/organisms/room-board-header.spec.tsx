@@ -68,8 +68,12 @@ describe("RoomBoardHeader", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("未接続・pending・phase4 では「次のフェーズへ」が無効になる", () => {
-      setup({ isHost: true, isDisconnected: true });
+    it.each([
+      ["未接続", { isDisconnected: true }],
+      ["フェーズ移行 pending", { isNextPhasePending: true }],
+      ["phase4", { phase: "phase4" as const }],
+    ])("%s では「次のフェーズへ」が無効になる", (_label, overrides) => {
+      setup({ isHost: true, ...overrides });
       expect(
         screen.getByRole("button", { name: "次のフェーズへ" }),
       ).toBeDisabled();

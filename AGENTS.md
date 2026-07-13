@@ -108,7 +108,7 @@ app  →  features  →  components/ui・lib  →  contracts
   コンポーネントローカル UI 状態」の 3 種で全て。
 - すべての UI コンポーネントに `*.stories.tsx` を作成し、
   Storybook を通じて component-driven に構築する。stories のタイトル階層は
-  features/ をミラーする（例: `Room/NoteCard`、`DotVote/DotVoteButton`）。
+  features/ をミラーする（例: `Notes/NoteCard`、`DotVote/DotVoteButton`）。
 - 外部 API 通信は MSW（`app/mocks/`）でモックする。WebSocket はフェイクの注入
   （`webSocketFactory`）でモックする。
 - コンポーネント内に生のテストデータをハードコードしない。fixture、handler、

@@ -38,6 +38,7 @@ status: **決定・移行済み**（決定 2026-07-13、移行完了 2026-07-14�
 | 動的 import() の死角                       | `rules/ast-grep/no-dynamic-import-in-features-and-app.yml`  |
 | CommonJS（require / import-equals）の死角  | `rules/ast-grep/no-commonjs-in-features-and-app.yml`        |
 | 非正規化 alias（連続スラッシュ）           | `rules/ast-grep/no-double-slash-import-specifier.yml`       |
+| 指定子のエスケープ（生テキストと解決値の乖離）| `rules/ast-grep/no-escape-in-import-specifier.yml`         |
 | JS ファミリ（検査対象外ファイル）の混入    | `rules/ast-grep/no-js-family-in-ts-only-zones.yml`          |
 | declare module（モジュール拡張）の死角     | `rules/ast-grep/no-module-augmentation-in-features.yml`     |
 | 未登録 feature の feature import（既定拒否）| `unregistered-feature-must-not-import-features`（同 one-way）|

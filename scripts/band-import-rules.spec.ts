@@ -113,7 +113,10 @@ describe("feature 帯規則（ホワイトリスト型）", () => {
     expectEachDetected(
       scan(dir),
       "features/zz-poc/molecules/evil.ts",
-      violations.map((line) => line.match(/["'](.+)["']/)?.[1] ?? line),
+      // 指定子は引用符込みで照合する（".." や "../organisms" のような短い形は
+      // 引用符を外すと別の finding のパスにも部分一致して一意でなくなり、
+      // 特定の抜け道が退行しても検知漏れに気づけなくなるため）。
+      violations.map((line) => line.match(/["'].+["']/)?.[0] ?? line),
       BAND_RULE,
     );
   });
@@ -313,6 +316,7 @@ const DOUBLE_SLASH_RULE = /^no-double-slash/;
 const JS_ZONE_RULE = /^no-js-family/;
 const MODULE_AUG_RULE = /^no-module-augmentation/;
 const UNREGISTERED_RULE = /^unregistered-feature/;
+const ESCAPE_RULE = /^no-escape-in-import-specifier/;
 
 describe("攻撃的検証で実証された死角の封鎖", () => {
   it("CommonJS require() は帯規則の死角なので features / app で禁止する", () => {
@@ -325,16 +329,18 @@ describe("攻撃的検証で実証された死角の封鎖", () => {
     });
 
     const findings = scan(dir);
+    // 規則は識別子 require の出現を報告する（別名経由の呼び出しも塞ぐため）。
+    // finding.text は require トークンそのものになる。
     expectEachDetected(
       findings,
       "features/zz-poc/molecules/require-evil.ts",
-      [`require("../containers/board")`],
+      ["require"],
       COMMONJS_RULE,
     );
     expectEachDetected(
       findings,
       "app/zz-poc/require-evil.ts",
-      [`require("node:fs")`],
+      ["require"],
       COMMONJS_RULE,
     );
   });
@@ -435,5 +441,45 @@ describe("攻撃的検証で実証された死角の封鎖", () => {
       [`@/features/zz-poc`],
       UNREGISTERED_RULE,
     );
+  });
+
+  it("エスケープ入り指定子（source-regex 境界規則の死角）をバックスラッシュごと禁止する", () => {
+    // モジュール指定子はエスケープ解決後の値で解決されるため、先頭文字を
+    // エスケープした "\\../containers/board" は生テキストが ^["']\\. に
+    // 一致せず帯規則を、"@\\u002ffeatures/..." 等は [.@]/features/ を
+    // 要求する規則を素通りする。正規の指定子に \\ は現れないので形ごと禁止。
+    const dir = createProject({
+      "features/zz-poc/molecules/escape-evil.ts": [
+        `import { a } from "\\../containers/board";`,
+        `import { b } from "@/f\\u0065atures/zz-poc/containers/board";`,
+      ].join("\n"),
+    });
+
+    const findings = findingsFor(
+      scan(dir),
+      "features/zz-poc/molecules/escape-evil.ts",
+    );
+    expect(
+      findings.filter((f) => ESCAPE_RULE.test(f.ruleId)).length,
+      "エスケープ入り指定子が検知されていない",
+    ).toBeGreaterThanOrEqual(2);
+  });
+
+  it("require の裸参照（別名経由の呼び出し）も検知する", () => {
+    const dir = createProject({
+      "features/zz-poc/molecules/require-alias-evil.ts": [
+        `const r = require;`,
+        `export const leaked = r("../containers/board");`,
+      ].join("\n"),
+    });
+
+    const findings = findingsFor(
+      scan(dir),
+      "features/zz-poc/molecules/require-alias-evil.ts",
+    );
+    expect(
+      findings.find((f) => COMMONJS_RULE.test(f.ruleId)),
+      "require の裸参照が検知されていない",
+    ).toBeDefined();
   });
 });
