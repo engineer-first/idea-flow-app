@@ -6,9 +6,9 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { notify } from "@/lib/notify";
-import { joinRoom, lookupInviteRoom } from "./actions";
+import { joinRoom, lookupInviteRoom } from "../logic/actions";
+import { lifecycleNotify } from "../logic/lifecycle-notify";
 import { JoinRoomSectionView } from "./join-room-section-view";
-import { lifecycleNotify } from "./lifecycle-notify";
 
 export function JoinRoomSection() {
   const router = useRouter();

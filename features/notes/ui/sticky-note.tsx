@@ -3,7 +3,7 @@ import { NOTE_HEIGHT, NOTE_WIDTH } from "@/contracts/board";
 import type { NoteColor } from "@/contracts/room-protocol";
 import { NOTE_COLOR_STYLES } from "@/features/room-members";
 import { cn } from "@/lib/utils";
-import { getNoteShadow } from "./note-shadow";
+import { getNoteShadow } from "../logic/note-shadow";
 
 export type StickyNoteProps = {
   noteId: string;

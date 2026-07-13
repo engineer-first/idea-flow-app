@@ -4,7 +4,7 @@ import { buildNote } from "@/contracts/room-protocol.fixture";
 import { PrivateNotesToolbar } from "./private-notes-toolbar";
 
 const meta = {
-  title: "Room/PrivateNotesToolbar",
+  title: "Notes/PrivateNotesToolbar",
   component: PrivateNotesToolbar,
   args: {
     notes: [

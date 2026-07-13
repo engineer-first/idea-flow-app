@@ -20,9 +20,9 @@ import { RoomMembers } from "@/features/room-members";
 import {
   CONNECTION_STATUS_LABELS,
   type RoomScreenConnectionStatus,
-} from "./connection-status";
+} from "../logic/connection-status";
+import type { Member } from "../logic/room-reducer";
 import { LeaveConfirmDialog } from "./leave-confirm-dialog";
-import type { Member } from "./room-reducer";
 
 export type RoomLobbyViewProps = {
   members: Member[];

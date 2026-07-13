@@ -12,16 +12,15 @@
 // 確定状態の真実はサーバー（RoomDO）側にあり、再接続時は snapshot で復元される。
 import { useCallback, useState } from "react";
 import type { Phase, ServerMessage } from "@/contracts/room-protocol";
+import { useNoteGroups, useRoomNotes } from "@/features/notes";
 import { notify } from "@/lib/notify";
 import type { RoomSocketFactory } from "@/lib/room-client/room-client";
+import type { Member } from "../logic/room-reducer";
+import { useLeaveRoom } from "../logic/use-leave-room";
+import { useRoomConnection } from "../logic/use-room-connection";
+import { useRoomState } from "../logic/use-room-state";
 import { ForceNextPhaseDialog } from "./force-next-phase-dialog";
 import { RoomBoardView } from "./room-board-view";
-import type { Member } from "./room-reducer";
-import { useLeaveRoom } from "./use-leave-room";
-import { useNoteGroups } from "./use-note-groups";
-import { useRoomConnection } from "./use-room-connection";
-import { useRoomNotes } from "./use-room-notes";
-import { useRoomState } from "./use-room-state";
 
 export type RoomBoardProps = {
   roomId: string;

@@ -15,7 +15,7 @@ import { DRAG_THRESHOLD_PX } from "@/contracts/board";
 import type { DotVoteKind } from "@/contracts/room-protocol";
 import { NOTE_CONTENT_MAX_LENGTH } from "@/contracts/room-protocol";
 import { DotVoteControls, type DotVoteRemaining } from "@/features/dot-vote";
-import type { Note } from "./notes-reducer";
+import type { Note } from "../logic/notes-reducer";
 import { StickyNote } from "./sticky-note";
 
 export type NoteCardProps = {

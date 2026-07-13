@@ -17,8 +17,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/dialog";
 import { notify } from "@/lib/notify";
-import { joinRoom } from "./actions";
-import { lifecycleNotify } from "./lifecycle-notify";
+import { joinRoom } from "../logic/actions";
+import { lifecycleNotify } from "../logic/lifecycle-notify";
 
 export type InviteCodeDialogProps = {
   inviteCode: string;

@@ -37,20 +37,22 @@ import {
 } from "@/contracts/room-protocol";
 import { DotVoteSummary } from "@/features/dot-vote";
 import { CopyInviteButton } from "@/features/invite";
+import {
+  type Note,
+  NoteCard,
+  NoteGroupCard,
+  PrivateNotesToolbar,
+  StickyNote,
+} from "@/features/notes";
 import { RoomMembers } from "@/features/room-members";
 import { VoteTotalingPanel } from "@/features/vote-totaling";
 import {
   CONNECTION_STATUS_LABELS,
   type RoomScreenConnectionStatus,
-} from "./connection-status";
+} from "../logic/connection-status";
+import type { Member } from "../logic/room-reducer";
 import { LeaveConfirmDialog } from "./leave-confirm-dialog";
-import { NoteCard } from "./note-card";
-import { NoteGroupCard } from "./note-group-card";
-import type { Note } from "./notes-reducer";
-import { PrivateNotesToolbar } from "./private-notes-toolbar";
-import type { Member } from "./room-reducer";
 import { RoomTimer } from "./room-timer";
-import { StickyNote } from "./sticky-note";
 
 const PHASE_LABELS: Record<Phase, string> = {
   lobby: "開始待ち",

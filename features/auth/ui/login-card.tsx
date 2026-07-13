@@ -4,7 +4,7 @@ import { KeyRound, ShieldAlert } from "lucide-react";
 import {
   DEV_AUTH_DEFAULT_EMAIL,
   DEV_AUTH_DEFAULT_PASSWORD,
-} from "./dev-auth-defaults";
+} from "../logic/dev-auth-defaults";
 
 export type LoginCardProps = {
   error?: string;

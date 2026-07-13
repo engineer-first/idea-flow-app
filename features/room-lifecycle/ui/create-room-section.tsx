@@ -6,9 +6,9 @@
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { notify } from "@/lib/notify";
-import { createRoom } from "./actions";
+import { createRoom } from "../logic/actions";
+import { lifecycleNotify } from "../logic/lifecycle-notify";
 import { CreateRoomSectionView } from "./create-room-section-view";
-import { lifecycleNotify } from "./lifecycle-notify";
 
 export function CreateRoomSection() {
   const router = useRouter();

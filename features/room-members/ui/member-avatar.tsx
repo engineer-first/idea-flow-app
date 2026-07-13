@@ -13,7 +13,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { NoteColor } from "@/contracts/room-protocol";
-import { NOTE_COLOR_STYLES } from "./note-color";
+import { NOTE_COLOR_STYLES } from "../logic/note-color";
 
 // 名前の頭文字 2 文字を返す。仕様:
 // - 空白で分割し、先頭 2 トークンの先頭 1 文字ずつ

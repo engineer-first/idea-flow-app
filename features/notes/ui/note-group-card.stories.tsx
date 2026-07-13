@@ -3,7 +3,7 @@ import { fn } from "storybook/test";
 import { NoteGroupCard } from "./note-group-card";
 
 const meta = {
-  title: "Room/NoteGroupCard",
+  title: "Notes/NoteGroupCard",
   component: NoteGroupCard,
   parameters: {
     layout: "padded",

@@ -4,7 +4,7 @@ import { buildNote } from "@/contracts/room-protocol.fixture";
 import { NoteCard } from "./note-card";
 
 const meta = {
-  title: "Room/NoteCard",
+  title: "Notes/NoteCard",
   component: NoteCard,
   parameters: {
     layout: "padded",

@@ -5,7 +5,7 @@ import { StickyNote } from "./sticky-note";
 const note = buildNote();
 
 const meta = {
-  title: "Room/StickyNote",
+  title: "Notes/StickyNote",
   component: StickyNote,
   args: {
     noteId: note.id,

@@ -11,7 +11,7 @@ vi.mock("next/navigation", () => ({
 
 const JOIN_ROOM = vi.fn();
 const LOOKUP_INVITE = vi.fn();
-vi.mock("./actions", () => ({
+vi.mock("../logic/actions", () => ({
   joinRoom: (...args: unknown[]) => JOIN_ROOM(...args),
   lookupInviteRoom: (...args: unknown[]) => LOOKUP_INVITE(...args),
 }));
@@ -23,7 +23,7 @@ const notifyMocks = vi.hoisted(() => ({
 vi.mock("@/lib/notify", () => ({
   notify: { error: notifyMocks.error },
 }));
-vi.mock("./lifecycle-notify", () => ({
+vi.mock("../logic/lifecycle-notify", () => ({
   lifecycleNotify: { joinedAsGuest: notifyMocks.joinedAsGuest },
 }));
 

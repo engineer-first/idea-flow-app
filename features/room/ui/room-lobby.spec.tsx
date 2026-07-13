@@ -26,7 +26,7 @@ vi.mock("@/lib/notify", () => ({
   },
 }));
 
-vi.mock("./room-notify", () => ({
+vi.mock("../logic/room-notify", () => ({
   roomNotify: {
     memberJoined: notifyMocks.memberJoined,
     memberLeft: notifyMocks.memberLeft,

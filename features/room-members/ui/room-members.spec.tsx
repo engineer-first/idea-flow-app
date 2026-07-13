@@ -5,7 +5,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { buildMembers } from "@/contracts/room-protocol.fixture";
-import { NOTE_COLOR_STYLES } from "./note-color";
+import { NOTE_COLOR_STYLES } from "../logic/note-color";
 import { ROOM_MEMBERS_MAX_VISIBLE, RoomMembers } from "./room-members";
 
 const ME = "11111111-1111-4111-8111-111111111111";

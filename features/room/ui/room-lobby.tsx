@@ -11,11 +11,11 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Phase, ServerMessage } from "@/contracts/room-protocol";
 import type { RoomSocketFactory } from "@/lib/room-client/room-client";
+import type { Member } from "../logic/room-reducer";
+import { useLeaveRoom } from "../logic/use-leave-room";
+import { useRoomConnection } from "../logic/use-room-connection";
+import { useRoomState } from "../logic/use-room-state";
 import { RoomLobbyView } from "./room-lobby-view";
-import type { Member } from "./room-reducer";
-import { useLeaveRoom } from "./use-leave-room";
-import { useRoomConnection } from "./use-room-connection";
-import { useRoomState } from "./use-room-state";
 
 export type RoomLobbyProps = {
   roomId: string;

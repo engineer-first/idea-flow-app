@@ -8,7 +8,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 const CREATE_ROOM = vi.fn();
-vi.mock("./actions", () => ({
+vi.mock("../logic/actions", () => ({
   createRoom: (...args: unknown[]) => CREATE_ROOM(...args),
 }));
 
@@ -19,7 +19,7 @@ const notifyMocks = vi.hoisted(() => ({
 vi.mock("@/lib/notify", () => ({
   notify: { error: notifyMocks.error },
 }));
-vi.mock("./lifecycle-notify", () => ({
+vi.mock("../logic/lifecycle-notify", () => ({
   lifecycleNotify: { roomCreated: notifyMocks.roomCreated },
 }));
 

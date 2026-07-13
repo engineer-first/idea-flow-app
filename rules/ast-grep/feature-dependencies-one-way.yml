@@ -1,7 +1,8 @@
 # 境界ルール: feature 間の依存は一方向のみ。循環を作らない。
 #
 # 許可されている feature 間エッジ（これが全て）:
-#   room → dot-vote / vote-totaling / room-members / invite
+#   room → notes / dot-vote / vote-totaling / room-members / invite
+#   notes → dot-vote / room-members
 #
 # それ以外の feature（dot-vote / vote-totaling / room-members / invite /
 # room-lifecycle / auth）は他の feature を import しない「葉」。
@@ -53,14 +54,14 @@ rule:
     field: source
     regex: "[.@]/features/"
 ---
-# room が依存してよいのは dot-vote / vote-totaling / room-members / invite のみ。
+# room が依存してよいのは notes / dot-vote / vote-totaling / room-members / invite のみ。
 # room-lifecycle・auth への依存（および自 feature への alias import）は禁止。
 id: room-feature-allowed-edges
 language: typescript
 severity: error
 files:
   - features/room/**
-message: room から import できる feature は dot-vote・vote-totaling・room-members・invite のみ
+message: room から import できる feature は notes・dot-vote・vote-totaling・room-members・invite のみ
 note: |
   room → room-lifecycle を許すと、room-lifecycle が room の状態（reducer 等）を
   使った時点で循環する。ルーム内で必要なロジックは features/room に置く。
@@ -78,7 +79,7 @@ language: tsx
 severity: error
 files:
   - features/room/**
-message: room から import できる feature は dot-vote・vote-totaling・room-members・invite のみ
+message: room から import できる feature は notes・dot-vote・vote-totaling・room-members・invite のみ
 note: |
   room → room-lifecycle を許すと、room-lifecycle が room の状態（reducer 等）を
   使った時点で循環する。ルーム内で必要なロジックは features/room に置く。
@@ -91,15 +92,63 @@ rule:
     field: source
     regex: "[.@]/features/(room|room-lifecycle|auth)[\"'/]"
 ---
-# feature 内は 1 階層のフラット構成なので、"../" が必要になる合法な import は
-# 存在しない。相対 import で親をさかのぼると、alias 規約（@/features/<name>）を
-# すり抜けて他 feature / 他レイヤーの内部へ直接依存できてしまうため、形で塞ぐ。
-id: features-must-not-escape-with-relative-imports
+# notes が依存してよいのは dot-vote / room-members のみ。
+# room への依存は禁止（room → notes のエッジと循環する）。
+id: notes-feature-allowed-edges
+language: typescript
+severity: error
+files:
+  - features/notes/**
+message: notes から import できる feature は dot-vote・room-members のみ
+note: |
+  notes → room を許すと room → notes と循環する。接続・フェーズ進行・
+  ボード画面の配線はオーケストレーターである room 側に置き、notes は
+  「付箋そのもの」に閉じる。自 feature 内は相対 import（"./xxx"）を使う。
+rule:
+  any:
+    - kind: import_statement
+    - kind: export_statement
+  has:
+    field: source
+    regex: "[.@]/features/(notes|room|vote-totaling|invite|room-lifecycle|auth)[\"'/]"
+---
+id: notes-feature-allowed-edges-tsx
+language: tsx
+severity: error
+files:
+  - features/notes/**
+message: notes から import できる feature は dot-vote・room-members のみ
+note: |
+  notes → room を許すと room → notes と循環する。接続・フェーズ進行・
+  ボード画面の配線はオーケストレーターである room 側に置き、notes は
+  「付箋そのもの」に閉じる。自 feature 内は相対 import（"./xxx"）を使う。
+rule:
+  any:
+    - kind: import_statement
+    - kind: export_statement
+  has:
+    field: source
+    regex: "[.@]/features/(notes|room|vote-totaling|invite|room-lifecycle|auth)[\"'/]"
+---
+# feature 内の構成は「ルート（index.ts 等）+ ui/ / logic/ の 1 段」まで。
+# 相対 import で親をさかのぼって features/ 直下を越えると、alias 規約
+# （@/features/<name>）をすり抜けて他 feature / 他レイヤーの内部へ直接依存
+# できてしまうため、「feature の外に届く深さの ../」を形で塞ぐ。
+# - feature 直下のファイル: "../" 1 つで feature の外に出るので全面禁止
+# - サブディレクトリ（ui/ logic/）のファイル: "../" は feature 内なので合法、
+#   "../../" で feature の外に出るので禁止
+# root ルールの適用除外は ui/ logic/ だけなので、規約外の名前のサブディレクトリ
+# （molecules/ など）を作るとそこからの "../" が全てエラーになる（fail-closed）。
+# 許可する層を増やすときはこの ignores を更新する。
+id: features-root-must-not-escape-with-relative-imports
 language: typescript
 severity: error
 files:
   - features/**
-message: features 内で "../" import を使わない（@/ alias か同一 feature 内の "./" を使う）
+ignores:
+  - "**/ui/**"
+  - "**/logic/**"
+message: feature 直下で "../" import を使わない（@/ alias か feature 内の "./" を使う）
 note: |
   他 feature は @/features/<name>（公開境界）、共有インフラは @/lib、
   境界スキーマは @/contracts を import する。
@@ -111,12 +160,15 @@ rule:
     field: source
     regex: "\\.\\./"
 ---
-id: features-must-not-escape-with-relative-imports-tsx
+id: features-root-must-not-escape-with-relative-imports-tsx
 language: tsx
 severity: error
 files:
   - features/**
-message: features 内で "../" import を使わない（@/ alias か同一 feature 内の "./" を使う）
+ignores:
+  - "**/ui/**"
+  - "**/logic/**"
+message: feature 直下で "../" import を使わない（@/ alias か feature 内の "./" を使う）
 note: |
   他 feature は @/features/<name>（公開境界）、共有インフラは @/lib、
   境界スキーマは @/contracts を import する。
@@ -127,3 +179,56 @@ rule:
   has:
     field: source
     regex: "\\.\\./"
+---
+id: features-subdir-must-not-escape-with-relative-imports
+language: typescript
+severity: error
+files:
+  - features/*/*/**
+message: feature のサブディレクトリから "../../" で feature の外に出ない（"../" は feature 内のみ）
+note: |
+  同一 feature 内の別層は "../ui" / "../logic"、他 feature は
+  @/features/<name>（公開境界）、共有インフラは @/lib を import する。
+rule:
+  any:
+    - kind: import_statement
+    - kind: export_statement
+  has:
+    field: source
+    regex: "\\.\\./\\.\\./"
+---
+id: features-subdir-must-not-escape-with-relative-imports-tsx
+language: tsx
+severity: error
+files:
+  - features/*/*/**
+message: feature のサブディレクトリから "../../" で feature の外に出ない（"../" は feature 内のみ）
+note: |
+  同一 feature 内の別層は "../ui" / "../logic"、他 feature は
+  @/features/<name>（公開境界）、共有インフラは @/lib を import する。
+rule:
+  any:
+    - kind: import_statement
+    - kind: export_statement
+  has:
+    field: source
+    regex: "\\.\\./\\.\\./"
+---
+# 2 層構成の判定器「JSX を返すなら ui/、返さないなら logic/」を機械検査にする。
+# logic/ に UI が混ざると ui → logic の一方通行が崩れ、hook・reducer のテストが
+# DOM 環境を要求し始める。spec は renderHook のラッパー等で JSX を使うため除外。
+id: feature-logic-layer-must-not-render-jsx
+language: tsx
+severity: error
+files:
+  - features/*/logic/**
+ignores:
+  - "**/*.spec.tsx"
+message: logic/ に JSX（UI）を置かない。コンポーネントは ui/ へ
+note: |
+  logic/ は hook・reducer・Server Action・純関数・定数の置き場。
+  JSX を返すものは ui/ に置く（spec / stories / fixture は実装と同居）。
+rule:
+  any:
+    - kind: jsx_element
+    - kind: jsx_self_closing_element

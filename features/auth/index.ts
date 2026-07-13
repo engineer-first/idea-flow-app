@@ -5,7 +5,7 @@ export {
   signInWithDevPassword,
   signInWithGoogle,
   signOut,
-} from "./actions";
-export { isEmailVerified } from "./google-claims";
-export { LoginCard } from "./login-card";
-export { getLoginPath, sanitizeNextPath } from "./redirects";
+} from "./logic/actions";
+export { isEmailVerified } from "./logic/google-claims";
+export { getLoginPath, sanitizeNextPath } from "./logic/redirects";
+export { LoginCard } from "./ui/login-card";
