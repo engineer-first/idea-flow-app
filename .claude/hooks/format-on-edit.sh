@@ -12,17 +12,8 @@ case "$FILE" in
   *) exit 0 ;;
 esac
 
-case "$FILE" in
-  */node_modules/*|*/.next/*|*/coverage/*|*/public/*|*/package-lock.json|*/AGENTS.md)
-    exit 0
-    ;;
-esac
-
-case "$FILE" in
-  *.ts|*.tsx|*.js|*.mjs|*.cjs|*.json|*.css|*.scss|*.md|*.mdx)
-    cd "$PROJECT_DIR" || exit 0
-    npx --no-install biome check --write "$FILE" >&2 || true
-    ;;
-esac
-
+# 拡張子ごとの振り分け・除外パス判定は scripts/format-file.sh に一本化されている
+# (opencode・Codex CLI とも共有する)。ここでは Claude Code 固有の stdin JSON
+# 解析だけを行い、実際の整形はそちらに委譲する。
+bash "$PROJECT_DIR/scripts/format-file.sh" "$FILE" >&2 || true
 exit 0

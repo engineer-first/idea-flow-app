@@ -57,12 +57,12 @@ app  →  features  →  components/ui・lib  →  contracts
 
 ## 命名規則
 
-| 対象 | 規則 | 例 |
-| --- | --- | --- |
-| ファイル名 | `kebab-case` | `idea-card.tsx`, `use-idea-list.ts` |
-| テスト / ストーリー | `*.spec.ts(x)` / `*.stories.tsx` | `note-card.spec.tsx` |
-| 関数名 | `camelCase` | `getUserName` |
-| スキーマ名（型・zod） | `PascalCase` | `User`, `Idea`, `IdeaStatus` |
+| 対象                  | 規則                             | 例                                  |
+| --------------------- | -------------------------------- | ----------------------------------- |
+| ファイル名            | `kebab-case`                     | `idea-card.tsx`, `use-idea-list.ts` |
+| テスト / ストーリー   | `*.spec.ts(x)` / `*.stories.tsx` | `note-card.spec.tsx`                |
+| 関数名                | `camelCase`                      | `getUserName`                       |
+| スキーマ名（型・zod） | `PascalCase`                     | `User`, `Idea`, `IdeaStatus`        |
 
 - Next.js の予約ファイル名は App Router の規約に従う。
 - 例: `page.tsx`、`layout.tsx`、`route.ts`、`loading.tsx`、`error.tsx`。

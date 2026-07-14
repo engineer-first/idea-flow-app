@@ -45,7 +45,7 @@ npm run dev:api
 npm run dev
 ```
 
-ブラウザで [http://localhost:3000](http://localhost:3000) を開いて動作を確認できます。
+ブラウザで <http://localhost:3000> を開いて動作を確認できます。
 
 ### 認証のローカル開発
 
@@ -63,21 +63,21 @@ Google ログインを確認する場合は、Google Cloud Console で OAuth ク
 
 ### よく使うコマンド
 
-| コマンド               | 説明                                                        |
-| ---------------------- | ----------------------------------------------------------- |
-| `npm run dev`          | Next.js 開発サーバーを起動                                  |
-| `npm run dev:api`      | api-worker（D1 + Durable Objects）をローカル起動            |
-| `npm run db:migrate`   | ローカル D1 に migration を適用                             |
+| コマンド                                    | 説明                                                                                                                                                                                                                           |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm run dev`                               | Next.js 開発サーバーを起動                                                                                                                                                                                                     |
+| `npm run dev:api`                           | api-worker（D1 + Durable Objects）をローカル起動                                                                                                                                                                               |
+| `npm run db:migrate`                        | ローカル D1 に migration を適用                                                                                                                                                                                                |
 | `npm run new:room-do-migration -- 短い説明` | RoomDO migration の `.sql` スタブをタイムスタンプ付きで作成（例: `-- add-note-kind`）。コミットするのは `.sql` だけ（集約 `index.ts` は gitignore 済みの生成物で、`npm ci` / `test:workers` / `dev:api` などが自動再生成する） |
-| `npm run build`        | Next.js 本番ビルド                                          |
-| `npm run build:cf`     | Cloudflare Workers 向けビルド（OpenNext）                   |
-| `npm run preview:cf`   | Workers 向けビルドを workerd 上でローカル実行（2構成同時）  |
-| `npm run lint`         | Biome による静的解析 (lint + format チェック)               |
-| `npm run fix`          | Biome の自動修正 (lint + format)                            |
-| `npm run format`       | Biome でファイルを一括フォーマット                          |
-| `npm run test`         | アプリ側ユニットテストを実行 (CI でも実行)                  |
-| `npm run test:workers` | Worker / Durable Object のテストを workerd 上で実行         |
-| `npm run typecheck`    | 型検査（Worker の型生成込み）                               |
+| `npm run build`                             | Next.js 本番ビルド                                                                                                                                                                                                             |
+| `npm run build:cf`                          | Cloudflare Workers 向けビルド（OpenNext）                                                                                                                                                                                      |
+| `npm run preview:cf`                        | Workers 向けビルドを workerd 上でローカル実行（2構成同時）                                                                                                                                                                     |
+| `npm run lint`                              | Biome による静的解析 (lint + format チェック)                                                                                                                                                                                  |
+| `npm run fix`                               | Biome の自動修正 (lint + format)                                                                                                                                                                                               |
+| `npm run format`                            | Biome でファイルを一括フォーマット                                                                                                                                                                                             |
+| `npm run test`                              | アプリ側ユニットテストを実行 (CI でも実行)                                                                                                                                                                                     |
+| `npm run test:workers`                      | Worker / Durable Object のテストを workerd 上で実行                                                                                                                                                                            |
+| `npm run typecheck`                         | 型検査（Worker の型生成込み）                                                                                                                                                                                                  |
 
 ### デプロイ（Cloudflare）
 
@@ -106,7 +106,9 @@ Node.js のバージョンは `mise.toml` で LTS に固定しています。CI 
 
 ## ドキュメントのフォーマット
 
-Markdown は現時点で Biome が未対応（[biomejs/biome#3718](https://github.com/biomejs/biome/issues/3718)）のため、保存時の自動整形は行いません。テーブルの列幅などは手動で調整してください。Biome が Markdown フォーマッタをリリースし次第、他言語と同様 `.vscode/settings.json` 経由で Biome に統一します。
+Markdown の整形には [remark](https://github.com/remarkjs/remark) を使用します。設定は `.remarkrc.mjs` に集約されており、VS Code 拡張 [remark](https://marketplace.visualstudio.com/items?itemName=unifiedjs.vscode-remark)（保存時整形）と CLI（`.claude/hooks/format-on-edit.sh` 経由のAIエージェント編集時整形、`npm run format:md`）が同じ設定・同じ実装を共有するため、人間が保存したときとAIが編集したときで整形結果が一致します。テーブルは `remark-gfm` の `stringLength` に `string-width` を渡すことで、全角文字幅を考慮した列揃えに対応しています。拡張子ごとの Biome/remark 振り分けは `scripts/format-file.sh` に一本化されており、Claude Code・opencode（`opencode.json` の `formatter`）・Codex CLI（`.codex/hooks.json` 経由の `scripts/format-changed-files.sh`）はいずれもこのスクリプトを共通で呼び出します。
+
+リポジトリを開いたら、推奨拡張機能として案内される **remark** をインストールしてください。
 
 ## 命名規則
 
