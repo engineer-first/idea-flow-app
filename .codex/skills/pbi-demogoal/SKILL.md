@@ -50,8 +50,10 @@ Template: `When {screen or action}, {user-observable result}.`
   Demo goals:
 
   - Clicking the "create room" button on the home screen navigates to the waiting screen.
-  - Arriving at the waiting screen shows the invite URL and invite code.
-  - Clicking the invite URL/code on the waiting screen copies it.
+  - Arriving at the waiting screen shows the invite URL.
+  - Arriving at the waiting screen shows the invite code.
+  - Clicking the invite URL on the waiting screen copies it.
+  - Clicking the invite code on the waiting screen copies it.
 
   Maps onto the spec as one `demo_goals` entry per bullet:
 
@@ -62,12 +64,20 @@ Template: `When {screen or action}, {user-observable result}.`
       "goal": "Clicking the \"create room\" button on the home screen navigates to the waiting screen."
     },
     {
-      "title": "Invite URL/code is shown",
-      "goal": "Arriving at the waiting screen shows the invite URL and invite code."
+      "title": "Invite URL is shown",
+      "goal": "Arriving at the waiting screen shows the invite URL."
     },
     {
-      "title": "Invite URL/code copies on click",
-      "goal": "Clicking the invite URL/code on the waiting screen copies it."
+      "title": "Invite code is shown",
+      "goal": "Arriving at the waiting screen shows the invite code."
+    },
+    {
+      "title": "Invite URL copies on click",
+      "goal": "Clicking the invite URL on the waiting screen copies it."
+    },
+    {
+      "title": "Invite code copies on click",
+      "goal": "Clicking the invite code on the waiting screen copies it."
     }
   ]
   ```
