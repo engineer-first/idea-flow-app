@@ -25,7 +25,11 @@ case "$FILE" in
     ;;
   *.md|*.mdx)
     cd "$PROJECT_DIR" || exit 0
-    npx --no-install remark --quiet --frail --output "$FILE" >&2 || true
+    # remark-cli の `-o/--output [path]` は値を取れるオプションのため、
+    # `--output "$FILE"` の順だと $FILE が「出力先」として解釈され、
+    # 入力なし(空のstdin)の結果でファイルが空上書きされる。
+    # 先にファイルをpositional引数で渡し、`--output` は値なしのフラグにする。
+    npx --no-install remark "$FILE" --quiet --frail --output >&2 || true
     ;;
 esac
 
