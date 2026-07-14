@@ -268,7 +268,7 @@ describe("動的 import() は文字列リテラル1つに限定して許可（fe
         `}`,
       ].join("\n"),
       "features/zz-poc/templates/dynamic-legal.tsx": [
-        `export function Ok() {`,
+        `export function render() {`,
         `  const p = import("../containers/board");`,
         `  return <div>{String(p)}</div>;`,
         `}`,
