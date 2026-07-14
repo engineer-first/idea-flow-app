@@ -106,9 +106,7 @@ Node.js のバージョンは `mise.toml` で LTS に固定しています。CI 
 
 ## ドキュメントのフォーマット
 
-Markdown の整形には VS Code 拡張 [Markdown All in One](https://marketplace.visualstudio.com/items?itemName=yzhang.markdown-all-in-one) を使用します（テーブルの列幅を全角文字幅を考慮して自動で揃えてくれます）。
-
-リポジトリを開いたら、推奨拡張機能として案内される **Markdown All in One** をインストールしてください。`.vscode/settings.json` により保存時に自動整形されます。
+Markdown は現時点で Biome が未対応（[biomejs/biome#3718](https://github.com/biomejs/biome/issues/3718)）のため、保存時の自動整形は行いません。テーブルの列幅などは手動で調整してください。Biome が Markdown フォーマッタをリリースし次第、他言語と同様 `.vscode/settings.json` 経由で Biome に統一します。
 
 ## 命名規則
 
