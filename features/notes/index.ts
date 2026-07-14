@@ -8,5 +8,5 @@ export { useNoteGroups } from "./logic/use-note-groups";
 export { useRoomNotes } from "./logic/use-room-notes";
 export { NoteCard } from "./molecules/note-card";
 export { NoteGroupCard } from "./molecules/note-group-card";
-export { PrivateNotesToolbar } from "./organisms/private-notes-toolbar";
 export { StickyNote } from "./molecules/sticky-note";
+export { PrivateNotesToolbar } from "./organisms/private-notes-toolbar";

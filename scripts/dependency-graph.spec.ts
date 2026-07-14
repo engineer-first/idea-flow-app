@@ -72,7 +72,8 @@ describe("buildFeatureDiagram", () => {
         },
         {
           path: "containers/room-board.tsx",
-          source: 'import { RoomBoardView } from "../templates/room-board-view";',
+          source:
+            'import { RoomBoardView } from "../templates/room-board-view";',
         },
         {
           path: "templates/room-board-view.tsx",
