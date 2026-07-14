@@ -1,0 +1,265 @@
+"use client";
+
+// ルームボードの表示用コンポーネント。データ層には一切依存せず、
+// 付箋の配列と各種コールバックをpropsで受け取る。
+// WebSocket接続・スロットル・プロトコル送信はroom-board.tsx（コンテナ）の責務。
+// 「どの付箋を選択中か」「どのダイアログが開いているか」は同期不要な
+// 純粋にUIの関心事なので、ここでローカルに持つ。
+// 描画の実体はヘッダー（room-board-header）とボード面（room-board-canvas）が
+// 持ち、この view は UI 状態とドラッグ機械（use-board-drag）の配線に徹する。
+import { useEffect, useRef, useState } from "react";
+import type { PersistentGroup } from "@/contracts/grouping";
+import {
+  DOT_VOTE_LIMITS,
+  type DotVoteKind,
+  type Phase,
+  type TimerState,
+} from "@/contracts/room-protocol";
+import type { Note } from "@/features/notes";
+import type { RoomScreenConnectionStatus } from "../logic/connection-status";
+import type { Member } from "../logic/room-reducer";
+import { useBoardDrag } from "../logic/use-board-drag";
+import { LeaveConfirmDialog } from "../molecules/leave-confirm-dialog";
+import { VoteTotalingDialog } from "../molecules/vote-totaling-dialog";
+import { RoomBoardCanvas } from "../organisms/room-board-canvas";
+import { RoomBoardHeader } from "../organisms/room-board-header";
+
+export type RoomBoardViewProps = {
+  notes: Note[];
+  groups: PersistentGroup[];
+  inviteCode: string;
+  inviteUrl: string;
+  phase: Phase;
+  timer: TimerState;
+  timerServerOffsetMs: number;
+  isHost: boolean;
+  // WebSocket 接続の表示用状態。値の生成は room-board（コンテナ）の責務で、
+  // ここでは受け取った状態を表示するだけ（このコンポーネントはデータ層に依存しない）。
+  connectionStatus: RoomScreenConnectionStatus;
+  draggingNoteId: string | null;
+  members: Member[];
+  currentUserId: string;
+  // ホストの userId（メンバー一覧の「ホスト」ラベル表示用）。
+  hostUserId: string;
+  isNextPhasePending: boolean;
+  privateNotes: Note[];
+  onAddPrivateNote: () => void;
+  onPrivateNoteContentChange: (noteId: string, content: string) => void;
+  onPrivateNoteDelete: (noteId: string) => void;
+  onPrivateNotePublish: (noteId: string, x: number, y: number) => void;
+  onPrivateNoteUnpublish: (noteId: string) => void;
+  onNoteDragStart: (noteId: string) => void;
+  onNoteDragMove: (noteId: string, x: number, y: number) => void;
+  onNoteDragEnd: (noteId: string, x: number, y: number) => void;
+  onNoteContentChange: (noteId: string, content: string) => void;
+  onNoteDelete: (noteId: string) => void;
+  onGroupCreate?: (name: string, noteIds: string[]) => void;
+  onGroupUpdateName?: (groupId: string, name: string) => void;
+  onNoteVote: (noteId: string, kind: DotVoteKind) => void;
+  onNoteVoteReset: (noteId: string, kind: DotVoteKind) => void;
+  // 退出。
+  onLeave: () => void;
+  // 退出処理中（多重押下防止）。true の間「退出する」ボタンは disabled。
+  isLeaving: boolean;
+  // 次フェーズへ。ホストのみ UI 表示。
+  onNextPhase: () => void;
+  onTimerStart: (durationMs: number) => void;
+  onTimerPause: () => void;
+  onTimerResume: () => void;
+  onTimerExtend: () => void;
+  onTimerStop: () => void;
+};
+
+export function RoomBoardView({
+  notes,
+  groups,
+  inviteCode,
+  inviteUrl,
+  phase,
+  timer,
+  timerServerOffsetMs,
+  isHost,
+  connectionStatus,
+  draggingNoteId,
+  members,
+  currentUserId,
+  hostUserId,
+  isNextPhasePending,
+  privateNotes,
+  onAddPrivateNote,
+  onPrivateNoteContentChange,
+  onPrivateNoteDelete,
+  onPrivateNotePublish,
+  onPrivateNoteUnpublish,
+  onNoteDragStart,
+  onNoteDragMove,
+  onNoteDragEnd,
+  onNoteContentChange,
+  onNoteDelete,
+  onGroupCreate,
+  onGroupUpdateName,
+  onNoteVote,
+  onNoteVoteReset,
+  onLeave,
+  isLeaving,
+  onNextPhase,
+  onTimerStart,
+  onTimerPause,
+  onTimerResume,
+  onTimerExtend,
+  onTimerStop,
+}: RoomBoardViewProps) {
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const [voteTotalingDialogOpen, setVoteTotalingDialogOpen] = useState(false);
+  const boardRootRef = useRef<HTMLDivElement>(null);
+  const boardScrollerRef = useRef<HTMLDivElement>(null);
+  const privateToolbarRef = useRef<HTMLDivElement>(null);
+
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    setVoteTotalingDialogOpen(phase === "phase4");
+  }, [phase]);
+
+  // ハイドレーション直後の高速接続確立によるMismatchedを防ぐため、マウント完了までは接続中（非活性）扱いにする
+  const isDisconnected = isMounted ? connectionStatus !== "open" : true;
+
+  const {
+    drag,
+    renderedNotes,
+    renderedPrivateNotes,
+    handleSharedNoteDragStart,
+    handlePrivateDragStart,
+    handlePointerMove,
+    handlePointerEnd,
+  } = useBoardDrag({
+    notes,
+    privateNotes,
+    currentUserId,
+    boardRootRef,
+    boardScrollerRef,
+    privateToolbarRef,
+    onNoteDragStart,
+    onNoteDragMove,
+    onNoteDragEnd,
+    onPrivateNotePublish,
+    onPrivateNoteUnpublish,
+  });
+
+  const voteRemaining = {
+    subjective: Math.max(
+      0,
+      DOT_VOTE_LIMITS.subjective -
+        notes.reduce(
+          (used, note) => used + note.dotVotes.subjective.ownCount,
+          0,
+        ),
+    ),
+    objective: Math.max(
+      0,
+      DOT_VOTE_LIMITS.objective -
+        notes.reduce(
+          (used, note) => used + note.dotVotes.objective.ownCount,
+          0,
+        ),
+    ),
+  };
+
+  // ツールバー発のドラッグでボード側にまだ実体がない間だけ、ゴーストを描く。
+  const dragGhost =
+    drag?.status === "shared" && !notes.some((note) => note.id === drag.note.id)
+      ? { note: drag.note, x: drag.x, y: drag.y }
+      : null;
+
+  // ボードへ出て行った付箋・共有ドラッグ中の付箋はドックに出さない。
+  const toolbarNotes = renderedPrivateNotes.filter(
+    (note) =>
+      !(note.id === drag?.note.id && drag.status === "shared") &&
+      note.id !== draggingNoteId,
+  );
+
+  return (
+    <div
+      ref={boardRootRef}
+      data-testid="room-board-view-root"
+      className="flex h-full flex-col gap-3"
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerEnd}
+      onPointerCancel={handlePointerEnd}
+    >
+      <RoomBoardHeader
+        inviteCode={inviteCode}
+        inviteUrl={inviteUrl}
+        phase={phase}
+        timer={timer}
+        timerServerOffsetMs={timerServerOffsetMs}
+        isHost={isHost}
+        isDisconnected={isDisconnected}
+        connectionStatus={connectionStatus}
+        members={members}
+        currentUserId={currentUserId}
+        hostUserId={hostUserId}
+        isNextPhasePending={isNextPhasePending}
+        voteRemaining={voteRemaining}
+        isLeaving={isLeaving}
+        onShowVoteResult={() => setVoteTotalingDialogOpen(true)}
+        onLeaveClick={() => setLeaveDialogOpen(true)}
+        onNextPhase={onNextPhase}
+        onTimerStart={onTimerStart}
+        onTimerPause={onTimerPause}
+        onTimerResume={onTimerResume}
+        onTimerExtend={onTimerExtend}
+        onTimerStop={onTimerStop}
+      />
+
+      <RoomBoardCanvas
+        notes={renderedNotes}
+        groups={groups}
+        privateNotes={toolbarNotes}
+        selectedNoteId={selectedNoteId}
+        draggingNoteId={draggingNoteId}
+        isDisconnected={isDisconnected}
+        voteRemaining={voteRemaining}
+        dragGhost={dragGhost}
+        isReturnDropTarget={
+          drag?.status === "shared" && drag.note.authorId === currentUserId
+        }
+        boardScrollerRef={boardScrollerRef}
+        privateToolbarRef={privateToolbarRef}
+        onSelect={setSelectedNoteId}
+        onNoteDragStart={handleSharedNoteDragStart}
+        onNoteContentChange={onNoteContentChange}
+        onNoteDelete={onNoteDelete}
+        onNoteVote={onNoteVote}
+        onNoteVoteReset={onNoteVoteReset}
+        onGroupCreate={onGroupCreate}
+        onGroupUpdateName={onGroupUpdateName}
+        onAddPrivateNote={onAddPrivateNote}
+        onPrivateNoteContentChange={onPrivateNoteContentChange}
+        onPrivateNoteDelete={onPrivateNoteDelete}
+        onPrivateNoteDragStart={handlePrivateDragStart}
+      />
+
+      <VoteTotalingDialog
+        open={voteTotalingDialogOpen}
+        onOpenChange={setVoteTotalingDialogOpen}
+        isVotingComplete={phase === "phase4"}
+        members={members}
+        notes={notes}
+      />
+
+      <LeaveConfirmDialog
+        open={leaveDialogOpen}
+        onOpenChange={setLeaveDialogOpen}
+        onConfirm={onLeave}
+        isLeaving={isLeaving}
+        mode={isHost ? "disband" : "leave"}
+      />
+    </div>
+  );
+}

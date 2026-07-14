@@ -2,7 +2,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@/app/auth/actions", () => ({
+vi.mock("@/features/auth", () => ({
   signOut: vi.fn(),
 }));
 

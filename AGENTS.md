@@ -15,19 +15,45 @@
 
 ## リポジトリ構成
 
-- `app/` — Next.js App Router の UI 層。ルーティング、状態・副作用を持つ
-  コンテナ、Server Actions（認可と入力検証を必須にする）。
-  `app/mocks/` に MSW ハンドラ。
+- `app/` — Next.js への「殻」。予約ファイル（`page.tsx` / `layout.tsx` /
+  `route.ts`）と 1 ルート専用の組み立て view のみ。`page.tsx` は認証・params
+  解決・データ取得の配線に徹し、資産は `features/` に置く。
+  `app/mocks/` に MSW ハンドラ（開発・テスト用インフラ）。
+- `features/` — ドメイン UI の唯一の置き場。機能（ユーザーに見える能力）単位。
+  各 feature の公開境界は `index.ts`（外から使えるのはそこに並ぶものだけ）。
+  現在: `room`（ルーム内体験）、`notes`（付箋）、`room-members`、`dot-vote`、
+  `vote-totaling`、`invite`、`room-lifecycle`（作成・参加）、`auth`。
+- `components/ui/` — shadcn 汎用部品のみ。ドメイン（contracts / features /
+  app）を知らないことがこの層の価値。`components/schema-diagrams/` は
+  Storybook 専用ドキュメント部品。
 - `contracts/` — 境界スキーマ（zod）。WS プロトコル・REST・セッション・ボード定数。
   クライアントとサーバーの両方がここを import する。実装より先にここを変える。
+  `*.fixture.ts` はスキーマ準拠のテストデータビルダー（テスト専用）。
 - `workers/` — Cloudflare Workers 側。`api-worker.ts`（D1 + RoomDO への唯一の入口）、
   `room/`（1ルーム = 1 Durable Object の権威サーバー。`room-do.ts` が
   エントリポイントの façade で、ドメインロジックは同ディレクトリの
   モジュールに分割）、`migrations/`（D1）。
-- `lib/api-client.ts` — Next サーバーから api-worker を呼ぶ唯一のクライアント。
-- `lib/session/` — セッション（HS256 JWT Cookie）の発行・検証。
-- `lib/room-client/` — ルーム WebSocket クライアント（自動再接続つき）。
-- `rules/ast-grep/` — app/workers の import 境界の機械検査ルール。
+- `lib/` — ドメイン非依存インフラ。React コンポーネントを置かない。
+  `api-client.ts`（Next サーバーから api-worker を呼ぶ唯一のクライアント）、
+  `session/`（HS256 JWT Cookie の発行・検証）、`room-client/`（ルーム
+  WebSocket クライアント。自動再接続つき）、`throttle.ts`、`notify.ts`
+  （文言を持たない汎用 toast。ドメイン文言は各 feature の notify に置く）。
+- `rules/ast-grep/` — レイヤー間 import 境界の機械検査ルール。
+
+### 依存の一方通行ルール
+
+矢印は「import してよい方向」。違反は ast-grep が CI（`lint:boundaries`）で
+機械検査する。詳細・理由は `rules/ast-grep/*.yml` のコメントが真実。
+
+```
+app  →  features  →  components/ui・lib  →  contracts
+```
+
+- feature 間は `index.ts`（公開境界）経由のみ。同一 feature 内は相対 import。
+  許可エッジの一覧は `rules/ast-grep/feature-dependencies-one-way.yml` が真実。
+  エッジを増やすときは、循環にならないことを確認してそこを更新する。
+- `app/` 配下を import してよいのは `app/` 配下だけ。2 ルート以上から
+  使われるようになったら features へ昇格する。
 
 ## 命名規則
 
@@ -40,6 +66,21 @@
 
 - Next.js の予約ファイル名は App Router の規約に従う。
 - 例: `page.tsx`、`layout.tsx`、`route.ts`、`loading.tsx`、`error.tsx`。
+- feature 内は 5 箱まで: `containers / templates / organisms / molecules`
+  （JSX を返すもの）と `logic`（hook・reducer・Server Action・純関数・定数）。
+  依存方向は ast-grep `feature-band-imports.yml` が機械検査する（規則・理由は
+  そのコメントが真実）。新規コンポーネントの既定は最下帯（`molecules/`）。上の
+  帯の部品が必要になったら CI が昇格を教える。atoms は作らない（リポジトリ
+  全体の atoms は `components/ui/`）。
+- feature 単位で「フラット or 5 箱」の二択。混在・規約外ディレクトリ・箱の
+  入れ子は `npm run check:feature-layout`（CI）が fail させる。
+  spec / stories / fixture は実装と同居させる。
+- 役割の細分はファイル名のサフィックスで表現する
+  （`-view`, `-card`, `-dialog`, `-section`, `use-`）。背景: feature 内 5 箱は
+  [`docs/feature-internal-structure.md`](docs/feature-internal-structure.md)、
+  feature 縦割りは [`docs/feature-structure.md`](docs/feature-structure.md)。
+- コンテナと view はステムを揃える（例: `room-board.tsx` と
+  `room-board-view.tsx`）。
 
 ## 開発プロセス（TDD）
 
@@ -54,12 +95,24 @@
 
 ## フロントエンドと UI（Storybook + MSW）
 
+- container / view 分離を必須にする。view は「props in、コールバック out」だけ。
+  view の判定器は「Storybook に単体で載せられるか」。
+- container が肥大したら関心ごとの hook（`use-*`）に分割し、container は
+  hooks を束ねて view に渡すだけにする（例: `features/room/logic/use-*.ts`）。
+  楽観更新の可否のようなポリシーは hook 単位で spec を書く。
+- 状態は「純関数 reducer + サーバー権威（RoomDO）」を維持する。グローバル
+  ストア（Zustand / Redux 等）は導入しない。RoomDO と並ぶ第二の真実が生まれ、
+  同期バグの温床になる。クライアントの状態は「サーバー真実の畳み込み・URL・
+  コンポーネントローカル UI 状態」の 3 種で全て。
 - すべての UI コンポーネントに `*.stories.tsx` を作成し、
-  Storybook を通じて component-driven に構築する。
+  Storybook を通じて component-driven に構築する。stories のタイトル階層は
+  features/ をミラーする（例: `Notes/NoteCard`、`DotVote/DotVoteButton`）。
 - 外部 API 通信は MSW（`app/mocks/`）でモックする。WebSocket はフェイクの注入
   （`webSocketFactory`）でモックする。
 - コンポーネント内に生のテストデータをハードコードしない。fixture、handler、
   builder、ガイド文言などの固定コンテンツはコンポーネントファイルの外に置く。
+  contracts 型のビルダーは `contracts/*.fixture.ts` に集約し、feature 固有の
+  fixture はコンポーネントと同居させる。
 - UI がデータに依存する場合は loading、empty、success、error 状態をテストする。
 
 ## API とサーバー処理（api-worker / Server Action / Route Handler）

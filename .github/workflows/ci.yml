@@ -35,6 +35,17 @@ jobs:
       - name: Lint & format check
         run: npm run lint -- --reporter=github
 
+      # レイヤー間の依存方向（app → features → components/ui・lib → contracts）の
+      # 機械検査。ルールは rules/ast-grep/。規約が壊れる速度を「レビューで気づける
+      # 速度」ではなく「lint が落ちる速度」で抑える。
+      - name: Check import boundaries (ast-grep)
+        run: npm run lint:boundaries
+
+      # feature 内の配置規約（フラット or 5 箱の二択・規約外ディレクトリ禁止・
+      # 深さ 2 まで）。ast-grep は import 文しか見ないため、配置はここで検査する。
+      - name: Check feature directory layout
+        run: npm run check:feature-layout
+
       - name: Type check
         run: npm run typecheck
 

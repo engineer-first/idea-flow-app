@@ -65,6 +65,10 @@ jobs:
           # 届くため、Vite の依存グラフに乗らない。externals に載せないと
           # 「migration だけ変えた PR」で schema stories がベースラインのコピーに
           # なり、ER 図の差分検出が働かない。
+          # Dependencies/* stories（依存図）も同様に静的アセット経由。生成
+          # スクリプトの変更を externals で追跡する。図のもう一つの入力である
+          # features/** のソースは各 feature の stories 経由で Vite グラフに
+          # 乗っているため載せない（載せると全 PR で全再撮影になる）。
           externals: |
             workers/migrations/**
             workers/room-do-migrations/**/*.sql
@@ -72,6 +76,8 @@ jobs:
             scripts/build-d1-schema.mts
             scripts/build-room-do-schema.mts
             scripts/generate-room-do-migrations.mjs
+            scripts/build-dependency-diagrams.mts
+            scripts/dependency-graph.mts
 
           # bot が作るブランチではビルド自体をスキップする（スナップショット消費 0。
           # skip はビルドを「スキップ済み」として記録するため、チェックが pending の

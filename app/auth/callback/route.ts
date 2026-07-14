@@ -7,8 +7,7 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { isEmailVerified } from "@/app/auth/google-claims";
-import { sanitizeNextPath } from "@/app/auth/redirects";
+import { isEmailVerified, sanitizeNextPath } from "@/features/auth";
 import { OAUTH_STATE_COOKIE } from "@/lib/session/cookie";
 import {
   getBaseUrl,

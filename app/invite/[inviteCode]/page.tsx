@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
-import { getLoginPath, sanitizeNextPath } from "@/app/auth/redirects";
-import { InviteCodeDialog } from "@/app/invite/[inviteCode]/invite-code-dialog";
 import {
   isValidInviteCode,
   normalizeInviteCode,
 } from "@/contracts/invite-code";
+import { getLoginPath, sanitizeNextPath } from "@/features/auth";
+import { InviteCodeDialog } from "@/features/room-lifecycle";
 import { lookupRoomByInviteCode } from "@/lib/api-client";
 import { getCurrentUser } from "@/lib/session/current-user";
 

@@ -1,12 +1,12 @@
 import { notFound, redirect } from "next/navigation";
-import { buildInviteUrl } from "@/app/invite/invite-url";
-import { RoomBoard } from "@/app/rooms/[id]/room-board";
 import {
   RoomInfoResponseSchema,
   RoomMembersResponseSchema,
 } from "@/contracts/api";
 import { isUuid } from "@/contracts/ids";
 import type { ProtocolMember } from "@/contracts/room-protocol";
+import { buildInviteUrl } from "@/features/invite";
+import { RoomBoard } from "@/features/room";
 import { apiFetch } from "@/lib/api-client";
 import { getCurrentUser } from "@/lib/session/current-user";
 import { getBaseUrl } from "@/lib/session/env";

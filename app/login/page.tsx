@@ -1,9 +1,12 @@
 import { redirect } from "next/navigation";
-import { signInWithDevPassword, signInWithGoogle } from "@/app/auth/actions";
-import { sanitizeNextPath } from "@/app/auth/redirects";
+import {
+  LoginCard,
+  sanitizeNextPath,
+  signInWithDevPassword,
+  signInWithGoogle,
+} from "@/features/auth";
 import { getCurrentUser } from "@/lib/session/current-user";
 import { isAuthConfigured, isDevAuthEnabled } from "@/lib/session/env";
-import LoginCard from "./login-card";
 
 export const dynamic = "force-dynamic";
 

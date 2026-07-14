@@ -11,6 +11,7 @@ export default defineConfig({
     setupFiles: ["./vitest.setup.ts"],
     include: [
       "app/**/*.{test,spec}.{ts,tsx}",
+      "features/**/*.{test,spec}.{ts,tsx}",
       "lib/**/*.{test,spec}.{ts,tsx}",
       "contracts/**/*.{test,spec}.{ts,tsx}",
       "components/**/*.{test,spec}.{ts,tsx}",
@@ -23,6 +24,7 @@ export default defineConfig({
       reporter: ["text"],
       include: [
         "app/**/*.{ts,tsx}",
+        "features/**/*.{ts,tsx}",
         "lib/**/*.{ts,tsx}",
         "contracts/**/*.{ts,tsx}",
         "scripts/**/*.mjs",
