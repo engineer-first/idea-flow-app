@@ -1,14 +1,10 @@
 {
-  // Markdown は Markdown All in One (MAIO) で整形する。
-  // MAIO のテーブル整形は全角(East Asian Width)を考慮するため、日本語混じりの表でも列が揃う。
+  // Markdown は Biome 未対応 (https://github.com/biomejs/biome/issues/3718) のため
+  // 保存時整形を行わない。対応リリース後、他言語と同様 Biome に切り替える。
   "[markdown]": {
-    "editor.defaultFormatter": "yzhang.markdown-all-in-one",
-    "editor.formatOnSave": true,
     // 行末スペースは Markdown では改行(hard break)の意味を持つため削らない
     "files.trimTrailingWhitespace": false
   },
-  // テーブル整形を明示的に有効化（既定で true だが、リポジトリ側で固定しておく）
-  "markdown.extension.tableFormatter.enabled": true,
   // TS/TSX/JS/JSON/CSS は Biome で保存時に自動整形する
   "[javascript]": {
     "editor.defaultFormatter": "biomejs.biome",
