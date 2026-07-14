@@ -1,7 +1,10 @@
 {
-  // Markdown は Biome 未対応 (https://github.com/biomejs/biome/issues/3718) のため
-  // 保存時整形を行わない。対応リリース後、他言語と同様 Biome に切り替える。
+  // Markdown は remark で整形する。remark-cli（AIエージェント用フック・
+  // npm run format:md）と vscode-remark 拡張（保存時整形）が同じ
+  // .remarkrc.mjs を読み込むため、人間とAIの整形結果が一致する。
   "[markdown]": {
+    "editor.defaultFormatter": "unifiedjs.vscode-remark",
+    "editor.formatOnSave": true,
     // 行末スペースは Markdown では改行(hard break)の意味を持つため削らない
     "files.trimTrailingWhitespace": false
   },

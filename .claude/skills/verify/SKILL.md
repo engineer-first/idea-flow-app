@@ -11,7 +11,7 @@ description: このリポジトリの変更をローカルで起動して実際�
   （`SESSION_SECRET` は workers/wrangler.jsonc の vars と一致していること、
   `NEXT_PUBLIC_ENABLE_DEV_AUTH=true` を忘れない）。
 - 初回のみ `npm run db:migrate`（ローカル D1 に migration を適用）。
-- 開発用ユーザーはログイン時に自動作成される（owner@example.test / password）。
+- 開発用ユーザーはログイン時に自動作成される（<owner@example.test> / password）。
 
 ## 起動と導線
 

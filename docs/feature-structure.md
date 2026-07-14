@@ -12,13 +12,13 @@ PR #128 で採用した「feature 縦割り + feature 内 ui / logic 2 層」の
 
 ## TL;DR
 
-| 欲しかったもの | 採用した装置 | Atomic Design で得られるか |
-| --- | --- | --- |
-| 部品の粒度が名前を解読せず分かる | `ui/` / `logic/` の 2 層（判定器: JSX を返すか） | △ 得られるが境界が主観的で腐る |
-| 実物の大きさ・見た目のカタログ | Storybook（全 UI に stories 必須） | ✕ ディレクトリでは実物は見えない |
-| データの流れ（誰が誰を使うか） | `Dependencies/*` stories（import 実測の自動生成図） | ✕ ディレクトリ（木）では依存（DAG）は表現できない |
-| 変更が 1 箇所に閉じる | feature 縦割り + `index.ts` 公開境界 | ✕ 1 機能の変更が atoms〜templates を横断する |
-| 境界の機械検査 | ast-grep（CI の `lint:boundaries`） | ✕ 「これは molecule か」を機械判定できない |
+| 欲しかったもの                   | 採用した装置                                        | Atomic Design で得られるか                        |
+| -------------------------------- | --------------------------------------------------- | ------------------------------------------------- |
+| 部品の粒度が名前を解読せず分かる | `ui/` / `logic/` の 2 層（判定器: JSX を返すか）    | △ 得られるが境界が主観的で腐る                    |
+| 実物の大きさ・見た目のカタログ   | Storybook（全 UI に stories 必須）                  | ✕ ディレクトリでは実物は見えない                  |
+| データの流れ（誰が誰を使うか）   | `Dependencies/*` stories（import 実測の自動生成図） | ✕ ディレクトリ（木）では依存（DAG）は表現できない |
+| 変更が 1 箇所に閉じる            | feature 縦割り + `index.ts` 公開境界                | ✕ 1 機能の変更が atoms〜templates を横断する      |
+| 境界の機械検査                   | ast-grep（CI の `lint:boundaries`）                 | ✕ 「これは molecule か」を機械判定できない        |
 
 ---
 
@@ -198,7 +198,7 @@ import 文の解析から mermaid 図を自動生成し（`npm run deps:diagrams
 storybook 起動時に自動実行）、Storybook の `Dependencies/*` に常設した。
 
 - features 俯瞰 1 枚（app と feature 間のエッジ = ast-grep 一方通行ルールの実測）
-  + feature 別 8 枚（ファイルレベルの依存。ui / logic を subgraph で表示）。
+  - feature 別 8 枚（ファイルレベルの依存。ui / logic を subgraph で表示）。
 - コードから生成されるので**嘘をつかない・腐らない**。手描きの図や
   ディレクトリ構造と違い、保守コストがゼロ。
 - Chromatic が見た目の差分を検出するため、依存の追加・削除が PR 上で見える。

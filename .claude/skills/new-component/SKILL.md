@@ -19,12 +19,12 @@ disable-model-invocation: true
 
 ファイル名は kebab-case で統一する（例: `idea-card`）。
 
-| 順序 | ファイル                 | 役割                                                             |
-| ---- | ------------------------ | ---------------------------------------------------------------- |
-| 1    | `idea-card.fixture.ts`   | テストデータ（fixture / builder）。コンポーネント内に持ち込まない |
-| 2    | `idea-card.spec.tsx`     | Vitest + Testing Library のテスト。実装より先に書く              |
-| 3    | `idea-card.tsx`          | 実装                                                             |
-| 4    | `idea-card.stories.tsx`  | Storybook stories（全 UI コンポーネントで必須）                  |
+| 順序 | ファイル                | 役割                                                              |
+| ---- | ----------------------- | ----------------------------------------------------------------- |
+| 1    | `idea-card.fixture.ts`  | テストデータ（fixture / builder）。コンポーネント内に持ち込まない |
+| 2    | `idea-card.spec.tsx`    | Vitest + Testing Library のテスト。実装より先に書く               |
+| 3    | `idea-card.tsx`         | 実装                                                              |
+| 4    | `idea-card.stories.tsx` | Storybook stories（全 UI コンポーネントで必須）                   |
 
 ## 手順（TDD）
 

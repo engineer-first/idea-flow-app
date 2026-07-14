@@ -7,10 +7,10 @@ status: **決定・移行済み**（決定 2026-07-13、移行完了 2026-07-14�
 
 「Atomic Design を採らない」という判断は、実は独立した 2 つの問いの答えである。
 
-| 問い                              | 選択肢                                                     | 採用と文書                                                    |
-| --------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------- |
-| 1. リポジトリ全体を何で縦に切るか | 粒度（Atomic ツリー）か、機能（feature）か                 | feature 縦割り → [feature-structure.md](feature-structure.md) |
-| 2. feature の**中**を何で分けるか | 本質の粒度分類か、役割 2 層か、**依存権の帯（5 箱）**か    | C′「依存権の帯」→ 本ドキュメント                              |
+| 問い                              | 選択肢                                                      | 採用と文書                                                    |
+| --------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------- |
+| 1. リポジトリ全体を何で縦に切るか | 粒度（Atomic ツリー）か、機能（feature）か                  | feature 縦割り → [feature-structure.md](feature-structure.md) |
+| 2. feature の**中**を何で分けるか | 本質の粒度分類か、役割 2 層か、\*\*依存権の帯（5 箱）\*\*か | C′「依存権の帯」→ 本ドキュメント                              |
 
 ## 決定（2026-07-13）
 
@@ -32,18 +32,18 @@ status: **決定・移行済み**（決定 2026-07-13、移行完了 2026-07-14�
 
 ### 強制する機械検査（プロンプトではなく CI）
 
-| 不変条件                                   | 装置                                                        |
-| ------------------------------------------ | ----------------------------------------------------------- |
-| 帯規則（上向き import 禁止）               | `rules/ast-grep/feature-band-imports.yml`（ホワイトリスト型）|
-| 動的 import() の非リテラル引数の死角       | `rules/ast-grep/no-dynamic-import-in-features-and-app.yml`  |
-| CommonJS（require / import-equals）の死角  | `rules/ast-grep/no-commonjs-in-features-and-app.yml`        |
-| 非正規化 alias（連続スラッシュ）           | `rules/ast-grep/no-double-slash-import-specifier.yml`       |
-| 指定子のエスケープ（生テキストと解決値の乖離）| `rules/ast-grep/no-escape-in-import-specifier.yml`         |
-| JS ファミリ（検査対象外ファイル）の混入    | `rules/ast-grep/no-js-family-in-ts-only-zones.yml`          |
-| 未登録 feature の feature import（既定拒否）| `unregistered-feature-must-not-import-features`（同 one-way）|
-| 配置（フラット or 5 箱・入れ子禁止など）   | `npm run check:feature-layout`（CI）                         |
-| logic/ への JSX 混入                       | `feature-logic-layer-must-not-render-jsx`                   |
-| 検知能力そのものの regression              | `scripts/band-import-rules.spec.ts`                          |
+| 不変条件                                       | 装置                                                          |
+| ---------------------------------------------- | ------------------------------------------------------------- |
+| 帯規則（上向き import 禁止）                   | `rules/ast-grep/feature-band-imports.yml`（ホワイトリスト型） |
+| 動的 import() の非リテラル引数の死角           | `rules/ast-grep/no-dynamic-import-in-features-and-app.yml`    |
+| CommonJS（require / import-equals）の死角      | `rules/ast-grep/no-commonjs-in-features-and-app.yml`          |
+| 非正規化 alias（連続スラッシュ）               | `rules/ast-grep/no-double-slash-import-specifier.yml`         |
+| 指定子のエスケープ（生テキストと解決値の乖離） | `rules/ast-grep/no-escape-in-import-specifier.yml`            |
+| JS ファミリ（検査対象外ファイル）の混入        | `rules/ast-grep/no-js-family-in-ts-only-zones.yml`            |
+| 未登録 feature の feature import（既定拒否）   | `unregistered-feature-must-not-import-features`（同 one-way） |
+| 配置（フラット or 5 箱・入れ子禁止など）       | `npm run check:feature-layout`（CI）                          |
+| logic/ への JSX 混入                           | `feature-logic-layer-must-not-render-jsx`                     |
+| 検知能力そのものの regression                  | `scripts/band-import-rules.spec.ts`                           |
 
 帯規則は「許可プレフィックス以外の相対 import を全禁止」のホワイトリスト型。
 ブラックリスト regex では `../index` ロンダリング・`.././` 等の非正規化
@@ -97,7 +97,7 @@ C′ はこの急所を**判定対象のすり替え**で外した:「これは�
 不変（当初の分析どおり）。採用時の判断は「**5 箱に分散すれば 1 箱あたりの
 衛星ノイズは許容範囲**」。エディタの fileNesting は削除済みで、GitHub の
 素のファイル一覧で衛星が畳まれないことは**受容した**（ここが案 B
-= コンポーネントごとのディレクトリ、との最終分岐だった）。
+\= コンポーネントごとのディレクトリ、との最終分岐だった）。
 
 実装ファイル自体が育ったときの処方箋は箱ではなく従来どおり 2 つ:
 
@@ -121,7 +121,7 @@ C′ はこの急所を**判定対象のすり替え**で外した:「これは�
 - **1 箱の実装ファイルが 15 を超える**（feature 切り出しでは分けられない
   まま）→ 箱の再設計ではなく、まず切り出し漏れを疑う（従来どおり）。
 
-## 補足 Q&A（2026-07 の議論から、今も有効なもの）
+## 補足 Q\&A（2026-07 の議論から、今も有効なもの）
 
 ### Q. container / view 分離とは何か
 

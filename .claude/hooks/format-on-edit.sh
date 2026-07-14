@@ -19,9 +19,13 @@ case "$FILE" in
 esac
 
 case "$FILE" in
-  *.ts|*.tsx|*.js|*.mjs|*.cjs|*.json|*.css|*.scss|*.md|*.mdx)
+  *.ts|*.tsx|*.js|*.mjs|*.cjs|*.json|*.css|*.scss)
     cd "$PROJECT_DIR" || exit 0
     npx --no-install biome check --write "$FILE" >&2 || true
+    ;;
+  *.md|*.mdx)
+    cd "$PROJECT_DIR" || exit 0
+    npx --no-install remark --quiet --frail --output "$FILE" >&2 || true
     ;;
 esac
 

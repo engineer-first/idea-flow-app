@@ -35,6 +35,11 @@ jobs:
       - name: Lint & format check
         run: npm run lint -- --reporter=github
 
+      - name: Markdown format check (remark)
+        run: |
+          npm run format:md
+          git diff --exit-code -- '*.md' '*.mdx'
+
       # レイヤー間の依存方向（app → features → components/ui・lib → contracts）の
       # 機械検査。ルールは rules/ast-grep/。規約が壊れる速度を「レビューで気づける
       # 速度」ではなく「lint が落ちる速度」で抑える。
