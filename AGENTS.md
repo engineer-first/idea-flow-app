@@ -49,7 +49,6 @@
 app  →  features  →  components/ui・lib  →  contracts
 ```
 
-- `contracts/` は何も import しない。`components/ui/` はドメインを知らない。
 - feature 間は `index.ts`（公開境界）経由のみ。同一 feature 内は相対 import。
   許可エッジの一覧は `rules/ast-grep/feature-dependencies-one-way.yml` が真実。
   エッジを増やすときは、循環にならないことを確認してそこを更新する。
@@ -69,11 +68,10 @@ app  →  features  →  components/ui・lib  →  contracts
 - 例: `page.tsx`、`layout.tsx`、`route.ts`、`loading.tsx`、`error.tsx`。
 - feature 内は 5 箱まで: `containers / templates / organisms / molecules`
   （JSX を返すもの）と `logic`（hook・reducer・Server Action・純関数・定数）。
-  箱は「本質の分類」ではなく「依存権の帯」で、規則は上向き import 禁止・
-  skip 合法・同帯合法の 3 つ（ast-grep `feature-band-imports.yml` が機械検査）。
-  新規コンポーネントの既定は最下帯（`molecules/`）。上の帯の部品が必要に
-  なったら CI が昇格を教える。atoms は作らない（リポジトリ全体の atoms は
-  `components/ui/`）。
+  依存方向は ast-grep `feature-band-imports.yml` が機械検査する（規則・理由は
+  そのコメントが真実）。新規コンポーネントの既定は最下帯（`molecules/`）。上の
+  帯の部品が必要になったら CI が昇格を教える。atoms は作らない（リポジトリ
+  全体の atoms は `components/ui/`）。
 - feature 単位で「フラット or 5 箱」の二択。混在・規約外ディレクトリ・箱の
   入れ子は `npm run check:feature-layout`（CI）が fail させる。
   spec / stories / fixture は実装と同居させる。
