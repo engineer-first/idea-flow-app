@@ -89,56 +89,10 @@ end
 - 課題整理（Map）のStep1〜5の5段階構成は `dezain-supurinto.md`
   にも反映済み（Step2「共有・分類」をStep2「共有」とStep3「グループ化」に分割）。
   ステップ構成の変更は必ず本表を起点とし、`dezain-supurinto.md` 側を追従させる。
-
-### 実装ゲーティング表（WSメッセージ × ステップ）
-
-[PBI-10](https://github.com/engineer-first/idea-flow-app/issues/56) /
-[DEMO-10](https://github.com/engineer-first/idea-flow-app/issues/57) の受け入れ条件を、
-`contracts/room-protocol.ts` の `ClientMessage` 種別単位に落とし込んだもの。
-`isBoardMutation()`（`workers/room/phase.ts`）は現状フェーズ単位
-（lobby/phase4のみ全ボード変更を拒否）でしか判定していない。本表はこれを
-ステップ単位に拡張する際の実装対象表であり、上の「機能対応表」（UI表示・
-使用可否の観点）とは別に、WSメッセージ単位で forbidden にすべきかどうかを
-定義する。
-
-| WSメッセージ                 | 1. 個人で書く | 2. 共有する | 3. グループ化 | 4. ステルス投票 | 5. 結果集計・絞り込み |
-| ---------------------------- | ------------- | ----------- | ------------- | --------------- | --------------------- |
-| note:create                  | ○（自分）     | ×           | ×             | ×               | ×                     |
-| note:update-content          | ○（自分）     | ×           | ×             | ×               | ×                     |
-| note:delete                  | ○（自分）     | ×           | ×             | ×               | ×                     |
-| note:publish                 | ×             | ○（自分）   | ×             | ×               | ×                     |
-| note:unpublish               | ×             | ○（自分）   | ×             | ×               | ×                     |
-| note:move                    | ×             | ○           | ○             | ×               | ×                     |
-| note:drag                    | ×             | ○           | ○             | ×               | ×                     |
-| 自動グルーピング（内部処理） | ×             | ×           | ○             | ×               | ×                     |
-| group:create                 | ×             | ×           | ○             | ×               | ×                     |
-| group:update-name            | ×             | ×           | ○             | ×               | ×                     |
-| note:vote                    | ×             | ×           | ×             | ○               | ×                     |
-| note:vote-reset              | ×             | ×           | ×             | ○               | ×                     |
-
-凡例: ○ = 許可（forbiddenにしない） / × = 拒否（サーバー側でforbiddenにする）。
-
-補足:
-
-- note:create / note:update-content / note:delete / note:publish /
-  note:unpublish の「（自分）」は、対象付箋が自分の author であることを
-  既存の認可（`canEdit()` / author\_id 一致チェック、`workers/room/notes.ts`）
-  がステップ判定とは別レイヤーで担保する。本表はその上に重ねるステップ単位の
-  ゲートであり、他者付箋への操作は本表の値に関わらず既存の認可で拒否される。
-- 「自動グルーピング」はメッセージ種別ではなく、`autoReorganize()`
-  （`workers/room/groups.ts`）が note:publish / note:move / note:delete の
-  副作用として無条件に発火している内部処理。ステップ単位ゲーティングを
-  実装する際は、呼び出し側（`workers/room/note-handlers.ts`）で現在の
-  ステップがStep3かどうかを見てスキップする必要がある。
-- group:create / group:update-name（手動グループ操作）はStep3のみ許可とした。
-  受け入れ条件（#56）は「近接による自動グルーピング」にしか触れておらず
-  手動グループ操作への言及はないが、グループ化に関する操作をStep3に集約する
-  解釈で統一した。実装時に齟齬が出た場合は本表を先に更新する。
-- 否定系確認の代表例（#57 デモゴールの確認観点に対応）: Step1-1で
-  note:vote → forbidden、Step1-4で note:create → forbidden。
-- 他者付箋の閲覧可否（private付箋は作者のみ見える）はステップに関わらず
-  常時有効な既存ルールのため、本表には含めない
-  （`workers/visibility.ts` の `visibleTo()` が真実）。
+- ステップ単位でのWSメッセージ実装ゲーティング（`isBoardMutation()` の
+  拡張対象表）は実装が変わるたびに変更が必要な実装レベルの詳細のため、
+  本表ではなく [Discussion #36](https://github.com/engineer-first/idea-flow-app/discussions/36)
+  で管理する。
 
 ---
 
