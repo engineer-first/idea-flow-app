@@ -1,5 +1,12 @@
 # features 構成の設計判断 — なぜ Atomic Design ではなく ui / logic の 2 層か
 
+> **注記（2026-07-14）**: タイトルと TL;DR の「ui / logic の 2 層」は
+> PR #128 時点の記録。feature 内部の構成はその後
+> `containers / templates / organisms / molecules / logic` の 5 箱
+> （依存権の帯）へ移行済み。現在の構成・移行理由は
+> [feature-internal-structure.md](feature-internal-structure.md) が真実。
+> 本ドキュメントが答える問い 1（下記）についての結論は今も有効。
+
 PR #128 で採用した「feature 縦割り + feature 内 ui / logic 2 層」の背景を整理する。
 「Atomic Design の方がコンポーネントの流れ・データの流れが見やすいのでは」という
 レビュー観点への回答を兼ねる。規約そのもの（何をどこに置くか）は
@@ -11,6 +18,9 @@ PR #128 で採用した「feature 縦割り + feature 内 ui / logic 2 層」の
 [feature-internal-structure.md](feature-internal-structure.md) に切り出した。
 
 ## TL;DR
+
+（問い 2 の答えは移行前の記録。現在の構成は
+[feature-internal-structure.md](feature-internal-structure.md) 参照）
 
 | 欲しかったもの                   | 採用した装置                                        | Atomic Design で得られるか                        |
 | -------------------------------- | --------------------------------------------------- | ------------------------------------------------- |
