@@ -106,7 +106,7 @@ Node.js のバージョンは `mise.toml` で LTS に固定しています。CI 
 
 ## ドキュメントのフォーマット
 
-Markdown の整形には [remark](https://github.com/remarkjs/remark) を使用します。設定は `.remarkrc.mjs` に集約されており、VS Code 拡張 [remark](https://marketplace.visualstudio.com/items?itemName=unifiedjs.vscode-remark)（保存時整形）と CLI（`.claude/hooks/format-on-edit.sh` 経由のAIエージェント編集時整形、`npm run format:md`）が同じ設定・同じ実装を共有するため、人間が保存したときとAIが編集したときで整形結果が一致します。テーブルは `remark-gfm` の `stringLength` に `string-width` を渡すことで、全角文字幅を考慮した列揃えに対応しています。
+Markdown の整形には [remark](https://github.com/remarkjs/remark) を使用します。設定は `.remarkrc.mjs` に集約されており、VS Code 拡張 [remark](https://marketplace.visualstudio.com/items?itemName=unifiedjs.vscode-remark)（保存時整形）と CLI（`.claude/hooks/format-on-edit.sh` 経由のAIエージェント編集時整形、`npm run format:md`）が同じ設定・同じ実装を共有するため、人間が保存したときとAIが編集したときで整形結果が一致します。テーブルは `remark-gfm` の `stringLength` に `string-width` を渡すことで、全角文字幅を考慮した列揃えに対応しています。拡張子ごとの Biome/remark 振り分けは `scripts/format-file.sh` に一本化されており、Claude Code・opencode（`opencode.json` の `formatter`）・Codex CLI（`.codex/hooks.json` 経由の `scripts/format-changed-files.sh`）はいずれもこのスクリプトを共通で呼び出します。
 
 リポジトリを開いたら、推奨拡張機能として案内される **remark** をインストールしてください。
 
