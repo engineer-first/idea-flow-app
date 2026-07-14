@@ -35,12 +35,11 @@ status: **決定・移行済み**（決定 2026-07-13、移行完了 2026-07-14�
 | 不変条件                                   | 装置                                                        |
 | ------------------------------------------ | ----------------------------------------------------------- |
 | 帯規則（上向き import 禁止）               | `rules/ast-grep/feature-band-imports.yml`（ホワイトリスト型）|
-| 動的 import() の死角                       | `rules/ast-grep/no-dynamic-import-in-features-and-app.yml`  |
+| 動的 import() の非リテラル引数の死角       | `rules/ast-grep/no-dynamic-import-in-features-and-app.yml`  |
 | CommonJS（require / import-equals）の死角  | `rules/ast-grep/no-commonjs-in-features-and-app.yml`        |
 | 非正規化 alias（連続スラッシュ）           | `rules/ast-grep/no-double-slash-import-specifier.yml`       |
 | 指定子のエスケープ（生テキストと解決値の乖離）| `rules/ast-grep/no-escape-in-import-specifier.yml`         |
 | JS ファミリ（検査対象外ファイル）の混入    | `rules/ast-grep/no-js-family-in-ts-only-zones.yml`          |
-| declare module（モジュール拡張）の死角     | `rules/ast-grep/no-module-augmentation-in-features.yml`     |
 | 未登録 feature の feature import（既定拒否）| `unregistered-feature-must-not-import-features`（同 one-way）|
 | 配置（フラット or 5 箱・入れ子禁止など）   | `npm run check:feature-layout`（CI）                         |
 | logic/ への JSX 混入                       | `feature-logic-layer-must-not-render-jsx`                   |
@@ -54,6 +53,24 @@ status: **決定・移行済み**（決定 2026-07-13、移行完了 2026-07-14�
 連続スラッシュ alias（`@//features`）/ JS ファミリ拡張子 / `declare module` /
 未登録 feature の裸の自 feature alias の 6 種の死角が実証され、上表の
 専用規則で fail-closed に塞いだ。
+
+### 改定（2026-07-14）: 動的 import() の緩和と declare module 規則の撤廃
+
+上記のレッドチーム対応は「fail-closed」を優先し過ぎ、実害の小さい経路まで
+一律禁止していた。2 点を見直した。
+
+- **動的 import()**: 変数・式・テンプレートリテラルなど静的に読めない引数は
+  引き続き禁止するが、文字列リテラル1つだけの引数（`import("./foo")`）は
+  許可する。next/dynamic 等の遅延読み込みは常にリテラル引数を要求するため
+  （バンドラの静的解析の前提）、この形は実務上の主要ユースケース。リテラルが
+  指す先の帯・feature 境界の妥当性は機械検査の対象外になるが、ソース上に
+  平文で残るためコードレビューで確認できる。三項演算子・文字列結合で
+  リテラルに偽装する経路は `pattern` + `constraints` で個別に塞いでいる
+  （詳細は `no-dynamic-import-in-features-and-app.yml` のコメント）。
+- **declare module（モジュール拡張）**: `no-module-augmentation-in-features.yml`
+  を撤廃した。このルールが塞いでいたのはコンパイル時の**型レベル**の結合
+  であり、他の規則が本来防いでいる**実行時**の結合（画面変更が認証コードを
+  壊す等）とは深刻度が異なる。型レベルの結合はコードレビューに委ねる。
 
 ## なぜ素朴な Atomic（本質分類）を拒否したか — 当初の分析は今も有効
 

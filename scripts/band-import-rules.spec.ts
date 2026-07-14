@@ -259,16 +259,16 @@ describe("feature 帯規則（ホワイトリスト型）", () => {
   });
 });
 
-describe("動的 import() の禁止（features / app）", () => {
-  it("帯規則の死角になる動的 import() を features 配下で検知する", () => {
+describe("動的 import() は文字列リテラル1つに限定して許可（features / app）", () => {
+  it("文字列リテラル1つだけの動的 import() は許可する（next/dynamic 等の遅延読み込み向けの緩和）", () => {
     const dir = createProject({
-      "features/zz-poc/molecules/dynamic-evil.ts": [
+      "features/zz-poc/molecules/dynamic-legal.ts": [
         `export function load() {`,
         `  return import("../containers/board");`,
         `}`,
       ].join("\n"),
-      "features/zz-poc/templates/dynamic-evil.tsx": [
-        `export function Evil() {`,
+      "features/zz-poc/templates/dynamic-legal.tsx": [
+        `export function Ok() {`,
         `  const p = import("../containers/board");`,
         `  return <div>{String(p)}</div>;`,
         `}`,
@@ -276,21 +276,21 @@ describe("動的 import() の禁止（features / app）", () => {
     });
 
     const findings = scan(dir);
-    expectEachDetected(
-      findings,
-      "features/zz-poc/molecules/dynamic-evil.ts",
-      [`import("../containers/board")`],
-      DYNAMIC_RULE,
-    );
-    expectEachDetected(
-      findings,
-      "features/zz-poc/templates/dynamic-evil.tsx",
-      [`import("../containers/board")`],
-      DYNAMIC_RULE,
-    );
+    expect(
+      findingsFor(
+        findings,
+        "features/zz-poc/molecules/dynamic-legal.ts",
+      ).filter((f) => DYNAMIC_RULE.test(f.ruleId)),
+    ).toEqual([]);
+    expect(
+      findingsFor(
+        findings,
+        "features/zz-poc/templates/dynamic-legal.tsx",
+      ).filter((f) => DYNAMIC_RULE.test(f.ruleId)),
+    ).toEqual([]);
   });
 
-  it("変数を渡す動的 import() も検知する(静的検査できない経路を形で塞ぐ)", () => {
+  it("変数を渡す動的 import() は検知する(静的検査できない経路を形で塞ぐ)", () => {
     const dir = createProject({
       "app/zz-poc/lazy.ts": [
         `export function load(path: string) {`,
@@ -306,6 +306,39 @@ describe("動的 import() の禁止（features / app）", () => {
       DYNAMIC_RULE,
     );
   });
+
+  it("三項演算子・文字列結合で文字列リテラルに偽装した動的 import() も検知する", () => {
+    const dir = createProject({
+      "features/zz-poc/molecules/dynamic-disguised.ts": [
+        `export function load(cond: boolean) {`,
+        `  return import(cond ? "./a" : "./b");`,
+        `}`,
+        `export function load2() {`,
+        `  return import("../containers/board" + "");`,
+        `}`,
+      ].join("\n"),
+    });
+
+    expectEachDetected(
+      scan(dir),
+      "features/zz-poc/molecules/dynamic-disguised.ts",
+      [`import(cond ? "./a" : "./b")`, `import("../containers/board" + "")`],
+      DYNAMIC_RULE,
+    );
+  });
+
+  it("空文字列リテラルの動的 import() は検知する", () => {
+    const dir = createProject({
+      "app/zz-poc/empty.ts": `export const p = import("");\n`,
+    });
+
+    expectEachDetected(
+      scan(dir),
+      "app/zz-poc/empty.ts",
+      [`import("")`],
+      DYNAMIC_RULE,
+    );
+  });
 });
 
 // 帯規則を独立レビューに攻撃的検証させて実証された、import 境界検査の
@@ -314,7 +347,6 @@ describe("動的 import() の禁止（features / app）", () => {
 const COMMONJS_RULE = /^no-commonjs/;
 const DOUBLE_SLASH_RULE = /^no-double-slash/;
 const JS_ZONE_RULE = /^no-js-family/;
-const MODULE_AUG_RULE = /^no-module-augmentation/;
 const UNREGISTERED_RULE = /^unregistered-feature/;
 const ESCAPE_RULE = /^no-escape-in-import-specifier/;
 
@@ -402,26 +434,6 @@ describe("攻撃的検証で実証された死角の封鎖", () => {
         `${path} が TS-only ゾーン規則で検知されていない`,
       ).toBeDefined();
     }
-  });
-
-  it("declare module によるモジュール拡張（上帯パスへのコンパイル時結合）を検知する", () => {
-    const dir = createProject({
-      "features/zz-poc/molecules/augment-evil.ts": [
-        `declare module "../containers/board" {`,
-        `  export const INJECTED: number;`,
-        `}`,
-        `export const marker = 1;`,
-      ].join("\n"),
-    });
-
-    const findings = findingsFor(
-      scan(dir),
-      "features/zz-poc/molecules/augment-evil.ts",
-    );
-    expect(
-      findings.find((f) => MODULE_AUG_RULE.test(f.ruleId)),
-      "declare module が検知されていない",
-    ).toBeDefined();
   });
 
   it("規約に未登録の feature からの feature import を既定拒否する（裸の自 feature alias を含む）", () => {
