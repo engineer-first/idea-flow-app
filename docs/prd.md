@@ -2,7 +2,7 @@
 
 > チーム向けアイデア創出支援アプリ **IdeaFlow** のプロダクト要求仕様。
 > MVP は **デザインスプリント形式**（課題整理 → 問いの作成 → アイデア決定）として具体化した。
-> 本ドキュメントは Wiki 上のインセプションデッキと、[`docs/ds-flow.md`](./ds-flow.md) / [`docs/dezain-supurinto.md`](./dezain-supurinto.md) で検討したデザインスプリント設計を統合したものです。
+> 本ドキュメントは Wiki 上のインセプションデッキと、[`docs/ds-feature-matrix.md`](./ds-feature-matrix.md) / [`docs/dezain-supurinto.md`](./dezain-supurinto.md) で検討したデザインスプリント設計を統合したものです。
 
 ## 目次
 
@@ -259,7 +259,7 @@ end
 | 発想支援ツール（サイドバー）       | アイデアフェーズで、オズボーンのチェックリスト・SCAMPER・逆転発想・他業界事例を参照できる    |
 | ファシリテーションガイド           | 各ステップで目的と次にやることを固定のガイド文言で表示し、進行役がいなくても迷わず進められる |
 
-> 進行フローの詳細図は [`docs/ds-flow.md`](./ds-flow.md)、各フェーズの機能・ガイド設計の詳細は [`docs/dezain-supurinto.md`](./dezain-supurinto.md) を参照。
+> 進行フローの詳細図とステップ別機能対応は [`docs/ds-feature-matrix.md`](./ds-feature-matrix.md)、各フェーズの機能・ガイド設計の詳細は [`docs/dezain-supurinto.md`](./dezain-supurinto.md) を参照。
 
 ---
 
@@ -350,7 +350,7 @@ Miro の代替ではなく、**Miro を使いこなす前段階のチーム**に
 
 ## 参考
 
-- [`docs/ds-flow.md`](./ds-flow.md) — デザインスプリント全体フロー図（Mermaid）
+- [`docs/ds-feature-matrix.md`](./ds-feature-matrix.md) — デザインスプリント全体フロー図（Mermaid）とステップ別機能対応表
 - [`docs/dezain-supurinto.md`](./dezain-supurinto.md) — 各フェーズの機能・ガイド設計の詳細
 - [`docs/tech-stack-research.md`](./tech-stack-research.md) — MVP 技術スタック調査
 - 以下のリポジトリ Wiki（インセプションデッキ）
