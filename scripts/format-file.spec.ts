@@ -7,7 +7,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // scripts/format-file.sh は自身の設置場所 (BASH_SOURCE) からプロジェクトルートを
@@ -108,6 +108,26 @@ describe("scripts/format-file.sh", () => {
 
     try {
       const result = runScript(file);
+
+      expect(result.status).toBe(0);
+      expect(readFileSync(file, "utf8")).toBe(original);
+    } finally {
+      rmSync(outsideDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a relative path that traverses outside the project directory via ..", () => {
+    const outsideDir = mkdtempSync(join(tmpdir(), "format-file-outside-"));
+    const file = join(outsideDir, "note.md");
+    // remark はデフォルト設定でも末尾空白や余分な空行を正規化するため、
+    // 素通りしていれば必ず書き換わる内容にしてプロジェクト外への書き込みを検出する。
+    const original = "#  Title  \n\n\n\n* item one\n* item two   \n";
+    writeFileSync(file, original);
+
+    try {
+      const relativePath = relative(projectDir, file);
+
+      const result = runScript(relativePath);
 
       expect(result.status).toBe(0);
       expect(readFileSync(file, "utf8")).toBe(original);
