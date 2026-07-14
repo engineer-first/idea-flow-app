@@ -9,8 +9,8 @@ PROJECT_DIR="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 cd "$PROJECT_DIR" || exit 0
 
 {
-  git diff --name-only --diff-filter=ACMR -- '*.ts' '*.tsx' '*.js' '*.mjs' '*.cjs' '*.json' '*.css' '*.scss' '*.md' '*.mdx'
-  git ls-files --others --exclude-standard -- '*.ts' '*.tsx' '*.js' '*.mjs' '*.cjs' '*.json' '*.css' '*.scss' '*.md' '*.mdx'
+  git diff --name-only --diff-filter=ACMR -- '*.ts' '*.tsx' '*.js' '*.mjs' '*.cjs' '*.json' '*.css' '*.scss' '*.md'
+  git ls-files --others --exclude-standard -- '*.ts' '*.tsx' '*.js' '*.mjs' '*.cjs' '*.json' '*.css' '*.scss' '*.md'
 } | sort -u | while IFS= read -r file; do
   # 1ファイルの整形失敗 (構文エラーや、フォーマット中に削除されたなど) で
   # バッチ全体を失敗させない。pipefail 下では while ループ内の最後のコマンドの

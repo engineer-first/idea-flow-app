@@ -25,7 +25,7 @@ case "$FILE" in
   *.ts|*.tsx|*.js|*.mjs|*.cjs|*.json|*.css|*.scss)
     npx --no-install biome check --write "$FILE"
     ;;
-  *.md|*.mdx)
+  *.md)
     # remark-cli の `-o/--output [path]` は値を取れるオプションなので、
     # `--output "$FILE"` の順で書くと $FILE が出力先の値として食われ、
     # 入力は空の stdin になり、ファイルが空に上書きされてしまう

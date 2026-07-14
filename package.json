@@ -13,7 +13,7 @@
     "check:room-do-migrations:immutable": "node scripts/check-room-do-migration-immutability.mjs",
     "fix": "biome check --write",
     "format": "biome format --write",
-    "format:md": "remark . --ext md,mdx --quiet --frail --output",
+    "format:md": "remark . --ext md --quiet --frail --output",
     "cf-typegen": "wrangler types --config workers/wrangler.jsonc workers/worker-configuration.d.ts",
     "typecheck": "npm run cf-typegen && tsc --noEmit && tsc -p workers/tsconfig.json --noEmit && tsc -p scripts/tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests",
