@@ -23,6 +23,65 @@ Do not use this skill for sprint task or bug issues. Sprint tasks and bugs are u
    - Status: `PBI` for PBI, `Demo Goal` for demo goals
 6. Report the created issue URLs and the Project field verification.
 
+## Writing the user story (`pbi.story`)
+
+Template: `As a {role}, I want to {desire}. Because {reason}.` (the "Because" clause may be folded into one sentence, but the reason must always read as the user's own motivation)
+
+- The subject must always be a user-facing role (host, participant, viewer, admin, team). Never use a developer/system subject like "the system will...".
+- For a PBI that isn't scoped to one individual role (e.g. production deployment, where the whole team benefits), "team" is an acceptable subject.
+- End the reason with the value the user personally gets, never an implementation rationale (e.g. not "for performance").
+- Reference examples (from a different product, showing the pattern generalizes across role/action/reason — not domain-specific):
+  - As a viewer, I want to read the full content of a posted article, because I want to check whether it has the information I'm looking for.
+  - As a questioner, I want to ask something I don't understand somewhere many people will see it, because I want answers from as many people as possible.
+  - As an admin, I want to force users (students, teachers) to change their password, because I want to raise security.
+- Story points are out of scope for this skill; do not add them to the `pbi` object.
+
+## Writing demo goals (`demo_goals[].goal`)
+
+Template: `When {screen or action}, {user-observable result}.`
+
+- The subject must be something the user actually touches on screen. Never write implementation terms (API, state, DB, WebSocket, reducer). Re-read what you wrote and check that no dev context leaked in.
+- One entry = one independently verifiable fact. Don't bundle multiple checks into one goal (split into another `demo_goals` entry, or move extra angles into `checks`).
+- The result must be provable purely through UI operation — write what the user can see on screen, not that the backend behaved correctly internally.
+- Worked example (from idea-flow-app's own domain; no story points):
+
+  > As a host, I want to create a brainstorming room and issue an invite URL/code, because I want to invite participants and start the discussion.
+
+  Demo goals:
+
+  - Clicking the "create room" button on the home screen navigates to the waiting screen.
+  - Arriving at the waiting screen shows the invite URL and invite code.
+  - Clicking the invite URL/code on the waiting screen copies it.
+
+  Maps onto the spec as one `demo_goals` entry per bullet:
+
+  ```json
+  "demo_goals": [
+    {
+      "title": "Create-room button navigates to the waiting screen",
+      "goal": "Clicking the \"create room\" button on the home screen navigates to the waiting screen."
+    },
+    {
+      "title": "Invite URL/code is shown",
+      "goal": "Arriving at the waiting screen shows the invite URL and invite code."
+    },
+    {
+      "title": "Invite URL/code copies on click",
+      "goal": "Clicking the invite URL/code on the waiting screen copies it."
+    }
+  ]
+  ```
+
+  Another example:
+
+  > As a participant, I want to join a room from the invite URL/code and see who else has joined, because I want to confirm I joined the right room.
+
+  Demo goals:
+
+  - Entering the invite code on the home screen and pressing join navigates to the matching waiting screen.
+  - The waiting screen shows currently joined members in real time.
+  - When the host clicks start on the waiting screen, everyone is navigated to the room screen.
+
 ## Spec Format
 
 Create a temporary JSON file outside the skill folder, for example under `/tmp`.
