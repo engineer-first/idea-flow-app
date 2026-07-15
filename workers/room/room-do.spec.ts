@@ -1021,7 +1021,7 @@ describe("RoomDO 課題整理ステップの境界ゲート", () => {
     expect(await nextJson(ws)).toMatchObject({
       type: "error",
       code: "forbidden",
-      message: expect.stringContaining("2-1 HMW作成"),
+      message: expect.stringContaining("2-1 HMWを個人で書く"),
     });
     ws.close();
   });
@@ -1050,7 +1050,7 @@ describe("RoomDO 課題整理ステップの境界ゲート", () => {
     expect(await nextJson(ws)).toMatchObject({
       type: "error",
       code: "forbidden",
-      message: expect.stringContaining("1-1 個人で書く"),
+      message: expect.stringContaining("1-1 課題を個人で書く"),
     });
     ws.close();
   });
@@ -1058,7 +1058,7 @@ describe("RoomDO 課題整理ステップの境界ゲート", () => {
   it.each([
     {
       step: 1,
-      label: "1-1 個人で書く",
+      label: "1-1 課題を個人で書く",
       operation: "note:publish",
       message: {
         type: "note:publish",
@@ -1069,7 +1069,7 @@ describe("RoomDO 課題整理ステップの境界ゲート", () => {
     },
     {
       step: 1,
-      label: "1-1 個人で書く",
+      label: "1-1 課題を個人で書く",
       operation: "note:move",
       message: {
         type: "note:move",
@@ -1080,7 +1080,7 @@ describe("RoomDO 課題整理ステップの境界ゲート", () => {
     },
     {
       step: 1,
-      label: "1-1 個人で書く",
+      label: "1-1 課題を個人で書く",
       operation: "group:create",
       message: {
         type: "group:create",
@@ -1297,7 +1297,7 @@ describe("RoomDO 課題整理ステップの境界ゲート", () => {
     expect(await nextJson(ws)).toMatchObject({
       type: "error",
       code: "forbidden",
-      message: expect.stringContaining("1-5 結果集計・絞り込み"),
+      message: expect.stringContaining("1-5 集計確認・絞り込み"),
     });
     ws.close();
   });
