@@ -2,7 +2,11 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { buildPhaseStep } from "@/contracts/phase.fixture";
-import { buildNote, buildNotes } from "@/contracts/room-protocol.fixture";
+import {
+  buildDecision,
+  buildNote,
+  buildNotes,
+} from "@/contracts/room-protocol.fixture";
 import { RoomBoardCanvas } from "./room-board-canvas";
 
 function setup(overrides: Partial<Parameters<typeof RoomBoardCanvas>[0]> = {}) {
@@ -161,11 +165,10 @@ describe("RoomBoardCanvas", () => {
 
     it("現在の決定と一致する付箋を強調する", () => {
       setup({
-        decision: {
-          phase: 1,
+        decision: buildDecision({
           noteId: "note-1",
           decidedBy: "11111111-1111-4111-8111-111111111111",
-        },
+        }),
       });
 
       expect(screen.getAllByText("取り組む課題")).toHaveLength(1);

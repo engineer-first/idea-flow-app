@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { RoomPhase } from "@/contracts/phase";
 import { buildLobbyPhase, buildPhaseStep } from "@/contracts/phase.fixture";
 import type { ProtocolMember, ServerMessage } from "@/contracts/room-protocol";
+import { buildDecision } from "@/contracts/room-protocol.fixture";
 import {
   applyDecisionServerMessage,
   applyMemberServerMessage,
@@ -251,11 +252,7 @@ describe("applyTimerServerMessage", () => {
 });
 
 describe("applyDecisionServerMessage", () => {
-  const decision = {
-    phase: 1,
-    noteId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-    decidedBy: A.userId,
-  };
+  const decision = buildDecision({ decidedBy: A.userId });
 
   it("decision:updated で最新の決定を反映する", () => {
     expect(

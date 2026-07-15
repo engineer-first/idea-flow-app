@@ -9,18 +9,14 @@
 
 import type { RoomPhase } from "@/contracts/phase";
 import type {
+  Decision as ProtocolDecision,
   ProtocolMember,
   ServerMessage,
   TimerState,
 } from "@/contracts/room-protocol";
 
 export type Member = ProtocolMember;
-
-export type Decision = {
-  phase: number;
-  noteId: string;
-  decidedBy: string;
-};
+export type Decision = ProtocolDecision;
 
 // snapshot / member_joined / member_left を受けて members state を更新する純粋関数。
 // 進行状態メッセージは早期 return。

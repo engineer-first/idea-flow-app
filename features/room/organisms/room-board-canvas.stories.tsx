@@ -2,7 +2,11 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { createRef } from "react";
 import { fn } from "storybook/test";
 import { buildPhaseStep } from "@/contracts/phase.fixture";
-import { buildNote, buildNotes } from "@/contracts/room-protocol.fixture";
+import {
+  buildDecision,
+  buildNote,
+  buildNotes,
+} from "@/contracts/room-protocol.fixture";
 import { RoomBoardCanvas } from "./room-board-canvas";
 
 const STEP_1_1 = buildPhaseStep(1);
@@ -128,10 +132,9 @@ export const ReadyToDecide: Story = {
 export const Decided: Story = {
   args: {
     phase: buildPhaseStep(5),
-    decision: {
-      phase: 1,
+    decision: buildDecision({
       noteId: "note-1",
       decidedBy: "11111111-1111-4111-8111-111111111111",
-    },
+    }),
   },
 };

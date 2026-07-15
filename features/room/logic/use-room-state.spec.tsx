@@ -19,7 +19,7 @@ vi.mock("./room-notify", () => ({
 }));
 
 import { buildLobbyPhase, buildPhaseStep } from "@/contracts/phase.fixture";
-import { buildMembers } from "@/contracts/room-protocol.fixture";
+import { buildDecision, buildMembers } from "@/contracts/room-protocol.fixture";
 import { useRoomState } from "./use-room-state";
 
 describe("useRoomState", () => {
@@ -36,11 +36,7 @@ describe("useRoomState", () => {
 
   it("snapshot で members / phase / timer を復元する", () => {
     const { result } = setup();
-    const decision = {
-      phase: 1,
-      noteId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-      decidedBy: "11111111-1111-4111-8111-111111111111",
-    };
+    const decision = buildDecision();
     act(() =>
       result.current.applyMessage({
         type: "snapshot",
@@ -62,11 +58,7 @@ describe("useRoomState", () => {
 
   it("decision:updated を反映し、phase:updated で決定をクリアする", () => {
     const { result } = setup();
-    const decision = {
-      phase: 1,
-      noteId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-      decidedBy: "11111111-1111-4111-8111-111111111111",
-    };
+    const decision = buildDecision();
 
     act(() =>
       result.current.applyMessage({ type: "decision:updated", ...decision }),

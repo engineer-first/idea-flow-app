@@ -1,10 +1,8 @@
 // フェーズごとのホスト確定の永続状態。決定はフェーズ番号をキーにし、
 // 課題・HMW・アイデアなど個別ドメインの名称を持ち込まない。
-export type Decision = {
-  phase: number;
-  noteId: string;
-  decidedBy: string;
-};
+import type { Decision as ProtocolDecision } from "../../contracts/room-protocol";
+
+export type Decision = ProtocolDecision;
 
 type DecisionRow = {
   phase: number;

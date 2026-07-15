@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { buildLobbyPhase, buildPhaseStep } from "./phase.fixture";
 import {
   ClientMessageSchema,
+  DecisionSchema,
   MemberSchema,
   NOTE_COLOR_PALETTE,
   NoteColorSchema,
@@ -16,6 +17,7 @@ import {
   ServerMessageSchema,
   TimerStateSchema,
 } from "./room-protocol";
+import { buildDecision } from "./room-protocol.fixture";
 
 const USER_A = "11111111-1111-4111-8111-111111111111";
 const USER_B = "22222222-2222-4222-8222-222222222222";
@@ -115,6 +117,23 @@ describe("MemberSchema", () => {
 
   it("name が無いと拒否する", () => {
     expect(MemberSchema.safeParse({ userId: USER_A }).success).toBe(false);
+  });
+});
+
+describe("DecisionSchema", () => {
+  it("Decision fixtureを受け入れ、上書きした値を反映する", () => {
+    const decision = buildDecision({ phase: 2, decidedBy: USER_B });
+
+    expect(DecisionSchema.parse(decision)).toEqual(decision);
+  });
+
+  it("範囲外のフェーズを拒否する", () => {
+    expect(
+      DecisionSchema.safeParse({
+        ...buildDecision(),
+        phase: 4,
+      }).success,
+    ).toBe(false);
   });
 });
 
@@ -433,6 +452,20 @@ describe("ClientMessageSchema", () => {
         noteId: "not-a-uuid",
       }).success,
     ).toBe(false);
+  });
+
+  it("note:decide の余剰な認可フィールドを破棄する", () => {
+    expect(
+      ClientMessageSchema.parse({
+        type: "note:decide",
+        noteId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        decidedBy: "attacker-id",
+        phase: 99,
+      }),
+    ).toEqual({
+      type: "note:decide",
+      noteId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    });
   });
 
   it("start_phase を受け入れる", () => {
