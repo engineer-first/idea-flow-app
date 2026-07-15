@@ -23,6 +23,7 @@ function snapshotMessage(
     members: [],
     phase: buildPhaseStep(1),
     isHost: true,
+    decision: null,
     timer: { status: "idle" },
     serverNow: Date.now(),
   };

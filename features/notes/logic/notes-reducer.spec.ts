@@ -51,6 +51,7 @@ describe("applyServerMessage", () => {
       members: [],
       phase: buildPhaseStep(1),
       isHost: false,
+      decision: null,
       timer: { status: "idle" },
       serverNow: 1_000,
     };
@@ -69,6 +70,7 @@ describe("applyServerMessage", () => {
       members: [],
       phase: buildPhaseStep(1),
       isHost: false,
+      decision: null,
       timer: { status: "idle" },
       serverNow: 1_000,
     };
@@ -241,6 +243,22 @@ describe("applyServerMessage", () => {
     const result = applyServerMessage([existing], message, {
       draggingNoteId: null,
     });
+
+    expect(result).toEqual([existing]);
+  });
+
+  it("decision:updated は決定UIが未実装の間も付箋配列を変更しない", () => {
+    const existing = makeNote();
+    const result = applyServerMessage(
+      [existing],
+      {
+        type: "decision:updated",
+        phase: 1,
+        noteId: existing.id,
+        decidedBy: USER_ID,
+      },
+      { draggingNoteId: null },
+    );
 
     expect(result).toEqual([existing]);
   });

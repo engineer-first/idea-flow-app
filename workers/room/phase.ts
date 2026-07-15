@@ -64,6 +64,7 @@ export function isBoardMutation(message: ClientMessage): boolean {
     case "note:delete":
     case "note:vote":
     case "note:vote-reset":
+    case "note:decide":
     case "group:create":
     case "group:update-name":
       return true;
@@ -95,7 +96,7 @@ const allowedBoardMutationsByPhase: {
     ],
     3: ["note:move", "note:drag", "group:create", "group:update-name"],
     4: ["note:vote", "note:vote-reset"],
-    5: [],
+    5: ["note:decide"],
   },
   2: {
     1: [],

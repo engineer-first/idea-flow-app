@@ -28,6 +28,7 @@ describe("applyMemberServerMessage", () => {
       members: [A, B],
       phase: LOBBY,
       isHost: true,
+      decision: null,
       timer: { status: "idle" },
       serverNow: 1_000,
     };
@@ -84,6 +85,16 @@ describe("applyMemberServerMessage", () => {
     const message: ServerMessage = {
       type: "phase:updated",
       phase: buildPhaseStep(1),
+    };
+    expect(applyMemberServerMessage([A], message)).toEqual([A]);
+  });
+
+  it("decision:updated は members を変えない", () => {
+    const message: ServerMessage = {
+      type: "decision:updated",
+      phase: 1,
+      noteId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      decidedBy: A.userId,
     };
     expect(applyMemberServerMessage([A], message)).toEqual([A]);
   });
@@ -160,6 +171,18 @@ describe("applyPhaseServerMessage", () => {
     );
   });
 
+  it("decision:updated は phase を変えない", () => {
+    const message: ServerMessage = {
+      type: "decision:updated",
+      phase: 1,
+      noteId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      decidedBy: A.userId,
+    };
+    expect(applyPhaseServerMessage(buildPhaseStep(5), message)).toEqual(
+      buildPhaseStep(5),
+    );
+  });
+
   it("snapshot.phase で再接続後の進行状態を復元する", () => {
     const message: ServerMessage = {
       type: "snapshot",
@@ -167,6 +190,7 @@ describe("applyPhaseServerMessage", () => {
       members: [A],
       phase: buildPhaseStep(1),
       isHost: true,
+      decision: null,
       timer: { status: "running", endsAt: 10_000, durationMs: 10_000 },
       serverNow: 1_000,
     };
@@ -195,6 +219,7 @@ describe("applyTimerServerMessage", () => {
       members: [A],
       phase: buildPhaseStep(1),
       isHost: true,
+      decision: null,
       timer: { status: "running", endsAt: 10_000, durationMs: 10_000 },
       serverNow: 1_000,
     };

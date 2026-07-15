@@ -43,6 +43,7 @@ describe("useRoomState", () => {
         members: buildMembers(2),
         phase: buildPhaseStep(2),
         isHost: true,
+        decision: null,
         timer: { status: "running", endsAt: 1_000, durationMs: 60_000 },
         serverNow: 500,
       }),

@@ -146,13 +146,14 @@ describe("NoteSchema", () => {
 });
 
 describe("ServerMessageSchema", () => {
-  it("snapshot は notes / members / phase / isHost を必須にする", () => {
+  it("snapshot は notes / members / phase / isHost / decision を必須にする", () => {
     const parsed = ServerMessageSchema.parse({
       type: "snapshot",
       notes: [],
       members: [{ userId: USER_A, name: "Owner", color: "yellow" }],
       phase: LOBBY,
       isHost: true,
+      decision: null,
       timer: { status: "idle" },
       serverNow: 1_700_000_000_000,
     });
@@ -162,6 +163,7 @@ describe("ServerMessageSchema", () => {
       members: [{ userId: USER_A, name: "Owner", color: "yellow" }],
       phase: LOBBY,
       isHost: true,
+      decision: null,
       timer: { status: "idle" },
       serverNow: 1_700_000_000_000,
     });
@@ -194,6 +196,35 @@ describe("ServerMessageSchema", () => {
       phase: LOBBY,
     });
     expect(result.success).toBe(false);
+  });
+
+  it("snapshot に decision フィールドが無いと拒否する", () => {
+    const result = ServerMessageSchema.safeParse({
+      type: "snapshot",
+      notes: [],
+      members: [{ userId: USER_A, name: "Owner", color: "yellow" }],
+      phase: LOBBY,
+      isHost: true,
+      timer: { status: "idle" },
+      serverNow: 1_700_000_000_000,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("decision:updated はフェーズ・付箋・決定者を受け入れる", () => {
+    expect(
+      ServerMessageSchema.parse({
+        type: "decision:updated",
+        phase: 1,
+        noteId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        decidedBy: USER_A,
+      }),
+    ).toEqual({
+      type: "decision:updated",
+      phase: 1,
+      noteId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      decidedBy: USER_A,
+    });
   });
 
   it("member_joined を受け入れる", () => {
@@ -383,6 +414,27 @@ describe("ClientMessageSchema", () => {
     ).toBe(false);
   });
 
+  it("note:decide は付箋IDだけを受け入れる", () => {
+    expect(
+      ClientMessageSchema.parse({
+        type: "note:decide",
+        noteId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      }),
+    ).toEqual({
+      type: "note:decide",
+      noteId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    });
+  });
+
+  it("note:decide はUUIDでない付箋IDを拒否する", () => {
+    expect(
+      ClientMessageSchema.safeParse({
+        type: "note:decide",
+        noteId: "not-a-uuid",
+      }).success,
+    ).toBe(false);
+  });
+
   it("start_phase を受け入れる", () => {
     expect(ClientMessageSchema.parse({ type: "start_phase" })).toEqual({
       type: "start_phase",
@@ -422,6 +474,7 @@ describe("parseServerMessage", () => {
           members: [],
           phase: LOBBY,
           isHost: false,
+          decision: null,
           timer: { status: "idle" },
           serverNow: 1_700_000_000_000,
         }),
@@ -432,6 +485,7 @@ describe("parseServerMessage", () => {
       members: [],
       phase: LOBBY,
       isHost: false,
+      decision: null,
       timer: { status: "idle" },
       serverNow: 1_700_000_000_000,
     });

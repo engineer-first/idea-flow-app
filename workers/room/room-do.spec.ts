@@ -58,6 +58,16 @@ function nextJson(ws: WebSocket): Promise<Record<string, unknown>> {
   });
 }
 
+function nextJsonWithin(
+  ws: WebSocket,
+  timeoutMs = 500,
+): Promise<Record<string, unknown> | undefined> {
+  return Promise.race([
+    nextJson(ws),
+    new Promise<undefined>((resolve) => setTimeout(resolve, timeoutMs)),
+  ]);
+}
+
 describe("RoomDO メンバーシップ", () => {
   it("upsertMember は冪等（複数回呼んでもメンバーは1件のまま）", async () => {
     const stub = roomStub("room-idempotent");
@@ -409,6 +419,7 @@ describe("RoomDO snapshot", () => {
 
     expect(snapshot.type).toBe("snapshot");
     expect(snapshot.isHost).toBe(true);
+    expect(snapshot.decision).toBeNull();
     expect(snapshot.members).toEqual(
       expect.arrayContaining([expect.objectContaining({ userId: USER_A })]),
     );
@@ -445,6 +456,214 @@ describe("RoomDO snapshot", () => {
     expect(snapshot.type).toBe("snapshot");
     expect(snapshot.isHost).toBe(false);
 
+    ws.close();
+  });
+});
+
+describe("RoomDO note:decide の認可", () => {
+  const SHARED_NOTE_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const PRIVATE_NOTE_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+  async function insertNote(
+    roomName: string,
+    noteId: string,
+    visibility: "private" | "shared",
+  ): Promise<void> {
+    await runInRoomDO(roomName, (_instance, state) => {
+      const now = new Date().toISOString();
+      state.storage.sql.exec(
+        `INSERT INTO notes
+           (id, author_id, content, visibility, color, x, y, created_at, updated_at)
+         VALUES (?1, ?2, '', ?3, 'yellow', 0, 0, ?4, ?4)`,
+        noteId,
+        USER_A,
+        visibility,
+        now,
+      );
+    });
+  }
+
+  it("非ホストは共有付箋を決定できず forbidden で拒否される", async () => {
+    const roomName = "room-decide-non-host";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.upsertMember(USER_B, "Member");
+    await stub.setPhase(buildPhaseStep(5), USER_A);
+    await insertNote(roomName, SHARED_NOTE_ID, "shared");
+
+    const ws = await connectDirectly(roomName, USER_B, USER_A);
+    ws.send(JSON.stringify({ type: "note:decide", noteId: SHARED_NOTE_ID }));
+
+    expect(await nextJsonWithin(ws)).toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+    ws.close();
+  });
+
+  it("未参加ユーザーは note:decide を送る WebSocket 接続自体を拒否される", async () => {
+    const roomName = "room-decide-non-member";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(5), USER_A);
+
+    const response = await stub.fetch("https://do/ws", {
+      headers: {
+        Upgrade: "websocket",
+        [USER_ID_HEADER]: USER_B,
+        [HOST_ID_HEADER]: USER_A,
+      },
+    });
+
+    expect(response.status).toBe(403);
+  });
+
+  it("非公開付箋はホストでも決定できず forbidden で拒否される", async () => {
+    const roomName = "room-decide-private-note";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(5), USER_A);
+    await insertNote(roomName, PRIVATE_NOTE_ID, "private");
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "note:decide", noteId: PRIVATE_NOTE_ID }));
+
+    expect(await nextJsonWithin(ws)).toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+    ws.close();
+  });
+});
+
+describe("RoomDO note:decide", () => {
+  const FIRST_NOTE_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const SECOND_NOTE_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+  async function insertSharedNote(
+    roomName: string,
+    noteId: string,
+  ): Promise<void> {
+    await runInRoomDO(roomName, (_instance, state) => {
+      const now = new Date().toISOString();
+      state.storage.sql.exec(
+        `INSERT INTO notes
+           (id, author_id, content, visibility, color, x, y, created_at, updated_at)
+         VALUES (?1, ?2, '', 'shared', 'yellow', 0, 0, ?3, ?3)`,
+        noteId,
+        USER_A,
+        now,
+      );
+    });
+  }
+
+  it("ホストは Step 1-5 で共有付箋を決定できる", async () => {
+    const roomName = "room-decide-host";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(5), USER_A);
+    await insertSharedNote(roomName, FIRST_NOTE_ID);
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "note:decide", noteId: FIRST_NOTE_ID }));
+
+    expect(await nextJson(ws)).toEqual({
+      type: "decision:updated",
+      phase: 1,
+      noteId: FIRST_NOTE_ID,
+      decidedBy: USER_A,
+    });
+    ws.close();
+
+    const reconnect = await stub.fetch("https://do/ws", {
+      headers: {
+        Upgrade: "websocket",
+        [USER_ID_HEADER]: USER_A,
+        [HOST_ID_HEADER]: USER_A,
+      },
+    });
+    const reconnectWs = reconnect.webSocket;
+    if (!reconnectWs) throw new Error("WebSocket 接続を確立できませんでした。");
+    reconnectWs.accept();
+
+    expect(await nextJson(reconnectWs)).toMatchObject({
+      type: "snapshot",
+      decision: {
+        phase: 1,
+        noteId: FIRST_NOTE_ID,
+        decidedBy: USER_A,
+      },
+    });
+    reconnectWs.close();
+  });
+
+  it("決定時は送信者と非ホストを含む接続中の全員へ配信する", async () => {
+    const roomName = "room-decide-broadcast";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.upsertMember(USER_B, "Member");
+    await stub.setPhase(buildPhaseStep(5), USER_A);
+    await insertSharedNote(roomName, FIRST_NOTE_ID);
+
+    const host = await connectDirectly(roomName, USER_A, USER_A);
+    const member = await connectDirectly(roomName, USER_B, USER_A);
+    const hostMessage = nextJson(host);
+    const memberMessage = nextJson(member);
+    host.send(JSON.stringify({ type: "note:decide", noteId: FIRST_NOTE_ID }));
+
+    const expected = {
+      type: "decision:updated",
+      phase: 1,
+      noteId: FIRST_NOTE_ID,
+      decidedBy: USER_A,
+    };
+    await expect(hostMessage).resolves.toEqual(expected);
+    await expect(memberMessage).resolves.toEqual(expected);
+    host.close();
+    member.close();
+  });
+
+  it("同じフェーズで再確定すると以前の決定を新しい付箋で上書きする", async () => {
+    const roomName = "room-decide-replace";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(5), USER_A);
+    await insertSharedNote(roomName, FIRST_NOTE_ID);
+    await insertSharedNote(roomName, SECOND_NOTE_ID);
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "note:decide", noteId: FIRST_NOTE_ID }));
+    await nextJson(ws);
+    ws.send(JSON.stringify({ type: "note:decide", noteId: SECOND_NOTE_ID }));
+
+    expect(await nextJson(ws)).toMatchObject({
+      type: "decision:updated",
+      noteId: SECOND_NOTE_ID,
+    });
+    const decision = await runInRoomDO(roomName, (_instance, state) => {
+      return state.storage.sql
+        .exec("SELECT note_id FROM decisions WHERE phase = 1")
+        .one() as { note_id: string };
+    });
+    expect(decision).toEqual({ note_id: SECOND_NOTE_ID });
+    ws.close();
+  });
+
+  it("Step 1-4 では note:decide を board-mutation-forbidden で拒否する", async () => {
+    const roomName = "room-decide-step-4-forbidden";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(4), USER_A);
+    await insertSharedNote(roomName, FIRST_NOTE_ID);
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "note:decide", noteId: FIRST_NOTE_ID }));
+
+    expect(await nextJson(ws)).toMatchObject({
+      type: "error",
+      code: "forbidden",
+      message: expect.stringContaining("1-4 ステルス投票"),
+    });
     ws.close();
   });
 });

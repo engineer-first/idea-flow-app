@@ -18,6 +18,7 @@ const NORMALIZE_PHASE_MIGRATION_ID = "20260715042808";
 const ALL_MIGRATION_IDS = ROOM_DO_MIGRATIONS.map((m) => m.id);
 
 const ALL_TABLES = [
+  "decisions",
   "groups",
   "member_color_assignments",
   "members",

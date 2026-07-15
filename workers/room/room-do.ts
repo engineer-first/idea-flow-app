@@ -34,6 +34,8 @@ import {
 } from "../room-do-migrations";
 import { filterVisible } from "../visibility";
 import { RoomBroadcaster, type SocketAttachment } from "./broadcast";
+import { decisionHandlers } from "./decision-handlers";
+import { getDecision } from "./decisions";
 import { groupHandlers, listVisibleGroups } from "./groups";
 import type { HandlerCtx, MessageHandlers } from "./handler-context";
 import {
@@ -71,6 +73,7 @@ export const HOST_ID_HEADER = "X-Idea-Flow-Host-Id";
 // ここでキー漏れがコンパイルエラーになる（旧 switch の never 網羅性チェック相当）。
 const clientMessageHandlers: MessageHandlers<ClientMessage["type"]> = {
   ...noteHandlers,
+  ...decisionHandlers,
   ...groupHandlers,
   ...phaseHandlers,
   ...timerHandlers,
@@ -298,13 +301,16 @@ export class RoomDO extends DurableObject {
 
   // 接続直後に現在状態を丸ごと届ける（再接続の復帰パスも兼ねる）。
   private sendSnapshot(ws: WebSocket, userId: string): void {
+    const phase = getPhase(this.sql);
     this.broadcaster.sendTo(ws, {
       type: "snapshot",
       notes: filterVisible({ viewerId: userId }, listNotes(this.sql, userId)),
       groups: listVisibleGroups(this.sql, userId),
       members: listMembers(this.sql),
-      phase: getPhase(this.sql),
+      phase,
       isHost: isHostUser(this.sql, userId),
+      decision:
+        phase.kind === "step" ? getDecision(this.sql, phase.phase) : null,
       timer: getTimerState(this.sql),
       serverNow: Date.now(),
     });

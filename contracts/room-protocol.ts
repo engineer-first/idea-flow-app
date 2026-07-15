@@ -171,6 +171,10 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
     noteId: z.string().uuid(),
     kind: DotVoteKindSchema,
   }),
+  z.object({
+    type: z.literal("note:decide"),
+    noteId: z.string().uuid(),
+  }),
   // ロビーから課題整理 Step 1-1 へ。ホストのみ。
   z.object({ type: z.literal("start_phase") }),
   // 課題整理の次ステップへ。ホストのみ。
@@ -210,6 +214,13 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
     members: z.array(MemberSchema),
     phase: RoomPhaseSchema,
     isHost: z.boolean(),
+    decision: z
+      .object({
+        phase: z.number().int(),
+        noteId: z.string().uuid(),
+        decidedBy: z.string().uuid(),
+      })
+      .nullable(),
     timer: TimerStateSchema,
     serverNow: TimerMillisecondsSchema,
   }),
@@ -242,6 +253,12 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("phase:updated"),
     phase: RoomPhaseSchema,
+  }),
+  z.object({
+    type: z.literal("decision:updated"),
+    phase: z.number().int().min(1).max(3),
+    noteId: z.string().uuid(),
+    decidedBy: z.string().uuid(),
   }),
   z.object({
     type: z.literal("timer:updated"),
