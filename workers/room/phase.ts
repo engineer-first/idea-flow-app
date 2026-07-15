@@ -86,7 +86,13 @@ const allowedBoardMutationsByPhase: {
 } = {
   1: {
     1: ["note:create", "note:update-content", "note:delete"],
-    2: ["note:publish", "note:unpublish", "note:move", "note:drag"],
+    2: [
+      "note:publish",
+      "note:unpublish",
+      "note:update-content",
+      "note:move",
+      "note:drag",
+    ],
     3: ["note:move", "note:drag", "group:create", "group:update-name"],
     4: ["note:vote", "note:vote-reset"],
     5: [],

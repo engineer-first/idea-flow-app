@@ -1147,10 +1147,30 @@ describe("RoomDO 課題整理ステップの境界ゲート", () => {
       },
     },
     {
+      step: 3,
+      label: "1-3 グループ化",
+      operation: "note:update-content",
+      message: {
+        type: "note:update-content",
+        noteId: "99999999-9999-4999-8999-999999999999",
+        content: "未許可の更新",
+      },
+    },
+    {
       step: 4,
       label: "1-4 ステルス投票",
       operation: "note:create",
       message: { type: "note:create" },
+    },
+    {
+      step: 4,
+      label: "1-4 ステルス投票",
+      operation: "note:update-content",
+      message: {
+        type: "note:update-content",
+        noteId: "99999999-9999-4999-8999-999999999999",
+        content: "未許可の更新",
+      },
     },
     {
       step: 4,
@@ -1299,6 +1319,36 @@ describe("RoomDO 課題整理ステップの境界ゲート", () => {
       code: "forbidden",
       message: expect.stringContaining("1-5 集計確認・絞り込み"),
     });
+    ws.close();
+  });
+
+  it("Step 1-2 では note:update-content を許可し、共有中の誤字を修正できる", async () => {
+    const roomName = "room-step-1-2-update-content-allowed";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(1), USER_A);
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "note:create" }));
+    const inserted = (await nextJson(ws)) as { note: { id: string } };
+    const noteId = inserted.note.id;
+
+    await stub.setPhase(buildPhaseStep(2), USER_A);
+    ws.send(JSON.stringify({ type: "note:publish", noteId, x: 100, y: 100 }));
+    await nextJson(ws);
+
+    ws.send(
+      JSON.stringify({
+        type: "note:update-content",
+        noteId,
+        content: "誤字を修正しました",
+      }),
+    );
+    expect(await nextJson(ws)).toMatchObject({
+      type: "note:updated",
+      note: { id: noteId, content: "誤字を修正しました" },
+    });
+
     ws.close();
   });
 });
