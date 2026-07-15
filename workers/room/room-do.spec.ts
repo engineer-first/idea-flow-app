@@ -227,10 +227,7 @@ describe("RoomDO 進行状態", () => {
   });
 
   it.each([
-    ["writing", buildPhaseStep(1)],
-    ["phase2", buildPhaseStep(2)],
-    ["phase3", buildPhaseStep(4)],
-    ["phase4", buildPhaseStep(5)],
+    ["phase1-step1", buildPhaseStep(1)],
     ["phase2-step1", buildPhaseStep(1, 2)],
     ["phase2-step3", buildPhaseStep(3, 2)],
     ["phase3-step5", buildPhaseStep(5, 3)],
@@ -248,8 +245,13 @@ describe("RoomDO 進行状態", () => {
     expect(await stub.getPhase()).toEqual(expected);
   });
 
+  // 旧フラット形式（writing / phase1..4）は migration
+  // normalize-legacy-phase-values が保存形式ごと正規化する。decode は
+  // 正規形式だけを解釈し、それ以外は lobby へ fail-safe する。
   it.each([
     ["garbage", buildLobbyPhase()],
+    ["writing", buildLobbyPhase()],
+    ["phase2", buildLobbyPhase()],
     ["phase1-step9", buildLobbyPhase()],
     ["phase2-step5", buildLobbyPhase()],
     ["phase3-step6", buildLobbyPhase()],

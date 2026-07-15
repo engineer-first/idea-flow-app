@@ -3,8 +3,9 @@ import {
   getRoomPhaseLabel,
   isLobby,
   isVotingStep,
-  PHASE_STEP_COUNTS,
+  type PHASE_STEP_COUNTS,
   type RoomPhase,
+  RoomPhaseSchema,
 } from "../../contracts/phase";
 import type { ClientMessage } from "../../contracts/room-protocol";
 import type { MessageHandlers } from "./handler-context";
@@ -26,25 +27,19 @@ function encodePhase(phase: RoomPhase): string {
   return `phase${phase.phase}-step${phase.step}`;
 }
 
+// 保存形式は encodePhase が書く「lobby / phaseN-stepM」だけ。旧フラット形式
+// （writing / phase1..4）は migration normalize-legacy-phase-values が保存時に
+// 正規化済み。未知の値は lobby へ fail-safe する（進行を勝手に進めない側に倒す）。
 function decodePhase(value: string): RoomPhase {
   if (value === "lobby") return { kind: "lobby" };
-  if (value === "phase1" || value === "writing") {
-    return { kind: "step", phase: 1, step: 1 };
-  }
-  if (value === "phase2") return { kind: "step", phase: 1, step: 2 };
-  if (value === "phase3") return { kind: "step", phase: 1, step: 4 };
-  if (value === "phase4") return { kind: "step", phase: 1, step: 5 };
-
   const match = /^phase(\d+)-step(\d+)$/.exec(value);
-  if (match) {
-    const phase = Number(match[1]);
-    const step = Number(match[2]);
-    const maxStep = PHASE_STEP_COUNTS[phase as keyof typeof PHASE_STEP_COUNTS];
-    if (maxStep !== undefined && step >= 1 && step <= maxStep) {
-      return { kind: "step", phase, step } as RoomPhase;
-    }
-  }
-  return { kind: "lobby" };
+  if (!match) return { kind: "lobby" };
+  const parsed = RoomPhaseSchema.safeParse({
+    kind: "step",
+    phase: Number(match[1]),
+    step: Number(match[2]),
+  });
+  return parsed.success ? parsed.data : { kind: "lobby" };
 }
 
 function nextRoomPhase(current: RoomPhase): RoomPhase {
