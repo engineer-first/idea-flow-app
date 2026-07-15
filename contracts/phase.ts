@@ -3,7 +3,7 @@
 // RoomPhaseSchema の両方を拡張する。
 import { z } from "zod";
 
-export const PHASE_STEP_COUNTS = { 1: 5 } as const;
+export const PHASE_STEP_COUNTS = { 1: 5, 2: 4, 3: 5 } as const;
 
 export const ROOM_PHASE_STEP_LABELS = {
   1: {
@@ -13,18 +13,46 @@ export const ROOM_PHASE_STEP_LABELS = {
     4: "1-4 ステルス投票",
     5: "1-5 結果集計・絞り込み",
   },
+  2: {
+    1: "2-1 HMW作成",
+    2: "2-2 共有",
+    3: "2-3 HMW投票",
+    4: "2-4 HMW決定",
+  },
+  3: {
+    1: "3-1 アイデアを書く",
+    2: "3-2 共有する",
+    3: "3-3 2軸マッピングで位置を決める",
+    4: "3-4 ステルス投票",
+    5: "3-5 集計確認・絞り込み",
+  },
 } as const;
 
-export const RoomPhaseSchema = z.discriminatedUnion("kind", [
+export const VOTING_STEP_BY_PHASE = { 1: 4, 2: 3, 3: 4 } as const;
+
+export const RESULT_STEP_BY_PHASE = { 1: 5, 2: 4, 3: 5 } as const;
+
+export const RoomPhaseSchema = z.union([
   z.object({ kind: z.literal("lobby") }),
   z.object({
     kind: z.literal("step"),
     phase: z.literal(1),
     step: z.number().int().min(1).max(PHASE_STEP_COUNTS[1]),
   }),
+  z.object({
+    kind: z.literal("step"),
+    phase: z.literal(2),
+    step: z.number().int().min(1).max(PHASE_STEP_COUNTS[2]),
+  }),
+  z.object({
+    kind: z.literal("step"),
+    phase: z.literal(3),
+    step: z.number().int().min(1).max(PHASE_STEP_COUNTS[3]),
+  }),
 ]);
 
 export type RoomPhase = z.infer<typeof RoomPhaseSchema>;
+export type RoomStepPhase = Extract<RoomPhase, { kind: "step" }>;
 
 type RoomPhaseLabelTarget =
   | RoomPhase
@@ -59,7 +87,9 @@ export function isPhaseStep(
 }
 
 export function isVotingStep(phase: RoomPhase): boolean {
-  return isPhaseStep(phase, 1, 4);
+  return (
+    phase.kind === "step" && phase.step === VOTING_STEP_BY_PHASE[phase.phase]
+  );
 }
 
 export function isGroupingStep(phase: RoomPhase): boolean {
@@ -67,5 +97,7 @@ export function isGroupingStep(phase: RoomPhase): boolean {
 }
 
 export function isResultStep(phase: RoomPhase): boolean {
-  return isPhaseStep(phase, 1, 5);
+  return (
+    phase.kind === "step" && phase.step === RESULT_STEP_BY_PHASE[phase.phase]
+  );
 }

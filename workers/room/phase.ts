@@ -3,7 +3,7 @@ import {
   getRoomPhaseLabel,
   isLobby,
   isVotingStep,
-  type PHASE_STEP_COUNTS,
+  PHASE_STEP_COUNTS,
   type RoomPhase,
 } from "../../contracts/phase";
 import type { ClientMessage } from "../../contracts/room-protocol";
@@ -36,10 +36,12 @@ function decodePhase(value: string): RoomPhase {
   if (value === "phase4") return { kind: "step", phase: 1, step: 5 };
 
   const match = /^phase(\d+)-step(\d+)$/.exec(value);
-  if (match?.[1] === "1") {
+  if (match) {
+    const phase = Number(match[1]);
     const step = Number(match[2]);
-    if (step >= 1 && step <= 5) {
-      return { kind: "step", phase: 1, step };
+    const maxStep = PHASE_STEP_COUNTS[phase as keyof typeof PHASE_STEP_COUNTS];
+    if (maxStep !== undefined && step >= 1 && step <= maxStep) {
+      return { kind: "step", phase, step } as RoomPhase;
     }
   }
   return { kind: "lobby" };
@@ -92,6 +94,19 @@ const allowedBoardMutationsByPhase: {
     2: ["note:publish", "note:unpublish", "note:move", "note:drag"],
     3: ["note:move", "note:drag", "group:create", "group:update-name"],
     4: ["note:vote", "note:vote-reset"],
+    5: [],
+  },
+  2: {
+    1: [],
+    2: [],
+    3: [],
+    4: [],
+  },
+  3: {
+    1: [],
+    2: [],
+    3: [],
+    4: [],
     5: [],
   },
 };

@@ -201,6 +201,17 @@ describe("RoomDO 進行状態", () => {
     expect(await stub.getPhase()).toEqual(buildPhaseStep(1));
   });
 
+  it.each([
+    buildPhaseStep(3, 2),
+    buildPhaseStep(5, 3),
+  ])("フェーズ2・3の保存済み進行状態を復元する: %o", async (phase) => {
+    const stub = roomStub(`room-phase-roundtrip-${phase.phase}-${phase.step}`);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(phase, USER_A);
+
+    expect(await stub.getPhase()).toEqual(phase);
+  });
+
   it("setPhase は room_owner のホスト以外なら reject（二重防御）", async () => {
     // setPhase は async 関数で throw するため、rejects で受ける。
     // runInDurableObject 経由にすれば unhandled rejection として漏れない。
@@ -220,10 +231,30 @@ describe("RoomDO 進行状態", () => {
     ["phase2", buildPhaseStep(2)],
     ["phase3", buildPhaseStep(4)],
     ["phase4", buildPhaseStep(5)],
+    ["phase2-step1", buildPhaseStep(1, 2)],
+    ["phase2-step3", buildPhaseStep(3, 2)],
+    ["phase3-step5", buildPhaseStep(5, 3)],
+  ])("保存済みの有効な phase=%s を %o として復元する", async (raw, expected) => {
+    const roomId = `room-phase-decode-${raw}`;
+    const stub = roomStub(roomId);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await runInRoomDO(roomId, (_instance, state) => {
+      state.storage.sql.exec(
+        "UPDATE room_state SET phase = ?1 WHERE id = 1",
+        raw,
+      );
+    });
+
+    expect(await stub.getPhase()).toEqual(expected);
+  });
+
+  it.each([
     ["garbage", buildLobbyPhase()],
-    ["phase2-step1", buildLobbyPhase()],
     ["phase1-step9", buildLobbyPhase()],
-  ])("保存済みの phase=%s を %o として復元する", async (raw, expected) => {
+    ["phase2-step5", buildLobbyPhase()],
+    ["phase3-step6", buildLobbyPhase()],
+    ["phase4-step1", buildLobbyPhase()],
+  ])("保存済みの無効な phase=%s を %o として復元する", async (raw, expected) => {
     const roomId = `room-phase-decode-${raw}`;
     const stub = roomStub(roomId);
     await stub.initializeNewRoom(USER_A, "Host");
@@ -976,6 +1007,23 @@ describe("RoomDO timer:* の認可", () => {
 });
 
 describe("RoomDO 課題整理ステップの境界ゲート", () => {
+  it("フェーズ2では変更系メッセージをdeny-allで拒否する", async () => {
+    const roomName = "room-phase-2-deny-all";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(1, 2), USER_A);
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "note:create" }));
+
+    expect(await nextJson(ws)).toMatchObject({
+      type: "error",
+      code: "forbidden",
+      message: expect.stringContaining("2-1 HMW作成"),
+    });
+    ws.close();
+  });
+
   it("Step 1-1 では note:vote を付箋の存在確認より前に forbidden で拒否する", async () => {
     const roomName = "room-step-1-1-vote-forbidden";
     const stub = roomStub(roomName);
