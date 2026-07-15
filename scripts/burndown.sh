@@ -23,8 +23,13 @@ for arg in "$@"; do
   case "$arg" in
     --json) MODE="json" ;;
     --all) SCOPE="all" ;;
-    -h|--help) grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    *) ONLY_SPRINT="$arg"; SCOPE="all" ;;
+    -h|--help) grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *)
+      if [[ -n "$ONLY_SPRINT" ]]; then
+        echo "エラー: スプリント名は1つだけ指定してください(クオートし忘れていませんか?)" >&2
+        exit 1
+      fi
+      ONLY_SPRINT="$arg"; SCOPE="all" ;;
   esac
 done
 
@@ -32,6 +37,7 @@ raw=$(gh api graphql -f owner="$OWNER" -f name="$NAME" -f query='
 query($owner: String!, $name: String!) {
   repository(owner: $owner, name: $name) {
     milestones(first: 20, orderBy: {field: DUE_DATE, direction: ASC}) {
+      pageInfo { hasNextPage }
       nodes {
         title
         dueOn
@@ -56,6 +62,10 @@ query($owner: String!, $name: String!) {
     }
   }
 }')
+
+if [[ "$(jq -r '.data.repository.milestones.pageInfo.hasNextPage' <<<"$raw")" == "true" ]]; then
+  echo "⚠ マイルストーンが20件を超えています。21件目以降のスプリントは集計対象外です" >&2
+fi
 
 summary=$(jq --arg today "$(date +%F)" '
   def est: [.labels.nodes[].name | capture("^est:(?<h>[0-9.]+)h$").h | tonumber] | first // null;
@@ -106,27 +116,26 @@ if [[ -n "$ONLY_SPRINT" ]]; then
   ONLY_SPRINT="$resolved"
 fi
 
+# JSON/テキスト双方で同じスプリント選択条件を使うため、ここで一度だけ絞り込む。
+summary=$(jq --arg scope "$SCOPE" --arg only "$ONLY_SPRINT" '
+  .sprints |= map(select(
+    ($only != "" and .title == $only)
+    or ($only == "" and ($scope == "all" or .tasks_open > 0))
+  ))
+  | if $only != "" then del(.no_milestone) else . end
+' <<<"$summary")
+
 if [[ "$MODE" == "json" ]]; then
-  jq --arg scope "$SCOPE" --arg only "$ONLY_SPRINT" '
-    .sprints |= map(select(
-      ($only != "" and .title == $only)
-      or ($only == "" and ($scope == "all" or .tasks_open > 0))
-    ))
-    | if $only != "" then del(.no_milestone) else . end
-  ' <<<"$summary"
+  echo "$summary"
   exit 0
 fi
 
-jq -r --arg scope "$SCOPE" --arg only "$ONLY_SPRINT" '
+jq -r --arg only "$ONLY_SPRINT" '
   def fmt_h: if . == floor then "\(floor)h" else "\(.)h" end;
   def task_lines: .[] | "    #\(.number)\t\(.est // "?" | if type == "number" then fmt_h else . end)\t\(.title)";
 
   "📊 バーンダウン集計 (\(.generated_at))\n",
   (.sprints[]
-   | select(
-       ($only != "" and .title == $only)
-       or ($only == "" and ($scope == "all" or .tasks_open > 0))
-     )
    | "== \(.title) (〜\(.due_on)) ==",
      "  総見積: \(.total_h | fmt_h) / \(.tasks_total) tasks",
      "  完了:   \(.done_h | fmt_h) / \(.tasks_total - .tasks_open) tasks",
