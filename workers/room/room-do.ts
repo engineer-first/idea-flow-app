@@ -16,9 +16,9 @@
 // ハイバネーションでインメモリ状態は消える（次のイベントで constructor が再実行
 // される）ため、状態は毎回 SQL から導出し、各モジュールにキャッシュを持たせない。
 import { DurableObject } from "cloudflare:workers";
+import type { RoomPhase } from "../../contracts/phase";
 import {
   type ClientMessage,
-  type Phase,
   type ProtocolMember,
   parseClientMessage,
   type TimerState,
@@ -47,7 +47,12 @@ import {
 } from "./members";
 import { noteHandlers } from "./note-handlers";
 import { listNotes } from "./notes";
-import { getPhase, isBoardMutation, phaseHandlers, savePhase } from "./phase";
+import {
+  getBoardMutationForbiddenMessage,
+  getPhase,
+  phaseHandlers,
+  savePhase,
+} from "./phase";
 import { getTimerState, timerHandlers } from "./timer";
 
 // api-worker がセッション検証済みのユーザーIDを DO へ引き継ぐヘッダー。
@@ -113,7 +118,7 @@ export class RoomDO extends DurableObject {
     // room_owner は api-worker が D1 rooms.host_id から渡した値だけで初期化する。
     // 以後も WS 接続時の ensureHost 以外に独立して書き換える経路を持たない。
     ensureHost(this.sql, hostId);
-    savePhase(this.sql, "lobby");
+    savePhase(this.sql, { kind: "lobby" });
   }
 
   isMember(userId: string): boolean {
@@ -162,7 +167,7 @@ export class RoomDO extends DurableObject {
     return listMembers(this.sql);
   }
 
-  getPhase(): Phase {
+  getPhase(): RoomPhase {
     return getPhase(this.sql);
   }
 
@@ -170,10 +175,10 @@ export class RoomDO extends DurableObject {
     return getTimerState(this.sql);
   }
 
-  // テスト用途限定の RPC。phase 順序や phase3 の投票ゲートを通らず任意の
+  // テスト用途限定の RPC。phase 順序や Step 1-4 の投票ゲートを通らず任意の
   // フェーズへ移動できるため、api-worker のエンドポイントなどクライアント
   // 到達経路には載せない（載せるとゲートが無言で無効化される）。
-  async setPhase(phase: Phase, byUserId: string): Promise<void> {
+  async setPhase(phase: RoomPhase, byUserId: string): Promise<void> {
     if (!isHostUser(this.sql, byUserId)) {
       throw new Error("進行状態を変更する権限がありません。");
     }
@@ -260,18 +265,13 @@ export class RoomDO extends DurableObject {
     message: ClientMessage,
   ): Promise<void> {
     const ctx = this.createHandlerCtx(ws, attachment.userId);
-    // lobby はボード開始前、phase4 は投票結果を確認しながら話し合う工程。
-    // どちらも「ボードを変更してよい工程」ではないため、WebSocket を直接
-    // 送られても状態が変わらないよう、変更系メッセージを境界で一元的に拒否する。
     const phase = getPhase(this.sql);
-    if ((phase === "lobby" || phase === "phase4") && isBoardMutation(message)) {
+    const forbiddenMessage = getBoardMutationForbiddenMessage(phase, message);
+    if (forbiddenMessage) {
       ctx.reply({
         type: "error",
         code: "forbidden",
-        message:
-          phase === "lobby"
-            ? "ボード開始前はボードを変更できません。"
-            : "投票結果の確認中はボードを変更できません。",
+        message: forbiddenMessage,
       });
       return;
     }

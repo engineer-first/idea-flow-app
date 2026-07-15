@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { buildPhaseStep } from "@/contracts/phase.fixture";
 import { buildNote, buildNotes } from "@/contracts/room-protocol.fixture";
 import { RoomBoardCanvas } from "./room-board-canvas";
 
@@ -8,6 +9,7 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardCanvas>[0]> = {}) {
   const props = {
     notes: buildNotes(2),
     groups: [],
+    phase: buildPhaseStep(1),
     privateNotes: [],
     selectedNoteId: null,
     draggingNoteId: null,
@@ -61,6 +63,34 @@ describe("RoomBoardCanvas", () => {
 
   it("近接する付箋からグループ枠を描画する", () => {
     setup({
+      phase: buildPhaseStep(3),
+      notes: [
+        buildNote({ id: "note-1", x: 100, y: 100 }),
+        buildNote({ id: "note-2", x: 350, y: 100 }),
+      ],
+    });
+
+    expect(screen.getByTestId("note-group-card")).toBeInTheDocument();
+  });
+
+  it("Step 1-2 では近接する付箋のグループ枠を描画しない", () => {
+    setup({
+      phase: buildPhaseStep(2),
+      notes: [
+        buildNote({ id: "note-1", x: 100, y: 100 }),
+        buildNote({ id: "note-2", x: 350, y: 100 }),
+      ],
+      groups: [
+        { id: "group-1", name: "既存グループ", noteIds: ["note-1", "note-2"] },
+      ],
+    });
+
+    expect(screen.queryByTestId("note-group-card")).not.toBeInTheDocument();
+  });
+
+  it("Step 1-4 では近接する付箋のグループ枠を描画する", () => {
+    setup({
+      phase: buildPhaseStep(4),
       notes: [
         buildNote({ id: "note-1", x: 100, y: 100 }),
         buildNote({ id: "note-2", x: 350, y: 100 }),

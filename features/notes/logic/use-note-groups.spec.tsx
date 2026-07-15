@@ -1,6 +1,7 @@
 // useNoteGroups（永続グループの状態とプロトコル化）の単体テスト。
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { buildPhaseStep } from "@/contracts/phase.fixture";
 import { buildGroup } from "@/contracts/room-protocol.fixture";
 import { useNoteGroups } from "./use-note-groups";
 
@@ -22,7 +23,7 @@ describe("useNoteGroups", () => {
         type: "snapshot",
         notes: [],
         members: [],
-        phase: "phase1",
+        phase: buildPhaseStep(1),
         isHost: true,
         timer: { status: "idle" },
         serverNow: Date.now(),
@@ -36,7 +37,7 @@ describe("useNoteGroups", () => {
         type: "snapshot",
         notes: [],
         members: [],
-        phase: "phase1",
+        phase: buildPhaseStep(1),
         isHost: true,
         timer: { status: "idle" },
         serverNow: Date.now(),

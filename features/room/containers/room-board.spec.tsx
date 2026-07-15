@@ -37,6 +37,8 @@ vi.mock("../logic/room-notify", () => ({
   },
 }));
 
+import type { RoomPhase } from "@/contracts/phase";
+import { buildPhaseStep } from "@/contracts/phase.fixture";
 import type { ProtocolNote } from "@/contracts/room-protocol";
 import { FORCE_NEXT_PHASE_COPY } from "../molecules/force-next-phase-dialog";
 import { RoomBoard } from "./room-board";
@@ -143,7 +145,7 @@ function renderBoard(options: { open?: boolean; isHost?: boolean } = {}) {
       isHost={options.isHost ?? true}
       hostUserId={USER_ID}
       initialMembers={[]}
-      initialPhase="phase1"
+      initialPhase={buildPhaseStep(1)}
       webSocketFactory={factory}
     />,
   );
@@ -158,7 +160,7 @@ function renderBoard(options: { open?: boolean; isHost?: boolean } = {}) {
 function connectWithSnapshot(
   notes: ProtocolNote[] = [],
   options?: {
-    phase?: "phase1" | "phase2" | "phase3";
+    phase?: RoomPhase;
     isHost?: boolean;
   },
 ) {
@@ -169,7 +171,7 @@ function connectWithSnapshot(
       type: "snapshot",
       notes,
       members: [],
-      phase: options?.phase ?? "phase1",
+      phase: options?.phase ?? buildPhaseStep(1),
       isHost: options?.isHost ?? true,
       timer: { status: "idle" },
       serverNow: Date.now(),
@@ -211,7 +213,7 @@ describe("メンバー参加・退出の通知", () => {
           { userId: USER_ID, name: "Host", color: "yellow" },
           { userId: OTHER_USER_ID, name: "Taro", color: "green" },
         ],
-        phase: "phase1",
+        phase: buildPhaseStep(1),
         isHost: true,
         timer: { status: "idle" },
         serverNow: Date.now(),
@@ -251,7 +253,7 @@ describe("サーバーメッセージ → 画面反映", () => {
   });
 
   it("forbidden エラーを受信するとポップアップ通知を表示する", () => {
-    const { socket } = connectWithSnapshot([], { phase: "phase3" });
+    const { socket } = connectWithSnapshot([], { phase: buildPhaseStep(4) });
 
     act(() =>
       socket.simulateServerMessage({
@@ -267,7 +269,7 @@ describe("サーバーメッセージ → 画面反映", () => {
   it("投票未完了（voting-incomplete）を受信すると toast ではなく強制進行の確認を表示し、確認で force 付き phase:next を送信する", () => {
     const { socket } = connectWithSnapshot([], {
       isHost: true,
-      phase: "phase3",
+      phase: buildPhaseStep(4),
     });
 
     act(() =>
@@ -295,7 +297,7 @@ describe("サーバーメッセージ → 画面反映", () => {
     // 保証に依存せず通常のエラー表示へ落とすことを固定する。
     const { socket } = connectWithSnapshot([], {
       isHost: false,
-      phase: "phase3",
+      phase: buildPhaseStep(4),
     });
 
     act(() =>
@@ -318,7 +320,7 @@ describe("サーバーメッセージ → 画面反映", () => {
     // 別タブなど他の経路で進行が確定したら、開いていた確認は根拠が古い。
     const { socket } = connectWithSnapshot([], {
       isHost: true,
-      phase: "phase3",
+      phase: buildPhaseStep(4),
     });
 
     act(() =>
@@ -331,7 +333,10 @@ describe("サーバーメッセージ → 画面反映", () => {
     expect(screen.getByText(FORCE_NEXT_PHASE_COPY.title)).toBeInTheDocument();
 
     act(() =>
-      socket.simulateServerMessage({ type: "phase:updated", phase: "phase4" }),
+      socket.simulateServerMessage({
+        type: "phase:updated",
+        phase: buildPhaseStep(5),
+      }),
     );
 
     expect(
@@ -342,7 +347,7 @@ describe("サーバーメッセージ → 画面反映", () => {
   it("強制進行の確認ダイアログは再接続の snapshot 受信で閉じる", () => {
     const { socket } = connectWithSnapshot([], {
       isHost: true,
-      phase: "phase3",
+      phase: buildPhaseStep(4),
     });
 
     act(() =>
@@ -359,7 +364,7 @@ describe("サーバーメッセージ → 画面反映", () => {
         type: "snapshot",
         notes: [],
         members: [],
-        phase: "phase4",
+        phase: buildPhaseStep(5),
         isHost: true,
         timer: { status: "idle" },
         serverNow: Date.now(),
@@ -374,7 +379,7 @@ describe("サーバーメッセージ → 画面反映", () => {
   it("強制進行の確認をキャンセルすると force 付き phase:next は送信されない", () => {
     const { socket } = connectWithSnapshot([], {
       isHost: true,
-      phase: "phase3",
+      phase: buildPhaseStep(4),
     });
 
     act(() =>
@@ -995,17 +1000,15 @@ describe("ユーザー操作 → プロトコルメッセージ送信", () => {
     expect(socket.sent).toHaveLength(0);
   });
 
-  it("ホストが確認後に「次のフェーズへ」を実行すると phase:next が送信される", () => {
+  it("ホストが確認後に「次のステップへ」を実行すると phase:next が送信される", () => {
     const { socket } = connectWithSnapshot([], {
       isHost: true,
-      phase: "phase1",
+      phase: buildPhaseStep(1),
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "次のフェーズへ" }));
+    fireEvent.click(screen.getByRole("button", { name: "次のステップへ" }));
 
-    expect(
-      screen.getByText("次のフェーズへ移行しますか？"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("次のステップへ進みますか？")).toBeInTheDocument();
 
     expect(socket.sent).not.toContain(JSON.stringify({ type: "phase:next" }));
 

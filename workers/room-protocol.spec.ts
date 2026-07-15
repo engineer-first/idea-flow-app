@@ -15,6 +15,7 @@ import {
   NOTE_SPAWN_X_MIN,
   NOTE_SPAWN_Y_MIN,
 } from "../contracts/board";
+import { buildLobbyPhase, buildPhaseStep } from "../contracts/phase.fixture";
 import {
   NOTE_COLOR_PALETTE,
   type ServerMessage,
@@ -40,6 +41,8 @@ const MEMBER: TestUser = {
   name: "Member",
 };
 const NOTE_COLOR_PATTERN = new RegExp(`^(${NOTE_COLOR_PALETTE.join("|")})$`);
+const LOBBY = buildLobbyPhase();
+const roomIdBySocket = new WeakMap<RoomSocket, string>();
 
 // 2ユーザーが同じルームに接続した状態を作る（snapshot 受信済み）。
 async function setupRoom(): Promise<{
@@ -57,6 +60,9 @@ async function setupRoom(): Promise<{
   const member = await connectRoomAs(MEMBER, roomId);
   const memberSnapshot = await member.next();
   expect(memberSnapshot.type).toBe("snapshot");
+
+  roomIdBySocket.set(owner, roomId);
+  roomIdBySocket.set(member, roomId);
 
   return { roomId, owner, member };
 }
@@ -78,6 +84,14 @@ async function setupStartedRoom(): Promise<{
 
 function send(socket: RoomSocket, message: unknown): void {
   socket.ws.send(JSON.stringify(message));
+}
+
+async function arrangeStep(socket: RoomSocket, step: number): Promise<void> {
+  const roomId = roomIdBySocket.get(socket);
+  if (!roomId) throw new Error("テスト用ルームIDが見つかりません。");
+  await runInRoomDO(roomId, (instance) =>
+    instance.setPhase(buildPhaseStep(step), OWNER.sub),
+  );
 }
 
 function storedHostId(roomId: string): Promise<string | null> {
@@ -103,9 +117,11 @@ async function createNote(room: {
   owner: RoomSocket;
   member: RoomSocket;
 }): Promise<string> {
+  await arrangeStep(room.owner, 1);
   send(room.owner, { type: "note:create" });
   const drafted = await expectType(room.owner, "note:inserted");
   expect(drafted.note.visibility).toBe("private");
+  await arrangeStep(room.owner, 2);
   send(room.owner, {
     type: "note:publish",
     noteId: drafted.note.id,
@@ -131,7 +147,7 @@ describe("snapshot（接続・再接続の復帰パス）", () => {
         color: expect.stringMatching(NOTE_COLOR_PATTERN),
       },
     ]);
-    expect(snapshot.phase).toBe("lobby");
+    expect(snapshot.phase).toEqual(LOBBY);
     expect(snapshot).not.toHaveProperty("room");
     expect(snapshot).not.toHaveProperty("self");
     socket.close();
@@ -143,12 +159,14 @@ describe("snapshot（接続・再接続の復帰パス）", () => {
 
     // owner が切断している間に member が本文と位置を確定する。
     owner.close();
+    await arrangeStep(member, 1);
     send(member, {
       type: "note:update-content",
       noteId,
       content: "切断中の更新",
     });
     await expectType(member, "note:updated");
+    await arrangeStep(member, 2);
     send(member, { type: "note:move", noteId, x: 640, y: 480 });
     await expectType(member, "note:updated");
 
@@ -175,23 +193,23 @@ describe("snapshot（接続・再接続の復帰パス）", () => {
         color: expect.stringMatching(NOTE_COLOR_PATTERN),
       },
     ]);
-    // ボード開始済みルームへの再接続なので、現在の進行状態（phase1）が届く。
-    expect(snapshot.phase).toBe("phase1");
+    // 移動後の Step 1-2 が復元される。
+    expect(snapshot.phase).toEqual(buildPhaseStep(2));
 
     reconnected.close();
     member.close();
   });
 
-  it("切断中に start_phase が進んだあと再接続すると snapshot.phase が phase1 になる", async () => {
+  it("切断中に start_phase が進んだあと再接続すると snapshot.phase が Step 1-1 になる", async () => {
     const { roomId, owner, member } = await setupRoom();
-    // member が切断している間に host が phase1 へ進める
+    // member が切断している間に host が Step 1-1 へ進める
     member.close();
     send(owner, { type: "start_phase" });
     await expectType(owner, "phase:updated");
 
     const reconnected = await connectRoomAs(MEMBER, roomId);
     const snapshot = await expectType(reconnected, "snapshot");
-    expect(snapshot.phase).toBe("phase1");
+    expect(snapshot.phase).toEqual(buildPhaseStep(1));
 
     reconnected.close();
     owner.close();
@@ -227,9 +245,9 @@ describe("メンバー色と付箋色", () => {
     for (const user of additionalMembers) {
       await joinRoomAs(user, inviteCode);
     }
-    // 付箋色の検証はボード操作（note:create）を伴うため phase1 へ進めておく。
+    // 付箋色の検証はボード操作（note:create）を伴うため Step 1-1 へ進めておく。
     await runInRoomDO(roomId, (instance) =>
-      instance.setPhase("phase1", OWNER.sub),
+      instance.setPhase(buildPhaseStep(1), OWNER.sub),
     );
 
     const member = await connectRoomAs(MEMBER, roomId);
@@ -246,6 +264,9 @@ describe("メンバー色と付箋色", () => {
     send(member, { type: "note:create" });
     const created = await expectType(member, "note:inserted");
     expect(created.note.color).toBe(memberColor);
+    await runInRoomDO(roomId, (instance) =>
+      instance.setPhase(buildPhaseStep(2), OWNER.sub),
+    );
     send(member, {
       type: "note:publish",
       noteId: created.note.id,
@@ -489,8 +510,8 @@ describe("start_phase / phase:updated（ホストだけ進行状態を進めら�
     send(owner, { type: "start_phase" });
     const toOwner = await expectType(owner, "phase:updated");
     const toMember = await expectType(member, "phase:updated");
-    expect(toOwner.phase).toBe("phase1");
-    expect(toMember.phase).toBe("phase1");
+    expect(toOwner.phase).toEqual(buildPhaseStep(1));
+    expect(toMember.phase).toEqual(buildPhaseStep(1));
 
     owner.close();
     member.close();
@@ -508,8 +529,8 @@ describe("start_phase / phase:updated（ホストだけ進行状態を進めら�
       headers: { Cookie: await sessionCookieFor(OWNER) },
     });
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { phase: string };
-    expect(body.phase).toBe("lobby");
+    const body = (await res.json()) as { phase: unknown };
+    expect(body.phase).toEqual(LOBBY);
 
     owner.close();
     member.close();
@@ -572,7 +593,7 @@ describe("start_phase / phase:updated（ホストだけ進行状態を進めら�
 
     send(owner, { type: "start_phase" });
     const updated = await expectType(owner, "phase:updated");
-    expect(updated.phase).toBe("phase1");
+    expect(updated.phase).toEqual(buildPhaseStep(1));
 
     owner.close();
   });
@@ -599,7 +620,7 @@ describe("start_phase / phase:updated（ホストだけ進行状態を進めら�
     owner.close();
   });
 
-  it("start_phase 後の phase は永続化され、再接続後の /api/rooms/[id] でも phase1 のまま", async () => {
+  it("start_phase 後の phase は永続化され、再接続後の /api/rooms/[id] でも Step 1-1 のまま", async () => {
     const { roomId, owner, member } = await setupRoom();
 
     send(owner, { type: "start_phase" });
@@ -612,8 +633,8 @@ describe("start_phase / phase:updated（ホストだけ進行状態を進めら�
     const res = await SELF.fetch(`https://api.test/api/rooms/${roomId}`, {
       headers: { Cookie: await sessionCookieFor(MEMBER) },
     });
-    const body = (await res.json()) as { phase: string };
-    expect(body.phase).toBe("phase1");
+    const body = (await res.json()) as { phase: unknown };
+    expect(body.phase).toEqual(buildPhaseStep(1));
   });
 });
 
@@ -657,6 +678,7 @@ describe("note:create", () => {
       NOTE_SPAWN_Y_MIN + NOTE_SPAWN_JITTER,
     );
 
+    await arrangeStep(owner, 2);
     send(owner, {
       type: "note:publish",
       noteId: toOwner.note.id,
@@ -677,11 +699,13 @@ describe("note:create", () => {
 });
 
 describe("note:publish", () => {
-  it("公開した付箋が既存グループに近ければ自動で加入する", async () => {
+  it("Step 1-3 では公開済み付箋からグループを作成できる", async () => {
     const { owner, member } = await setupStartedRoom();
     const firstNoteId = await createNote({ owner, member });
     const secondNoteId = await createNote({ owner, member });
     const groupId = "55555555-5555-4555-8555-555555555555";
+
+    await arrangeStep(owner, 3);
 
     send(owner, {
       type: "group:create",
@@ -695,32 +719,6 @@ describe("note:publish", () => {
     });
     await expectType(owner, "group:updated");
     await expectType(member, "group:updated");
-
-    send(owner, { type: "note:create" });
-    const drafted = await expectType(owner, "note:inserted");
-
-    send(owner, {
-      type: "note:publish",
-      noteId: drafted.note.id,
-      x: 100,
-      y: 100,
-    });
-    await expectType(owner, "note:inserted");
-    await expectType(member, "note:inserted");
-    const ownerGroupUpdate = await expectType(owner, "group:updated");
-    const memberGroupUpdate = await expectType(member, "group:updated");
-
-    expect(ownerGroupUpdate.group).toMatchObject({
-      id: groupId,
-      noteIds: expect.arrayContaining([
-        firstNoteId,
-        secondNoteId,
-        drafted.note.id,
-      ]),
-    });
-    expect(memberGroupUpdate.group.noteIds).toEqual(
-      ownerGroupUpdate.group.noteIds,
-    );
 
     owner.close();
     member.close();
@@ -746,6 +744,7 @@ describe("note:publish", () => {
     });
     expect((await expectType(member, "error")).code).toBe("forbidden");
 
+    await arrangeStep(owner, 2);
     send(owner, {
       type: "note:publish",
       noteId: drafted.note.id,
@@ -794,6 +793,8 @@ describe("note:unpublish", () => {
     const firstNoteId = await createNote({ owner, member });
     const secondNoteId = await createNote({ owner, member });
 
+    await arrangeStep(owner, 3);
+
     send(owner, {
       type: "group:create",
       group: {
@@ -807,6 +808,7 @@ describe("note:unpublish", () => {
     await expectType(owner, "group:updated");
     await expectType(member, "group:updated");
 
+    await arrangeStep(owner, 2);
     send(owner, { type: "note:unpublish", noteId: firstNoteId });
     await expectType(owner, "note:deleted");
     await expectType(owner, "note:inserted");
@@ -827,6 +829,8 @@ describe("private note の永続化", () => {
     const { owner, member } = await setupStartedRoom();
     send(owner, { type: "note:create" });
     const drafted = await expectType(owner, "note:inserted");
+
+    await arrangeStep(owner, 4);
 
     send(member, {
       type: "note:vote",
@@ -887,6 +891,8 @@ describe("note:update-content / note:move（pgTAP: メンバーの共同編集�
     const { owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
 
+    await arrangeStep(owner, 1);
+
     send(member, {
       type: "note:update-content",
       noteId,
@@ -905,6 +911,8 @@ describe("note:update-content / note:move（pgTAP: メンバーの共同編集�
   it("note:move で位置が確定し、全員に note:updated が届く", async () => {
     const { owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
+
+    await arrangeStep(owner, 2);
 
     send(member, { type: "note:move", noteId, x: 123, y: 456 });
     const toOwner = await expectType(owner, "note:updated");
@@ -938,6 +946,8 @@ describe("note:vote（課題ドット投票）", () => {
     const { owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
 
+    await arrangeStep(owner, 4);
+
     send(member, { type: "note:vote", noteId, kind: "subjective" });
     const toOwner = await expectType(owner, "note:updated");
     const toMember = await expectType(member, "note:updated");
@@ -960,6 +970,8 @@ describe("note:vote（課題ドット投票）", () => {
   it("投票済みの主観ドットを再度押すと取り消せる", async () => {
     const { owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
+
+    await arrangeStep(owner, 4);
 
     send(member, { type: "note:vote", noteId, kind: "subjective" });
     await expectType(owner, "note:updated");
@@ -984,6 +996,8 @@ describe("note:vote（課題ドット投票）", () => {
     const { roomId, owner, member } = await setupStartedRoom();
     const firstNoteId = await createNote({ owner, member });
     const secondNoteId = await createNote({ owner, member });
+
+    await arrangeStep(owner, 4);
 
     send(member, {
       type: "note:vote",
@@ -1019,6 +1033,8 @@ describe("note:vote（課題ドット投票）", () => {
       noteIds.push(await createNote({ owner, member }));
     }
 
+    await arrangeStep(owner, 4);
+
     for (const noteId of noteIds.slice(0, 3)) {
       send(member, { type: "note:vote", noteId, kind: "objective" });
       await expectType(owner, "note:updated");
@@ -1044,6 +1060,8 @@ describe("note:vote（課題ドット投票）", () => {
     const { owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
 
+    await arrangeStep(owner, 4);
+
     for (const voter of [owner, member]) {
       for (let count = 0; count < 3; count++) {
         send(voter, { type: "note:vote", noteId, kind: "objective" });
@@ -1064,6 +1082,8 @@ describe("note:vote（課題ドット投票）", () => {
   it("客観ドットは同じ付箋に残り数まで積める", async () => {
     const { owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
+
+    await arrangeStep(owner, 4);
 
     for (const expected of [1, 2, 3]) {
       send(member, { type: "note:vote", noteId, kind: "objective" });
@@ -1090,6 +1110,8 @@ describe("note:vote（課題ドット投票）", () => {
   it("客観ドットはリセットで同じ付箋上の自分の票を0に戻せる", async () => {
     const { owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
+
+    await arrangeStep(owner, 4);
 
     for (let i = 0; i < 2; i++) {
       send(member, { type: "note:vote", noteId, kind: "objective" });
@@ -1122,6 +1144,8 @@ describe("note:delete（pgTAP: DELETE は author のみ）", () => {
     const { owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
 
+    await arrangeStep(owner, 1);
+
     send(owner, { type: "note:delete", noteId });
     const toOwner = await expectType(owner, "note:deleted");
     const toMember = await expectType(member, "note:deleted");
@@ -1135,6 +1159,8 @@ describe("note:delete（pgTAP: DELETE は author のみ）", () => {
   it("author でないメンバーの削除は forbidden で拒否され、付箋は残る", async () => {
     const { roomId, owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
+
+    await arrangeStep(owner, 1);
 
     send(member, { type: "note:delete", noteId });
     const error = await expectType(member, "error");
@@ -1222,11 +1248,106 @@ describe("入力検証（コントラクト境界）", () => {
 });
 
 describe("グループ指向のグループ同期", () => {
+  it("Step 1-2 の移動では既存グループを自動再編成しない", async () => {
+    const { roomId, owner, member } = await setupStartedRoom();
+    const firstNoteId = await createNote({ owner, member });
+    const secondNoteId = await createNote({ owner, member });
+    const groupId = "44444444-4444-4444-8444-444444444444";
+
+    await arrangeStep(owner, 3);
+    send(owner, {
+      type: "group:create",
+      group: {
+        id: groupId,
+        name: "維持するグループ",
+        noteIds: [firstNoteId, secondNoteId],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    });
+    await expectType(owner, "group:updated");
+    await expectType(member, "group:updated");
+
+    await arrangeStep(owner, 2);
+    send(owner, {
+      type: "note:move",
+      noteId: firstNoteId,
+      x: 1_200,
+      y: 1_200,
+    });
+    await expectType(owner, "note:updated");
+    await expectType(member, "note:updated");
+
+    member.close();
+    const reconnected = await connectRoomAs(MEMBER, roomId);
+    const snapshot = await expectType(reconnected, "snapshot");
+    expect(snapshot.groups).toEqual([
+      expect.objectContaining({
+        id: groupId,
+        noteIds: [firstNoteId, secondNoteId],
+      }),
+    ]);
+
+    owner.close();
+    reconnected.close();
+  });
+
+  it("Step 1-2 から Step 1-3 への進行では既存グループを自動再編成しない", async () => {
+    const { roomId, owner, member } = await setupStartedRoom();
+    const firstNoteId = await createNote({ owner, member });
+    const secondNoteId = await createNote({ owner, member });
+    const groupId = "55555555-5555-4555-8555-555555555556";
+
+    await arrangeStep(owner, 3);
+    send(owner, {
+      type: "group:create",
+      group: {
+        id: groupId,
+        name: "遷移で維持するグループ",
+        noteIds: [firstNoteId, secondNoteId],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    });
+    await expectType(owner, "group:updated");
+    await expectType(member, "group:updated");
+
+    await arrangeStep(owner, 2);
+    send(owner, {
+      type: "note:move",
+      noteId: firstNoteId,
+      x: 1_200,
+      y: 1_200,
+    });
+    await expectType(owner, "note:updated");
+    await expectType(member, "note:updated");
+
+    send(owner, { type: "phase:next" });
+    await expectType(owner, "phase:updated");
+    await expectType(member, "phase:updated");
+
+    member.close();
+    const reconnected = await connectRoomAs(MEMBER, roomId);
+    const snapshot = await expectType(reconnected, "snapshot");
+    expect(snapshot.groups).toEqual([
+      expect.objectContaining({
+        id: groupId,
+        noteIds: [firstNoteId, secondNoteId],
+      }),
+    ]);
+
+    owner.close();
+    reconnected.close();
+  });
+
   it("非公開付箋を含むグループの作成は拒否される", async () => {
     const { owner, member } = await setupStartedRoom();
     const sharedNoteId = await createNote({ owner, member });
+    await arrangeStep(owner, 1);
     send(owner, { type: "note:create" });
     const drafted = await expectType(owner, "note:inserted");
+
+    await arrangeStep(owner, 3);
 
     send(owner, {
       type: "group:create",
@@ -1251,6 +1372,8 @@ describe("グループ指向のグループ同期", () => {
     // 付箋を2個作成
     const noteId1 = await createNote({ owner, member });
     const noteId2 = await createNote({ owner, member });
+
+    await arrangeStep(owner, 3);
 
     // G1: [noteId1, noteId2] のグループ作成
     const groupId = "11111111-1111-4111-8111-111111111111";
@@ -1298,13 +1421,18 @@ describe("グループ指向のグループ同期", () => {
       "更新されたグループ",
     );
 
-    // 付箋1を削除 -> 残り付箋が1個になるので自動消滅するはず
+    // Step 1-3 の移動で付箋1を離すと、残り付箋が1個になり自動消滅する。
     const member2 = await connectRoomAs(MEMBER, roomId);
     await expectType(member2, "snapshot");
 
-    send(reconnected, { type: "note:delete", noteId: noteId1 });
-    await expectType(reconnected, "note:deleted");
-    await expectType(member2, "note:deleted");
+    send(reconnected, {
+      type: "note:move",
+      noteId: noteId1,
+      x: 1_200,
+      y: 1_200,
+    });
+    await expectType(reconnected, "note:updated");
+    await expectType(member2, "note:updated");
 
     // グループ消滅イベントが飛んでくるはず
     const ownerDel = await expectType(reconnected, "group:deleted");
@@ -1320,6 +1448,8 @@ describe("グループ指向のグループ同期", () => {
   it("存在しない代表付箋IDへのグループ名更新は not-found で拒否されること", async () => {
     const { owner, member } = await setupStartedRoom();
     const fakeId = "99999999-9999-4999-8999-999999999999";
+
+    await arrangeStep(owner, 3);
 
     send(owner, {
       type: "group:update-name",

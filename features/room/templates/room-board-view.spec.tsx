@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { buildPhaseStep } from "@/contracts/phase.fixture";
 import {
   buildMembers,
   buildNote,
@@ -15,7 +16,7 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardView>[0]> = {}) {
     notes: buildNotes(2),
     inviteCode: "AB12CD",
     inviteUrl: "https://idea-flow.example/invite/AB12CD",
-    phase: "phase1" as const,
+    phase: buildPhaseStep(1),
     timer: { status: "idle" } as const,
     timerServerOffsetMs: 0,
     isHost: false,
@@ -163,17 +164,17 @@ describe("RoomBoardView", () => {
     expect(screen.getByText("客観 残り1")).toBeInTheDocument();
   });
 
-  it("phase3 のホストはフェーズ4へ進める", () => {
-    setup({ isHost: true, phase: "phase3" });
+  it("Step 1-4 のホストは Step 1-5 へ進める", () => {
+    setup({ isHost: true, phase: buildPhaseStep(4) });
 
     expect(
-      screen.getByRole("button", { name: "次のフェーズへ" }),
+      screen.getByRole("button", { name: "次のステップへ" }),
     ).not.toBeDisabled();
   });
 
-  it("phase4 では投票結果をダイアログ表示し、閉じると元のボードで話し合える", () => {
+  it("Step 1-5 では投票結果をダイアログ表示し、閉じると元のボードで話し合える", () => {
     setup({
-      phase: "phase4",
+      phase: buildPhaseStep(5),
       members: buildMembers(2, ME),
       notes: buildNotes(4).map((note, index) => ({
         ...note,
@@ -325,7 +326,10 @@ describe("RoomBoardView", () => {
     it("近くに置かれた複数の付箋がある場合、グループ枠が描画されること", () => {
       const note1 = buildNote({ id: "note-1", x: 100, y: 100 });
       const note2 = buildNote({ id: "note-2", x: 350, y: 100 }); // 隙間 50px (閾値 60px 以下)
-      setup({ notes: [note1, note2] });
+      setup({
+        notes: [note1, note2],
+        phase: buildPhaseStep(3),
+      });
 
       expect(screen.getByTestId("note-group-card")).toBeInTheDocument();
       expect(screen.getByText("グループ")).toBeInTheDocument();
@@ -334,7 +338,10 @@ describe("RoomBoardView", () => {
     it("離れた位置に置かれた複数の付箋がある場合、グループ枠は描画されないこと", () => {
       const note1 = buildNote({ id: "note-1", x: 100, y: 100 });
       const note2 = buildNote({ id: "note-2", x: 361, y: 100 }); // 隙間 61px (閾値 60px 超)
-      setup({ notes: [note1, note2] });
+      setup({
+        notes: [note1, note2],
+        phase: buildPhaseStep(3),
+      });
 
       expect(screen.queryByTestId("note-group-card")).not.toBeInTheDocument();
     });
@@ -344,6 +351,7 @@ describe("RoomBoardView", () => {
       const note2 = buildNote({ id: "note-2", x: 350, y: 100 });
       setup({
         notes: [note1, note2],
+        phase: buildPhaseStep(3),
         groups: [
           {
             id: "g1",
@@ -362,6 +370,7 @@ describe("RoomBoardView", () => {
       const note2 = buildNote({ id: "note-2", x: 350, y: 100 });
       setup({
         notes: [note1, note2],
+        phase: buildPhaseStep(3),
         onGroupCreate,
       });
 
@@ -390,6 +399,7 @@ describe("RoomBoardView", () => {
       const note2 = buildNote({ id: "note-2", x: 350, y: 100 });
       setup({
         notes: [note1, note2],
+        phase: buildPhaseStep(3),
         groups: [
           { id: "g1", name: "元々の名前", noteIds: ["note-1", "note-2"] },
         ],
@@ -407,23 +417,23 @@ describe("RoomBoardView", () => {
     });
   });
 
-  describe("フェーズ移行", () => {
-    it("ホストの場合のみ「次のフェーズへ」ボタンを表示する", () => {
+  describe("ステップ移行", () => {
+    it("ホストの場合のみ「次のステップへ」ボタンを表示する", () => {
       setup({ isHost: true });
 
       expect(
-        screen.getByRole("button", { name: "次のフェーズへ" }),
+        screen.getByRole("button", { name: "次のステップへ" }),
       ).toBeInTheDocument();
     });
 
-    it("フェーズ移行前に確認ダイアログを表示し、確認後にonNextPhaseを呼ぶ", () => {
+    it("ステップ移行前に確認ダイアログを表示し、確認後にonNextPhaseを呼ぶ", () => {
       const onNextPhase = vi.fn();
       setup({ isHost: true, onNextPhase });
 
-      fireEvent.click(screen.getByRole("button", { name: "次のフェーズへ" }));
+      fireEvent.click(screen.getByRole("button", { name: "次のステップへ" }));
 
       expect(
-        screen.getByText("次のフェーズへ移行しますか？"),
+        screen.getByText("次のステップへ進みますか？"),
       ).toBeInTheDocument();
 
       expect(onNextPhase).not.toHaveBeenCalled();

@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { buildPhaseStep } from "@/contracts/phase.fixture";
 import { buildMembers } from "@/contracts/room-protocol.fixture";
 import { RoomBoardHeader } from "./room-board-header";
 
@@ -9,7 +10,7 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardHeader>[0]> = {}) {
   const props = {
     inviteCode: "AB12CD",
     inviteUrl: "https://idea-flow.example/invite/AB12CD",
-    phase: "phase1" as const,
+    phase: buildPhaseStep(1),
     timer: { status: "idle" } as const,
     timerServerOffsetMs: 0,
     isHost: false,
@@ -53,29 +54,29 @@ describe("RoomBoardHeader", () => {
     });
   });
 
-  it("現在フェーズのラベルと残り投票数を表示する", () => {
-    setup({ phase: "phase2" });
+  it("現在ステップのラベルと残り投票数を表示する", () => {
+    setup({ phase: buildPhaseStep(2) });
 
-    expect(screen.getByText("フェーズ2")).toBeInTheDocument();
+    expect(screen.getByText("1-2 共有する")).toBeInTheDocument();
     expect(screen.getByText("主観 残り5")).toBeInTheDocument();
   });
 
-  describe("フェーズ移行", () => {
-    it("host のみ「次のフェーズへ」を表示する", () => {
+  describe("ステップ移行", () => {
+    it("host のみ「次のステップへ」を表示する", () => {
       setup({ isHost: false });
       expect(
-        screen.queryByRole("button", { name: "次のフェーズへ" }),
+        screen.queryByRole("button", { name: "次のステップへ" }),
       ).not.toBeInTheDocument();
     });
 
     it.each([
       ["未接続", { isDisconnected: true }],
-      ["フェーズ移行 pending", { isNextPhasePending: true }],
-      ["phase4", { phase: "phase4" as const }],
-    ])("%s では「次のフェーズへ」が無効になる", (_label, overrides) => {
+      ["ステップ移行 pending", { isNextPhasePending: true }],
+      ["Step 1-5", { phase: buildPhaseStep(5) }],
+    ])("%s では「次のステップへ」が無効になる", (_label, overrides) => {
       setup({ isHost: true, ...overrides });
       expect(
-        screen.getByRole("button", { name: "次のフェーズへ" }),
+        screen.getByRole("button", { name: "次のステップへ" }),
       ).toBeDisabled();
     });
 
@@ -83,7 +84,7 @@ describe("RoomBoardHeader", () => {
       const onNextPhase = vi.fn();
       setup({ isHost: true, onNextPhase });
 
-      fireEvent.click(screen.getByRole("button", { name: "次のフェーズへ" }));
+      fireEvent.click(screen.getByRole("button", { name: "次のステップへ" }));
       fireEvent.click(screen.getByRole("button", { name: "移行する" }));
 
       expect(onNextPhase).toHaveBeenCalledTimes(1);
@@ -107,18 +108,18 @@ describe("RoomBoardHeader", () => {
     });
   });
 
-  describe("投票結果ボタン（phase4 限定）", () => {
-    it("phase4 で表示され、押下で onShowVoteResult を呼ぶ", () => {
+  describe("投票結果ボタン（Step 1-5 限定）", () => {
+    it("Step 1-5 で表示され、押下で onShowVoteResult を呼ぶ", () => {
       const onShowVoteResult = vi.fn();
-      setup({ phase: "phase4", onShowVoteResult });
+      setup({ phase: buildPhaseStep(5), onShowVoteResult });
 
       fireEvent.click(screen.getByRole("button", { name: "投票結果を表示" }));
 
       expect(onShowVoteResult).toHaveBeenCalledTimes(1);
     });
 
-    it("phase4 以外では表示しない", () => {
-      setup({ phase: "phase1" });
+    it("Step 1-5 以外では表示しない", () => {
+      setup({ phase: buildPhaseStep(1) });
       expect(
         screen.queryByRole("button", { name: "投票結果を表示" }),
       ).not.toBeInTheDocument();

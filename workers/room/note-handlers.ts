@@ -5,8 +5,13 @@ import {
   NOTE_SPAWN_X_MIN,
   NOTE_SPAWN_Y_MIN,
 } from "../../contracts/board";
+import { isPhaseStep } from "../../contracts/phase";
 import { autoReorganize } from "./groups";
-import { type MessageHandlers, replyForbidden } from "./handler-context";
+import {
+  type HandlerCtx,
+  type MessageHandlers,
+  replyForbidden,
+} from "./handler-context";
 import { getMemberColor } from "./members";
 import {
   broadcastNoteInserted,
@@ -25,6 +30,7 @@ import {
   unpublishNote,
   updateNoteContent,
 } from "./notes";
+import { getPhase } from "./phase";
 import {
   addUserNoteVote,
   countUserNoteVotes,
@@ -32,6 +38,12 @@ import {
   hasReachedVoteLimit,
   removeUserNoteVotes,
 } from "./votes";
+
+function autoReorganizeAtGroupingStep(ctx: HandlerCtx): void {
+  if (isPhaseStep(getPhase(ctx.sql), 1, 3)) {
+    autoReorganize(ctx.storage, ctx.broadcaster);
+  }
+}
 
 export const noteHandlers: MessageHandlers<
   | "note:create"
@@ -79,7 +91,7 @@ export const noteHandlers: MessageHandlers<
       y: message.y,
       updated_at: updatedAt,
     });
-    autoReorganize(ctx.storage, ctx.broadcaster);
+    autoReorganizeAtGroupingStep(ctx);
   },
 
   "note:unpublish": (ctx, message) => {
@@ -102,7 +114,7 @@ export const noteHandlers: MessageHandlers<
       visibility: "private",
       updated_at: updatedAt,
     });
-    autoReorganize(ctx.storage, ctx.broadcaster);
+    autoReorganizeAtGroupingStep(ctx);
   },
 
   "note:update-content": (ctx, message) => {
@@ -138,7 +150,7 @@ export const noteHandlers: MessageHandlers<
     });
 
     // 位置が変わったので自動再編成を実行
-    autoReorganize(ctx.storage, ctx.broadcaster);
+    autoReorganizeAtGroupingStep(ctx);
   },
 
   // ドラッグ中の座標は永続化せず、送信者以外の可視な相手へ中継するだけ。
@@ -181,7 +193,7 @@ export const noteHandlers: MessageHandlers<
     );
 
     // 付箋が削除されたので自動再編成を実行
-    autoReorganize(ctx.storage, ctx.broadcaster);
+    autoReorganizeAtGroupingStep(ctx);
   },
 
   "note:vote": (ctx, message) => {

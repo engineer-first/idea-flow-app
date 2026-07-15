@@ -9,6 +9,7 @@ import {
   calculateRenderGroups,
   type PersistentGroup,
 } from "@/contracts/grouping";
+import { isAtOrAfterGroupingStep, type RoomPhase } from "@/contracts/phase";
 import type { DotVoteKind } from "@/contracts/room-protocol";
 import type { DotVoteRemaining } from "@/features/dot-vote";
 import {
@@ -22,6 +23,7 @@ import {
 export type RoomBoardCanvasProps = {
   notes: Note[];
   groups: PersistentGroup[];
+  phase: RoomPhase;
   privateNotes: Note[];
   selectedNoteId: string | null;
   draggingNoteId: string | null;
@@ -55,6 +57,7 @@ export type RoomBoardCanvasProps = {
 export function RoomBoardCanvas({
   notes,
   groups,
+  phase,
   privateNotes,
   selectedNoteId,
   draggingNoteId,
@@ -77,7 +80,9 @@ export function RoomBoardCanvas({
   onPrivateNoteDelete,
   onPrivateNoteDragStart,
 }: RoomBoardCanvasProps) {
-  const renderGroups = calculateRenderGroups(notes, groups);
+  const renderGroups = isAtOrAfterGroupingStep(phase)
+    ? calculateRenderGroups(notes, groups)
+    : [];
 
   function handleBoardPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     // 付箋の上のpointerdownはバブリングしてくるので、ボード背景を

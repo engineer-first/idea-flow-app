@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { buildPhaseStep } from "@/contracts/phase.fixture";
 import type { ServerMessage } from "@/contracts/room-protocol";
 import {
   applyServerMessage,
@@ -48,7 +49,7 @@ describe("applyServerMessage", () => {
       type: "snapshot",
       notes: [note],
       members: [],
-      phase: "phase1",
+      phase: buildPhaseStep(1),
       isHost: false,
       timer: { status: "idle" },
       serverNow: 1_000,
@@ -66,7 +67,7 @@ describe("applyServerMessage", () => {
       type: "snapshot",
       notes: [snapshotNote],
       members: [],
-      phase: "phase1",
+      phase: buildPhaseStep(1),
       isHost: false,
       timer: { status: "idle" },
       serverNow: 1_000,
