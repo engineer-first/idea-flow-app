@@ -1,11 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { fn } from "storybook/test";
-import { buildPhaseStep } from "@/contracts/phase.fixture";
+import type { RoomStepPhase } from "@/contracts/phase";
 import { buildMembers } from "@/contracts/room-protocol.fixture";
 import { RoomBoardHeader } from "./room-board-header";
 import { buildPausedTimer } from "./room-timer.fixture";
 
 const ME = "11111111-1111-4111-8111-111111111111";
+const STEP_1_1: RoomStepPhase = { kind: "step", phase: 1, step: 1 };
+const STEP_1_4: RoomStepPhase = { kind: "step", phase: 1, step: 4 };
+const STEP_1_5: RoomStepPhase = { kind: "step", phase: 1, step: 5 };
 
 const meta = {
   title: "Room/RoomBoardHeader",
@@ -16,7 +19,7 @@ const meta = {
   args: {
     inviteCode: "AB12CD",
     inviteUrl: "https://idea-flow.example/invite/AB12CD",
-    phase: buildPhaseStep(1),
+    phase: STEP_1_1,
     timer: { status: "idle" },
     timerServerOffsetMs: 0,
     isHost: true,
@@ -72,14 +75,14 @@ export const Reconnecting: Story = {
 // Step 1-5: 投票結果ボタンが現れ、ステップ移行は打ち止めになる。
 export const VoteTotaled: Story = {
   args: {
-    phase: buildPhaseStep(5),
+    phase: STEP_1_5,
   },
 };
 
 // Step 1-4: ステルス投票中は投票結果ボタンをまだ表示しない。
 export const StealthVoting: Story = {
   args: {
-    phase: buildPhaseStep(4),
+    phase: STEP_1_4,
   },
 };
 

@@ -1,10 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { fn, userEvent, within } from "storybook/test";
-import { buildPhaseStep } from "@/contracts/phase.fixture";
+import type { RoomStepPhase } from "@/contracts/phase";
 import { buildMembers, buildNotes } from "@/contracts/room-protocol.fixture";
 import { RoomBoardView } from "./room-board-view";
 
 const ME = "11111111-1111-4111-8111-111111111111";
+const STEP_1_1: RoomStepPhase = { kind: "step", phase: 1, step: 1 };
+const STEP_1_5: RoomStepPhase = { kind: "step", phase: 1, step: 5 };
 
 const meta = {
   title: "Room/RoomBoardView",
@@ -16,7 +18,7 @@ const meta = {
     notes: buildNotes(3),
     inviteCode: "AB12CD",
     inviteUrl: "https://idea-flow.example/invite/AB12CD",
-    phase: buildPhaseStep(1),
+    phase: STEP_1_1,
     timer: { status: "idle" },
     timerServerOffsetMs: 0,
     isHost: true,
@@ -125,7 +127,7 @@ export const DotVoting: Story = {
 
 export const VoteTotaled: Story = {
   args: {
-    phase: buildPhaseStep(5),
+    phase: STEP_1_5,
     members: buildMembers(2, ME),
     notes: buildNotes(3).map((note, index) => ({
       ...note,
@@ -164,7 +166,7 @@ export const Reconnecting: Story = {
 export const HostCanMovePhase: Story = {
   args: {
     isHost: true,
-    phase: buildPhaseStep(1),
+    phase: STEP_1_1,
   },
 };
 
@@ -172,7 +174,7 @@ export const HostCanMovePhase: Story = {
 export const NextPhaseConfirmDialog: Story = {
   args: {
     isHost: true,
-    phase: buildPhaseStep(1),
+    phase: STEP_1_1,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);

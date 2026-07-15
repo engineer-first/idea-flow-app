@@ -1,9 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { createRef } from "react";
 import { fn } from "storybook/test";
-import { buildPhaseStep } from "@/contracts/phase.fixture";
+import type { RoomStepPhase } from "@/contracts/phase";
 import { buildNote, buildNotes } from "@/contracts/room-protocol.fixture";
 import { RoomBoardCanvas } from "./room-board-canvas";
+
+const STEP_1_1: RoomStepPhase = { kind: "step", phase: 1, step: 1 };
+const STEP_1_2: RoomStepPhase = { kind: "step", phase: 1, step: 2 };
+const STEP_1_3: RoomStepPhase = { kind: "step", phase: 1, step: 3 };
 
 const meta = {
   title: "Room/RoomBoardCanvas",
@@ -14,7 +18,7 @@ const meta = {
   args: {
     notes: buildNotes(3),
     groups: [],
-    phase: buildPhaseStep(1),
+    phase: STEP_1_1,
     privateNotes: [],
     selectedNoteId: null,
     draggingNoteId: null,
@@ -62,7 +66,7 @@ export const Empty: Story = {
 // 近接する付箋がグループ枠にまとまっている状態。
 export const Grouped: Story = {
   args: {
-    phase: buildPhaseStep(3),
+    phase: STEP_1_3,
     notes: [
       buildNote({ id: "note-1", x: 100, y: 100 }),
       buildNote({ id: "note-2", x: 350, y: 100 }),
@@ -74,7 +78,7 @@ export const Grouped: Story = {
 // Step 1-2 では永続グループが存在しても枠を表示しない。
 export const GroupsHiddenBeforeGrouping: Story = {
   args: {
-    phase: buildPhaseStep(2),
+    phase: STEP_1_2,
     notes: [
       buildNote({ id: "note-1", x: 100, y: 100 }),
       buildNote({ id: "note-2", x: 350, y: 100 }),
