@@ -12,6 +12,7 @@
 // - phase1-3: 課題の記入・整理・投票工程。phase4 は投票結果の確認画面。
 import { z } from "zod";
 import { BOARD_HEIGHT, BOARD_WIDTH } from "./board";
+import { RoomPhaseSchema } from "./phase";
 
 export const NOTE_CONTENT_MAX_LENGTH = 2000;
 
@@ -82,16 +83,6 @@ export const GroupSchema = z.object({
 });
 
 export type ProtocolGroup = z.infer<typeof GroupSchema>;
-
-// lobby = 開始前 / phase1-3 = ボード上の工程 / phase4 = 投票結果
-export const PhaseSchema = z.enum([
-  "lobby",
-  "phase1",
-  "phase2",
-  "phase3",
-  "phase4",
-]);
-export type Phase = z.infer<typeof PhaseSchema>;
 
 export const TIMER_MAX_DURATION_MS = 5_999_000;
 const TimerMillisecondsSchema = z.number().int().finite().min(0);
@@ -180,10 +171,10 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
     noteId: z.string().uuid(),
     kind: DotVoteKindSchema,
   }),
-  // ロビーからボードへ（lobby → phase1）。ホストのみ。
+  // ロビーから課題整理 Step 1-1 へ。ホストのみ。
   z.object({ type: z.literal("start_phase") }),
-  // ボード内の次工程（phase1 → phase2 → phase3 → phase4）。ホストのみ。
-  // force は phase3 の全員投票ゲートを迂回する脱出ハッチ（離脱者がいても
+  // 課題整理の次ステップへ。ホストのみ。
+  // force は Step 1-4 の全員投票ゲートを迂回する脱出ハッチ（離脱者がいても
   // ホストが進行できる）。ホスト判定が先に評価されるため、非ホストが
   // force を送っても効果はない。
   z.object({
@@ -217,7 +208,7 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
     notes: z.array(NoteSchema),
     groups: z.array(GroupSchema).optional(),
     members: z.array(MemberSchema),
-    phase: PhaseSchema,
+    phase: RoomPhaseSchema,
     isHost: z.boolean(),
     timer: TimerStateSchema,
     serverNow: TimerMillisecondsSchema,
@@ -250,7 +241,7 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
   // start_phase 成功時（ロビー離脱）にも phase:next 成功時にも使う。
   z.object({
     type: z.literal("phase:updated"),
-    phase: PhaseSchema,
+    phase: RoomPhaseSchema,
   }),
   z.object({
     type: z.literal("timer:updated"),
@@ -259,7 +250,7 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("error"),
-    // voting-incomplete: phase3 の全員投票ゲートによる phase:next 拒否。
+    // voting-incomplete: Step 1-4 の全員投票ゲートによる phase:next 拒否。
     // クライアントがホストへ「強制的に進むか」の確認を出す判別に使う。
     code: z.enum([
       "invalid-message",

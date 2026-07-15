@@ -10,7 +10,6 @@ import {
   NOTE_COLOR_PALETTE,
   NoteColorSchema,
   NoteSchema,
-  PhaseSchema,
   parseClientMessage,
   parseServerMessage,
   ServerMessageSchema,
@@ -19,6 +18,10 @@ import {
 
 const USER_A = "11111111-1111-4111-8111-111111111111";
 const USER_B = "22222222-2222-4222-8222-222222222222";
+const LOBBY = { kind: "lobby" } as const;
+const STEP_1_1 = { kind: "step", phase: 1, step: 1 } as const;
+const STEP_1_2 = { kind: "step", phase: 1, step: 2 } as const;
+const STEP_1_5 = { kind: "step", phase: 1, step: 5 } as const;
 
 describe("NoteColorSchema", () => {
   it("固定20色のパレットを受け入れ、重複を持たない", () => {
@@ -31,25 +34,6 @@ describe("NoteColorSchema", () => {
 
   it("パレット外の色は拒否する", () => {
     expect(NoteColorSchema.safeParse("black").success).toBe(false);
-  });
-});
-
-describe("PhaseSchema", () => {
-  it("lobby と phase1-4 を受け入れる", () => {
-    expect(PhaseSchema.parse("lobby")).toBe("lobby");
-    expect(PhaseSchema.parse("phase1")).toBe("phase1");
-    expect(PhaseSchema.parse("phase2")).toBe("phase2");
-    expect(PhaseSchema.parse("phase3")).toBe("phase3");
-    expect(PhaseSchema.parse("phase4")).toBe("phase4");
-  });
-
-  it("旧 writing は拒否する（互換は RoomDO getPhase 側）", () => {
-    expect(PhaseSchema.safeParse("writing").success).toBe(false);
-  });
-
-  it("未知のフェーズは拒否する", () => {
-    expect(PhaseSchema.safeParse("review").success).toBe(false);
-    expect(PhaseSchema.safeParse("").success).toBe(false);
   });
 });
 
@@ -166,7 +150,7 @@ describe("ServerMessageSchema", () => {
       type: "snapshot",
       notes: [],
       members: [{ userId: USER_A, name: "Owner", color: "yellow" }],
-      phase: "lobby",
+      phase: LOBBY,
       isHost: true,
       timer: { status: "idle" },
       serverNow: 1_700_000_000_000,
@@ -175,7 +159,7 @@ describe("ServerMessageSchema", () => {
       type: "snapshot",
       notes: [],
       members: [{ userId: USER_A, name: "Owner", color: "yellow" }],
-      phase: "lobby",
+      phase: LOBBY,
       isHost: true,
       timer: { status: "idle" },
       serverNow: 1_700_000_000_000,
@@ -186,7 +170,7 @@ describe("ServerMessageSchema", () => {
     const result = ServerMessageSchema.safeParse({
       type: "snapshot",
       notes: [],
-      phase: "lobby",
+      phase: LOBBY,
     });
     expect(result.success).toBe(false);
   });
@@ -206,7 +190,7 @@ describe("ServerMessageSchema", () => {
       type: "snapshot",
       notes: [],
       members: [{ userId: USER_A, name: "Owner", color: "yellow" }],
-      phase: "lobby",
+      phase: LOBBY,
     });
     expect(result.success).toBe(false);
   });
@@ -222,19 +206,19 @@ describe("ServerMessageSchema", () => {
     });
   });
 
-  it("phase:updated は lobby / phase1-4 を受け入れる", () => {
+  it("phase:updated は lobby と課題整理ステップを受け入れる", () => {
     expect(
-      ServerMessageSchema.parse({ type: "phase:updated", phase: "lobby" }),
-    ).toEqual({ type: "phase:updated", phase: "lobby" });
+      ServerMessageSchema.parse({ type: "phase:updated", phase: LOBBY }),
+    ).toEqual({ type: "phase:updated", phase: LOBBY });
     expect(
-      ServerMessageSchema.parse({ type: "phase:updated", phase: "phase1" }),
-    ).toEqual({ type: "phase:updated", phase: "phase1" });
+      ServerMessageSchema.parse({ type: "phase:updated", phase: STEP_1_1 }),
+    ).toEqual({ type: "phase:updated", phase: STEP_1_1 });
     expect(
-      ServerMessageSchema.parse({ type: "phase:updated", phase: "phase2" }),
-    ).toEqual({ type: "phase:updated", phase: "phase2" });
+      ServerMessageSchema.parse({ type: "phase:updated", phase: STEP_1_2 }),
+    ).toEqual({ type: "phase:updated", phase: STEP_1_2 });
     expect(
-      ServerMessageSchema.parse({ type: "phase:updated", phase: "phase4" }),
-    ).toEqual({ type: "phase:updated", phase: "phase4" });
+      ServerMessageSchema.parse({ type: "phase:updated", phase: STEP_1_5 }),
+    ).toEqual({ type: "phase:updated", phase: STEP_1_5 });
   });
 
   it("phase:next クライアントメッセージを受け入れる", () => {
@@ -291,7 +275,7 @@ describe("ServerMessageSchema", () => {
     expect(
       ServerMessageSchema.safeParse({
         type: "phase_changed",
-        phase: "phase1",
+        phase: STEP_1_1,
       }).success,
     ).toBe(false);
   });
@@ -435,7 +419,7 @@ describe("parseServerMessage", () => {
           type: "snapshot",
           notes: [],
           members: [],
-          phase: "lobby",
+          phase: LOBBY,
           isHost: false,
           timer: { status: "idle" },
           serverNow: 1_700_000_000_000,
@@ -445,7 +429,7 @@ describe("parseServerMessage", () => {
       type: "snapshot",
       notes: [],
       members: [],
-      phase: "lobby",
+      phase: LOBBY,
       isHost: false,
       timer: { status: "idle" },
       serverNow: 1_700_000_000_000,

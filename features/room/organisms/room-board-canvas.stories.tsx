@@ -13,6 +13,7 @@ const meta = {
   args: {
     notes: buildNotes(3),
     groups: [],
+    phase: { kind: "step", phase: 1, step: 1 },
     privateNotes: [],
     selectedNoteId: null,
     draggingNoteId: null,
@@ -60,6 +61,7 @@ export const Empty: Story = {
 // 近接する付箋がグループ枠にまとまっている状態。
 export const Grouped: Story = {
   args: {
+    phase: { kind: "step", phase: 1, step: 3 },
     notes: [
       buildNote({ id: "note-1", x: 100, y: 100 }),
       buildNote({ id: "note-2", x: 350, y: 100 }),

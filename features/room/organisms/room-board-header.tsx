@@ -4,7 +4,8 @@
 // フェーズ表示と移行操作・接続状態・退出/解散・タイマーを 1 列に束ねる。
 // データ層には依存せず、表示状態とコールバックを props で受け取る。
 import { Button } from "@/components/ui/button";
-import type { Phase, TimerState } from "@/contracts/room-protocol";
+import { isResultStep, type RoomPhase } from "@/contracts/phase";
+import type { TimerState } from "@/contracts/room-protocol";
 import type { DotVoteRemaining } from "@/features/dot-vote";
 import { DotVoteSummary } from "@/features/dot-vote";
 import { CopyInviteButton } from "@/features/invite";
@@ -13,7 +14,7 @@ import {
   CONNECTION_STATUS_LABELS,
   type RoomScreenConnectionStatus,
 } from "../logic/connection-status";
-import { PHASE_LABELS } from "../logic/phase-labels";
+import { getPhaseLabel } from "../logic/phase-labels";
 import type { Member } from "../logic/room-reducer";
 import { NextPhaseConfirmDialog } from "../molecules/next-phase-confirm-dialog";
 import { RoomTimer } from "./room-timer";
@@ -21,7 +22,7 @@ import { RoomTimer } from "./room-timer";
 export type RoomBoardHeaderProps = {
   inviteCode: string;
   inviteUrl: string;
-  phase: Phase;
+  phase: RoomPhase;
   timer: TimerState;
   timerServerOffsetMs: number;
   isHost: boolean;
@@ -97,9 +98,9 @@ export function RoomBoardHeader({
         />
         <DotVoteSummary voteRemaining={voteRemaining} />
         <span className="text-sm text-muted-foreground">
-          Phase:
+          現在のステップ:
           <span className="ml-1 font-semibold text-foreground">
-            {PHASE_LABELS[phase]}
+            {getPhaseLabel(phase)}
           </span>
         </span>
 
@@ -107,7 +108,7 @@ export function RoomBoardHeader({
           <NextPhaseConfirmDialog
             phase={phase}
             disabled={
-              isDisconnected || isNextPhasePending || phase === "phase4"
+              isDisconnected || isNextPhasePending || isResultStep(phase)
             }
             onConfirm={onNextPhase}
           />
@@ -126,7 +127,7 @@ export function RoomBoardHeader({
             {CONNECTION_STATUS_LABELS[connectionStatus]}
           </span>
         )}
-        {phase === "phase4" ? (
+        {isResultStep(phase) ? (
           <Button type="button" onClick={onShowVoteResult}>
             投票結果を表示
           </Button>

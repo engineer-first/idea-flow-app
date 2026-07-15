@@ -29,7 +29,7 @@ describe("useRoomState", () => {
 
   function setup() {
     return renderHook(() =>
-      useRoomState({ initialMembers: [], initialPhase: "lobby" }),
+      useRoomState({ initialMembers: [], initialPhase: { kind: "lobby" } }),
     );
   }
 
@@ -40,7 +40,7 @@ describe("useRoomState", () => {
         type: "snapshot",
         notes: [],
         members: buildMembers(2),
-        phase: "phase2",
+        phase: { kind: "step", phase: 1, step: 2 },
         isHost: true,
         timer: { status: "running", endsAt: 1_000, durationMs: 60_000 },
         serverNow: 500,
@@ -48,7 +48,7 @@ describe("useRoomState", () => {
     );
 
     expect(result.current.members).toHaveLength(2);
-    expect(result.current.phase).toBe("phase2");
+    expect(result.current.phase).toEqual({ kind: "step", phase: 1, step: 2 });
     expect(result.current.timer.status).toBe("running");
   });
 

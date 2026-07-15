@@ -4,6 +4,7 @@ import {
   RoomMembersResponseSchema,
 } from "@/contracts/api";
 import { isUuid } from "@/contracts/ids";
+import { isLobby } from "@/contracts/phase";
 import type { ProtocolMember } from "@/contracts/room-protocol";
 import { buildInviteUrl } from "@/features/invite";
 import { RoomBoard } from "@/features/room";
@@ -42,8 +43,8 @@ export default async function RoomPage({ params }: RoomPageProps) {
   }
 
   // lobby 状態なら付箋画面に直行させず、スタート画面へ誘導する。
-  // phase1-3 のボード工程と phase4 の投票結果は直接開く。
-  if (parsed.data.phase === "lobby") {
+  // 課題整理の全ステップはボードを直接開く。
+  if (isLobby(parsed.data.phase)) {
     redirect(`/rooms/${parsed.data.roomId}/start`);
   }
 

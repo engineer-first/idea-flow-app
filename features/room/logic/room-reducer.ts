@@ -6,8 +6,9 @@
 //   同じ順序規約に従う前提）。同一 userId の重複は作らない。
 // - phase はサーバーが真実を持つ。lobby がデフォルト。
 // - timer は serverNow と受信時刻の差でクライアント時計を補正する。
+
+import type { RoomPhase } from "@/contracts/phase";
 import type {
-  Phase,
   ProtocolMember,
   ServerMessage,
   TimerState,
@@ -83,9 +84,9 @@ export function applyTimerServerMessage(
 
 // phase state を更新する純粋関数。phase 以外のメッセージは何もしない。
 export function applyPhaseServerMessage(
-  phase: Phase,
+  phase: RoomPhase,
   message: ServerMessage,
-): Phase {
+): RoomPhase {
   switch (message.type) {
     case "phase:updated": {
       // start_phase / phase:next の両方で配信される。

@@ -36,6 +36,7 @@ vi.mock("../logic/room-notify", () => ({
   },
 }));
 
+import type { RoomPhase } from "@/contracts/phase";
 import type { ProtocolMember } from "@/contracts/room-protocol";
 import { RoomLobby } from "./room-lobby";
 
@@ -105,7 +106,7 @@ function renderStart(
     isHost?: boolean;
     currentUserId?: string;
     initialMembers?: ProtocolMember[];
-    initialPhase?: "lobby" | "phase1" | "phase2" | "phase3";
+    initialPhase?: RoomPhase;
   } = {},
 ) {
   FakeWebSocket.instances = [];
@@ -119,7 +120,7 @@ function renderStart(
       currentUserId={options.currentUserId ?? HOST_ID}
       isHost={options.isHost ?? true}
       hostUserId={HOST_ID}
-      initialPhase={options.initialPhase ?? "lobby"}
+      initialPhase={options.initialPhase ?? { kind: "lobby" }}
       initialMembers={options.initialMembers ?? []}
       webSocketFactory={factory}
     />,
@@ -179,7 +180,7 @@ describe("サーバーメッセージ → 画面反映", () => {
           { userId: HOST_ID, name: "Host", color: "yellow" },
           { userId: MEMBER_ID, name: "Member", color: "green" },
         ],
-        phase: "lobby",
+        phase: { kind: "lobby" },
         isHost: true,
         timer: { status: "idle" },
         serverNow: Date.now(),
@@ -239,7 +240,7 @@ describe("サーバーメッセージ → 画面反映", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
-  it("phase:updated: phase1 を受信すると /rooms/[id] へ router.replace する", () => {
+  it("phase:updated: Step 1-1 を受信すると /rooms/[id] へ router.replace する", () => {
     renderStart();
     // snapshot でメンバー確定
     const socket = findSocket();
@@ -248,7 +249,7 @@ describe("サーバーメッセージ → 画面反映", () => {
         type: "snapshot",
         notes: [],
         members: [{ userId: HOST_ID, name: "Host", color: "yellow" }],
-        phase: "lobby",
+        phase: { kind: "lobby" },
         isHost: true,
         timer: { status: "idle" },
         serverNow: Date.now(),
@@ -257,7 +258,7 @@ describe("サーバーメッセージ → 画面反映", () => {
     act(() =>
       socket.simulateServerMessage({
         type: "phase:updated",
-        phase: "phase1",
+        phase: { kind: "step", phase: 1, step: 1 },
       }),
     );
     expect(navigationMocks.replace).toHaveBeenCalledWith(`/rooms/${ROOM_ID}`);

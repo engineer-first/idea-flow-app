@@ -11,7 +11,8 @@
 //
 // 確定状態の真実はサーバー（RoomDO）側にあり、再接続時は snapshot で復元される。
 import { useCallback, useState } from "react";
-import type { Phase, ServerMessage } from "@/contracts/room-protocol";
+import type { RoomPhase } from "@/contracts/phase";
+import type { ServerMessage } from "@/contracts/room-protocol";
 import { useNoteGroups, useRoomNotes } from "@/features/notes";
 import { notify } from "@/lib/notify";
 import type { RoomSocketFactory } from "@/lib/room-client/room-client";
@@ -33,7 +34,7 @@ export type RoomBoardProps = {
   hostUserId: string;
   // SSR 時にサーバーから取得した初期状態。再接続時の flicker を抑える。
   initialMembers: Member[];
-  initialPhase: Phase;
+  initialPhase: RoomPhase;
   // テストからフェイク WebSocket を注入するための口。本番では未指定。
   webSocketFactory?: RoomSocketFactory;
 };
@@ -89,7 +90,7 @@ export function RoomBoard({
     if (message.type === "phase:updated" || message.type === "snapshot") {
       setIsNextPhasePending(false);
       // 進行が確定（別タブ等）・復元（再接続）されたら、開いていた
-      // 強制進行の確認は phase3 のゲート前提が崩れているため閉じる。
+      // 強制進行の確認は Step 1-4 のゲート前提が崩れているため閉じる。
       setIsForceNextPhaseDialogOpen(false);
     }
 

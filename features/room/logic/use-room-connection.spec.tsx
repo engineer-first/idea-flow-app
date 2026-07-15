@@ -142,13 +142,13 @@ describe("useRoomConnection", () => {
     act(() =>
       lastSocket().simulateServerMessage({
         type: "phase:updated",
-        phase: "phase2",
+        phase: { kind: "step", phase: 1, step: 2 },
       }),
     );
     expect(first).not.toHaveBeenCalled();
     expect(second).toHaveBeenCalledWith({
       type: "phase:updated",
-      phase: "phase2",
+      phase: { kind: "step", phase: 1, step: 2 },
     });
   });
 

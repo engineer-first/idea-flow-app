@@ -20,7 +20,7 @@ function snapshotMessage(
     type: "snapshot",
     notes,
     members: [],
-    phase: "phase1",
+    phase: { kind: "step", phase: 1, step: 1 },
     isHost: true,
     timer: { status: "idle" },
     serverNow: Date.now(),

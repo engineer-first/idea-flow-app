@@ -9,10 +9,10 @@
 // 持ち、この view は UI 状態とドラッグ機械（use-board-drag）の配線に徹する。
 import { useEffect, useRef, useState } from "react";
 import type { PersistentGroup } from "@/contracts/grouping";
+import { isResultStep, type RoomPhase } from "@/contracts/phase";
 import {
   DOT_VOTE_LIMITS,
   type DotVoteKind,
-  type Phase,
   type TimerState,
 } from "@/contracts/room-protocol";
 import type { Note } from "@/features/notes";
@@ -29,7 +29,7 @@ export type RoomBoardViewProps = {
   groups: PersistentGroup[];
   inviteCode: string;
   inviteUrl: string;
-  phase: Phase;
+  phase: RoomPhase;
   timer: TimerState;
   timerServerOffsetMs: number;
   isHost: boolean;
@@ -123,7 +123,7 @@ export function RoomBoardView({
   }, []);
 
   useEffect(() => {
-    setVoteTotalingDialogOpen(phase === "phase4");
+    setVoteTotalingDialogOpen(isResultStep(phase));
   }, [phase]);
 
   // ハイドレーション直後の高速接続確立によるMismatchedを防ぐため、マウント完了までは接続中（非活性）扱いにする
@@ -220,6 +220,7 @@ export function RoomBoardView({
       <RoomBoardCanvas
         notes={renderedNotes}
         groups={groups}
+        phase={phase}
         privateNotes={toolbarNotes}
         selectedNoteId={selectedNoteId}
         draggingNoteId={draggingNoteId}
@@ -248,7 +249,7 @@ export function RoomBoardView({
       <VoteTotalingDialog
         open={voteTotalingDialogOpen}
         onOpenChange={setVoteTotalingDialogOpen}
-        isVotingComplete={phase === "phase4"}
+        isVotingComplete={isResultStep(phase)}
         members={members}
         notes={notes}
       />

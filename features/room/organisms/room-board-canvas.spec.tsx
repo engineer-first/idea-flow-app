@@ -8,6 +8,7 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardCanvas>[0]> = {}) {
   const props = {
     notes: buildNotes(2),
     groups: [],
+    phase: { kind: "step", phase: 1, step: 1 } as const,
     privateNotes: [],
     selectedNoteId: null,
     draggingNoteId: null,
@@ -61,6 +62,7 @@ describe("RoomBoardCanvas", () => {
 
   it("近接する付箋からグループ枠を描画する", () => {
     setup({
+      phase: { kind: "step", phase: 1, step: 3 },
       notes: [
         buildNote({ id: "note-1", x: 100, y: 100 }),
         buildNote({ id: "note-2", x: 350, y: 100 }),
@@ -68,6 +70,21 @@ describe("RoomBoardCanvas", () => {
     });
 
     expect(screen.getByTestId("note-group-card")).toBeInTheDocument();
+  });
+
+  it("Step 1-2 では近接する付箋のグループ枠を描画しない", () => {
+    setup({
+      phase: { kind: "step", phase: 1, step: 2 },
+      notes: [
+        buildNote({ id: "note-1", x: 100, y: 100 }),
+        buildNote({ id: "note-2", x: 350, y: 100 }),
+      ],
+      groups: [
+        { id: "group-1", name: "既存グループ", noteIds: ["note-1", "note-2"] },
+      ],
+    });
+
+    expect(screen.queryByTestId("note-group-card")).not.toBeInTheDocument();
   });
 
   it("ドラッグ中のゴースト付箋を描画する", () => {

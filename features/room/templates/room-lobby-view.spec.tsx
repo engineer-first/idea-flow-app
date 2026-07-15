@@ -16,7 +16,7 @@ function renderView(
       currentUserId={ME}
       isHost
       hostUserId={ME}
-      phase="lobby"
+      phase={{ kind: "lobby" }}
       inviteCode="AB12CD"
       inviteUrl="https://idea-flow.example/invite/AB12CD"
       connectionStatus="open"
@@ -76,7 +76,7 @@ describe("RoomLobbyView", () => {
   });
 
   it("data-phase と data-host を container がテストから参照できる形で持つ", () => {
-    renderView({ phase: "lobby", isHost: true });
+    renderView({ phase: { kind: "lobby" }, isHost: true });
     const view = screen.getByTestId("room-lobby-view");
     expect(view).toHaveAttribute("data-phase", "lobby");
     expect(view).toHaveAttribute("data-host", "true");

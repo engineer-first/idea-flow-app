@@ -15,7 +15,7 @@ const meta = {
     notes: buildNotes(3),
     inviteCode: "AB12CD",
     inviteUrl: "https://idea-flow.example/invite/AB12CD",
-    phase: "phase1",
+    phase: { kind: "step", phase: 1, step: 1 },
     timer: { status: "idle" },
     timerServerOffsetMs: 0,
     isHost: true,
@@ -124,7 +124,7 @@ export const DotVoting: Story = {
 
 export const VoteTotaled: Story = {
   args: {
-    phase: "phase4",
+    phase: { kind: "step", phase: 1, step: 5 },
     members: buildMembers(2, ME),
     notes: buildNotes(3).map((note, index) => ({
       ...note,
@@ -159,26 +159,26 @@ export const Reconnecting: Story = {
   },
 };
 
-// ホストがフェーズ移行操作を行える状態。
+// ホストがステップ移行操作を行える状態。
 export const HostCanMovePhase: Story = {
   args: {
     isHost: true,
-    phase: "phase1",
+    phase: { kind: "step", phase: 1, step: 1 },
   },
 };
 
-// 「次のフェーズへ」押下後、確認ダイアログが表示されている状態。
+// 「次のステップへ」押下後、確認ダイアログが表示されている状態。
 export const NextPhaseConfirmDialog: Story = {
   args: {
     isHost: true,
-    phase: "phase1",
+    phase: { kind: "step", phase: 1, step: 1 },
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
     await userEvent.click(
       await canvas.findByRole("button", {
-        name: "次のフェーズへ",
+        name: "次のステップへ",
       }),
     );
   },

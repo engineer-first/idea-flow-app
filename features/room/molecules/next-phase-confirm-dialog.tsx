@@ -14,11 +14,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import type { Phase } from "@/contracts/room-protocol";
-import { PHASE_LABELS } from "../logic/phase-labels";
+import type { RoomPhase } from "@/contracts/phase";
+import { getPhaseLabel } from "../logic/phase-labels";
 
 export type NextPhaseConfirmDialogProps = {
-  phase: Phase;
+  phase: RoomPhase;
   disabled: boolean;
   onConfirm: () => void;
 };
@@ -32,17 +32,17 @@ export function NextPhaseConfirmDialog({
     <AlertDialog>
       <AlertDialogTrigger asChild>
         <Button type="button" disabled={disabled}>
-          次のフェーズへ
+          次のステップへ
         </Button>
       </AlertDialogTrigger>
 
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>次のフェーズへ移行しますか？</AlertDialogTitle>
+          <AlertDialogTitle>次のステップへ進みますか？</AlertDialogTitle>
 
           <AlertDialogDescription>
-            {PHASE_LABELS[phase]}
-            から次のフェーズへ移行します。
+            {getPhaseLabel(phase)}
+            から次のステップへ進みます。
             移行すると現在の付箋が整理され、一部の内容が引き継がれない場合があります。
           </AlertDialogDescription>
         </AlertDialogHeader>

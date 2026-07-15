@@ -6,7 +6,7 @@ const meta = {
   title: "Room/NextPhaseConfirmDialog",
   component: NextPhaseConfirmDialog,
   args: {
-    phase: "phase1",
+    phase: { kind: "step", phase: 1, step: 1 },
     disabled: false,
     onConfirm: fn(),
   },
@@ -28,12 +28,12 @@ export const Disabled: Story = {
 // 押下後、確認ダイアログが開いた状態（現在フェーズのラベルが説明に入る）。
 export const Opened: Story = {
   args: {
-    phase: "phase3",
+    phase: { kind: "step", phase: 1, step: 3 },
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(
-      await canvas.findByRole("button", { name: "次のフェーズへ" }),
+      await canvas.findByRole("button", { name: "次のステップへ" }),
     );
   },
 };

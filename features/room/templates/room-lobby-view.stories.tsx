@@ -11,7 +11,7 @@ const baseArgs: RoomLobbyViewProps = {
   currentUserId: ME,
   isHost: true,
   hostUserId: ME,
-  phase: "lobby",
+  phase: { kind: "lobby" },
   inviteCode: "AB12CD",
   inviteUrl: "https://idea-flow.example/invite/AB12CD",
   connectionStatus: "open",

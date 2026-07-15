@@ -15,7 +15,7 @@ const meta = {
   args: {
     inviteCode: "AB12CD",
     inviteUrl: "https://idea-flow.example/invite/AB12CD",
-    phase: "phase1",
+    phase: { kind: "step", phase: 1, step: 1 },
     timer: { status: "idle" },
     timerServerOffsetMs: 0,
     isHost: true,
@@ -68,10 +68,10 @@ export const Reconnecting: Story = {
   },
 };
 
-// phase4: 投票結果ボタンが現れ、フェーズ移行は打ち止めになる。
+// Step 1-5: 投票結果ボタンが現れ、ステップ移行は打ち止めになる。
 export const VoteTotaled: Story = {
   args: {
-    phase: "phase4",
+    phase: { kind: "step", phase: 1, step: 5 },
   },
 };
 

@@ -27,6 +27,7 @@ const OUTSIDER = {
   name: "Outsider",
 };
 const NOTE_COLOR_PATTERN = new RegExp(`^(${NOTE_COLOR_PALETTE.join("|")})$`);
+const LOBBY = { kind: "lobby" } as const;
 
 async function sessionCookie(user: typeof OWNER): Promise<string> {
   const token = await signToken(user, {
@@ -104,7 +105,7 @@ describe("ルーム作成", () => {
       inviteCode,
       isHost: true,
       hostUserId: OWNER.sub,
-      phase: "lobby",
+      phase: LOBBY,
     });
   });
 });
@@ -122,7 +123,7 @@ describe("ルーム情報（isHost / hostUserId / phase）", () => {
       inviteCode,
       isHost: false,
       hostUserId: OWNER.sub,
-      phase: "lobby",
+      phase: LOBBY,
     });
   });
 });
