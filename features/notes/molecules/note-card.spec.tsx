@@ -197,6 +197,14 @@ describe("NoteCard", () => {
 
       expect(getCard()).not.toHaveAttribute("data-selected");
     });
+
+    it("isDecided=true の付箋を強調し、決定バッジを表示する", () => {
+      setup({ isDecided: true });
+
+      expect(getCard()).toHaveAttribute("data-decided", "true");
+      expect(getCard()).toHaveClass("ring-2");
+      expect(screen.getByText("取り組む課題")).toBeInTheDocument();
+    });
   });
 
   describe("編集モード", () => {
@@ -214,6 +222,22 @@ describe("NoteCard", () => {
       setup({ isSelected: false });
 
       clickNote();
+
+      expect(screen.getByRole("textbox")).toHaveAttribute("readonly");
+    });
+
+    it("editingDisabled 中は選択済みの付箋をクリックしても編集モードに入らない", () => {
+      setup({ isSelected: true, editingDisabled: true });
+
+      clickNote();
+
+      expect(screen.getByRole("textbox")).toHaveAttribute("readonly");
+    });
+
+    it("editingDisabled 中は選択済みの付箋でEnterを押しても編集モードに入らない", () => {
+      setup({ isSelected: true, editingDisabled: true });
+
+      fireEvent.keyDown(getNoteSurface(), { key: "Enter" });
 
       expect(screen.getByRole("textbox")).toHaveAttribute("readonly");
     });

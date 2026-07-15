@@ -3,6 +3,7 @@ import type { RoomPhase } from "@/contracts/phase";
 import { buildLobbyPhase, buildPhaseStep } from "@/contracts/phase.fixture";
 import type { ProtocolMember, ServerMessage } from "@/contracts/room-protocol";
 import {
+  applyDecisionServerMessage,
   applyMemberServerMessage,
   applyPhaseServerMessage,
   applyTimerServerMessage,
@@ -246,5 +247,55 @@ describe("applyTimerServerMessage", () => {
         1_850,
       ),
     ).toEqual({ timer: updated.timer, serverOffsetMs: 150 });
+  });
+});
+
+describe("applyDecisionServerMessage", () => {
+  const decision = {
+    phase: 1,
+    noteId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    decidedBy: A.userId,
+  };
+
+  it("decision:updated で最新の決定を反映する", () => {
+    expect(
+      applyDecisionServerMessage(null, {
+        type: "decision:updated",
+        ...decision,
+      }),
+    ).toEqual(decision);
+  });
+
+  it("snapshot の決定状態で再接続後の表示を復元する", () => {
+    expect(
+      applyDecisionServerMessage(null, {
+        type: "snapshot",
+        notes: [],
+        members: [A],
+        phase: buildPhaseStep(5),
+        isHost: true,
+        decision,
+        timer: { status: "idle" },
+        serverNow: 1_000,
+      }),
+    ).toEqual(decision);
+  });
+
+  it("phase:updated で前フェーズの決定をクリアする", () => {
+    expect(
+      applyDecisionServerMessage(decision, {
+        type: "phase:updated",
+        phase: buildPhaseStep(2),
+      }),
+    ).toBeNull();
+  });
+
+  it("決定に関係しないメッセージでは現在の決定を維持する", () => {
+    expect(
+      applyDecisionServerMessage(decision, {
+        type: "member_joined",
+        member: B,
+      }),
+    ).toEqual(decision);
   });
 });

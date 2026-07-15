@@ -22,6 +22,7 @@ const meta = {
     timer: { status: "idle" },
     timerServerOffsetMs: 0,
     isHost: true,
+    decision: null,
     connectionStatus: "open",
     draggingNoteId: null,
     members: buildMembers(3, ME),
@@ -44,6 +45,7 @@ const meta = {
     groups: [],
     onNoteVote: fn(),
     onNoteVoteReset: fn(),
+    onNoteDecide: fn(),
     onLeave: fn(),
     isLeaving: false,
     onNextPhase: fn(),
@@ -144,6 +146,24 @@ export const VoteTotaled: Story = {
         },
       },
     })),
+  },
+};
+
+export const ReadyToDecide: Story = {
+  args: {
+    phase: STEP_1_5,
+    isHost: true,
+  },
+};
+
+export const Decided: Story = {
+  args: {
+    phase: STEP_1_5,
+    decision: {
+      phase: 5,
+      noteId: "note-1",
+      decidedBy: ME,
+    },
   },
 };
 

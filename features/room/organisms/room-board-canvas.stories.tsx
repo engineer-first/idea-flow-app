@@ -19,6 +19,8 @@ const meta = {
     notes: buildNotes(3),
     groups: [],
     phase: STEP_1_1,
+    decision: null,
+    isHost: true,
     privateNotes: [],
     selectedNoteId: null,
     draggingNoteId: null,
@@ -34,6 +36,7 @@ const meta = {
     onNoteDelete: fn(),
     onNoteVote: fn(),
     onNoteVoteReset: fn(),
+    onNoteDecide: fn(),
     onGroupCreate: fn(),
     onGroupUpdateName: fn(),
     onAddPrivateNote: fn(),
@@ -112,5 +115,23 @@ export const WithPrivateNotes: Story = {
 export const Disconnected: Story = {
   args: {
     isDisconnected: true,
+  },
+};
+
+export const ReadyToDecide: Story = {
+  args: {
+    phase: buildPhaseStep(5),
+    selectedNoteId: "note-1",
+  },
+};
+
+export const Decided: Story = {
+  args: {
+    phase: buildPhaseStep(5),
+    decision: {
+      phase: 1,
+      noteId: "note-1",
+      decidedBy: "11111111-1111-4111-8111-111111111111",
+    },
   },
 };

@@ -114,6 +114,11 @@ export function RoomBoard({
     send({ type: "phase:next", force: true });
   }, [isNextPhasePending, send]);
 
+  const handleNoteDecide = useCallback(
+    (noteId: string) => send({ type: "note:decide", noteId }),
+    [send],
+  );
+
   const handleTimerStart = useCallback(
     (durationMs: number) => send({ type: "timer:start", durationMs }),
     [send],
@@ -154,6 +159,7 @@ export function RoomBoard({
         timer={roomState.timer}
         timerServerOffsetMs={roomState.timerServerOffsetMs}
         isHost={isHost}
+        decision={roomState.decision}
         connectionStatus={connectionStatus}
         draggingNoteId={notes.draggingNoteId}
         members={roomState.members}
@@ -180,6 +186,7 @@ export function RoomBoard({
         onGroupUpdateName={noteGroups.renameGroup}
         onNoteVote={notes.voteNote}
         onNoteVoteReset={notes.resetNoteVote}
+        onNoteDecide={handleNoteDecide}
         onLeave={leave}
         isLeaving={isLeaving}
       />

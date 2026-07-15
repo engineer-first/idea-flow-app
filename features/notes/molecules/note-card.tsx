@@ -23,6 +23,8 @@ export type NoteCardProps = {
   // 自分自身が現在ドラッグ中かどうか。trueの間は影を深くして「持ち上げた」見た目にする。
   isOwnDrag: boolean;
   isSelected: boolean;
+  editingDisabled?: boolean;
+  isDecided?: boolean;
   // WebSocket未接続時（connecting/closed）に親から渡す。true の間は選択・
   // ドラッグ・編集開始・削除を無効化する。room-client.send() は未openだと
   // メッセージを黙って破棄するため、UI操作自体を止めないと「入力したのに
@@ -57,6 +59,8 @@ export function NoteCard({
   note,
   isOwnDrag,
   isSelected,
+  editingDisabled = false,
+  isDecided = false,
   disabled = false,
   onSelect,
   onDragStart,
@@ -160,7 +164,7 @@ export function NoteCard({
     if (!origin) {
       return;
     }
-    if (origin.wasSelected) {
+    if (origin.wasSelected && !editingDisabled) {
       setIsEditing(true);
     }
   }
@@ -174,7 +178,7 @@ export function NoteCard({
       onDelete(note.id);
       return;
     }
-    if (event.key === "Enter") {
+    if (event.key === "Enter" && !editingDisabled) {
       event.preventDefault();
       setIsEditing(true);
     }
@@ -185,6 +189,7 @@ export function NoteCard({
       noteId={note.id}
       isLifted={isOwnDrag}
       isSelected={isSelected}
+      isDecided={isDecided}
       color={note.color}
       testId="note-card"
       data-editing={isEditing || undefined}
@@ -196,6 +201,11 @@ export function NoteCard({
         }
       }
     >
+      {isDecided ? (
+        <span className="pointer-events-none absolute right-1 top-1 z-30 rounded bg-emerald-700 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+          取り組む課題
+        </span>
+      ) : null}
       <textarea
         ref={textareaRef}
         value={localContent}

@@ -10,6 +10,8 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardCanvas>[0]> = {}) {
     notes: buildNotes(2),
     groups: [],
     phase: buildPhaseStep(1),
+    decision: null,
+    isHost: false,
     privateNotes: [],
     selectedNoteId: null,
     draggingNoteId: null,
@@ -25,6 +27,7 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardCanvas>[0]> = {}) {
     onNoteDelete: vi.fn(),
     onNoteVote: vi.fn(),
     onNoteVoteReset: vi.fn(),
+    onNoteDecide: vi.fn(),
     onGroupCreate: vi.fn(),
     onGroupUpdateName: vi.fn(),
     onAddPrivateNote: vi.fn(),
@@ -120,5 +123,52 @@ describe("RoomBoardCanvas", () => {
     setup({ isDisconnected: true });
 
     expect(screen.getByRole("button", { name: "付箋を追加" })).toBeDisabled();
+  });
+
+  describe("決定操作", () => {
+    it("ホストが結果ステップで選択した付箋の決定ボタンを表示し、押下を通知する", () => {
+      const onNoteDecide = vi.fn();
+      setup({
+        phase: buildPhaseStep(5),
+        isHost: true,
+        selectedNoteId: "note-1",
+        onNoteDecide,
+      });
+
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: "これを「取り組む課題」に決定",
+        }),
+      );
+      expect(onNoteDecide).toHaveBeenCalledWith("note-1");
+    });
+
+    it.each([
+      { phase: buildPhaseStep(5), isHost: false },
+      { phase: buildPhaseStep(4), isHost: true },
+    ])("非ホストまたは結果ステップ以外では決定ボタンを表示しない", ({
+      phase,
+      isHost,
+    }) => {
+      setup({ phase, isHost, selectedNoteId: "note-1" });
+
+      expect(
+        screen.queryByRole("button", {
+          name: "これを「取り組む課題」に決定",
+        }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("現在の決定と一致する付箋を強調する", () => {
+      setup({
+        decision: {
+          phase: 1,
+          noteId: "note-1",
+          decidedBy: "11111111-1111-4111-8111-111111111111",
+        },
+      });
+
+      expect(screen.getAllByText("取り組む課題")).toHaveLength(1);
+    });
   });
 });

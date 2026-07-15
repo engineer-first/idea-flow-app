@@ -409,6 +409,36 @@ describe("サーバーメッセージ → 画面反映", () => {
     expect(screen.getByDisplayValue("最初の付箋")).toBeInTheDocument();
   });
 
+  it("結果ステップのホストが付箋を決定すると note:decide を送信する", () => {
+    const { socket } = connectWithSnapshot([protocolNote()], {
+      phase: buildPhaseStep(5),
+      isHost: true,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
+    const card = screen.getByTestId("note-card");
+    const surface = within(card).getByRole("button", { name: "付箋" });
+    fireEvent.pointerDown(surface, {
+      pointerId: 1,
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.pointerUp(surface, {
+      pointerId: 1,
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "これを「取り組む課題」に決定",
+      }),
+    );
+
+    expect(socket.sent).toContain(
+      JSON.stringify({ type: "note:decide", noteId: NOTE_ID }),
+    );
+  });
+
   it("note:inserted で付箋が追加される", () => {
     const { socket } = connectWithSnapshot([]);
     act(() =>

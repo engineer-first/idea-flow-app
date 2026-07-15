@@ -17,6 +17,7 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardView>[0]> = {}) {
     inviteCode: "AB12CD",
     inviteUrl: "https://idea-flow.example/invite/AB12CD",
     phase: buildPhaseStep(1),
+    decision: null,
     timer: { status: "idle" } as const,
     timerServerOffsetMs: 0,
     isHost: false,
@@ -48,6 +49,7 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardView>[0]> = {}) {
     isLeaving: false,
     onNoteVote: vi.fn(),
     onNoteVoteReset: vi.fn(),
+    onNoteDecide: vi.fn(),
     connectionStatus: "open" as const,
     groups: [],
     ...overrides,
@@ -222,6 +224,27 @@ describe("RoomBoardView", () => {
     );
 
     expect(onNoteVote).toHaveBeenCalledWith("note-1", "subjective");
+  });
+
+  it("結果ステップのホストが選択した付箋を決定するとonNoteDecideを呼ぶ", () => {
+    const onNoteDecide = vi.fn();
+    setup({
+      phase: buildPhaseStep(5),
+      isHost: true,
+      onNoteDecide,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
+
+    const [first] = screen.getAllByTestId("note-card");
+    clickNote(first);
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "これを「取り組む課題」に決定",
+      }),
+    );
+
+    expect(onNoteDecide).toHaveBeenCalledWith("note-1");
   });
 
   describe("接続状態の表示", () => {

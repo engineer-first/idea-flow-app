@@ -17,7 +17,7 @@ import {
 } from "@/contracts/room-protocol";
 import type { Note } from "@/features/notes";
 import type { RoomScreenConnectionStatus } from "../logic/connection-status";
-import type { Member } from "../logic/room-reducer";
+import type { Decision, Member } from "../logic/room-reducer";
 import { useBoardDrag } from "../logic/use-board-drag";
 import { LeaveConfirmDialog } from "../molecules/leave-confirm-dialog";
 import { VoteTotalingDialog } from "../molecules/vote-totaling-dialog";
@@ -33,6 +33,7 @@ export type RoomBoardViewProps = {
   timer: TimerState;
   timerServerOffsetMs: number;
   isHost: boolean;
+  decision: Decision | null;
   // WebSocket 接続の表示用状態。値の生成は room-board（コンテナ）の責務で、
   // ここでは受け取った状態を表示するだけ（このコンポーネントはデータ層に依存しない）。
   connectionStatus: RoomScreenConnectionStatus;
@@ -57,6 +58,7 @@ export type RoomBoardViewProps = {
   onGroupUpdateName?: (groupId: string, name: string) => void;
   onNoteVote: (noteId: string, kind: DotVoteKind) => void;
   onNoteVoteReset: (noteId: string, kind: DotVoteKind) => void;
+  onNoteDecide: (noteId: string) => void;
   // 退出。
   onLeave: () => void;
   // 退出処理中（多重押下防止）。true の間「退出する」ボタンは disabled。
@@ -79,6 +81,7 @@ export function RoomBoardView({
   timer,
   timerServerOffsetMs,
   isHost,
+  decision,
   connectionStatus,
   draggingNoteId,
   members,
@@ -100,6 +103,7 @@ export function RoomBoardView({
   onGroupUpdateName,
   onNoteVote,
   onNoteVoteReset,
+  onNoteDecide,
   onLeave,
   isLeaving,
   onNextPhase,
@@ -221,6 +225,8 @@ export function RoomBoardView({
         notes={renderedNotes}
         groups={groups}
         phase={phase}
+        decision={decision}
+        isHost={isHost}
         privateNotes={toolbarNotes}
         selectedNoteId={selectedNoteId}
         draggingNoteId={draggingNoteId}
@@ -238,6 +244,7 @@ export function RoomBoardView({
         onNoteDelete={onNoteDelete}
         onNoteVote={onNoteVote}
         onNoteVoteReset={onNoteVoteReset}
+        onNoteDecide={onNoteDecide}
         onGroupCreate={onGroupCreate}
         onGroupUpdateName={onGroupUpdateName}
         onAddPrivateNote={onAddPrivateNote}
