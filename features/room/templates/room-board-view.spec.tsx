@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { buildPhaseStep } from "@/contracts/phase.fixture";
 import {
   buildMembers,
   buildNote,
@@ -15,7 +16,7 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardView>[0]> = {}) {
     notes: buildNotes(2),
     inviteCode: "AB12CD",
     inviteUrl: "https://idea-flow.example/invite/AB12CD",
-    phase: { kind: "step", phase: 1, step: 1 } as const,
+    phase: buildPhaseStep(1),
     timer: { status: "idle" } as const,
     timerServerOffsetMs: 0,
     isHost: false,
@@ -164,7 +165,7 @@ describe("RoomBoardView", () => {
   });
 
   it("Step 1-4 のホストは Step 1-5 へ進める", () => {
-    setup({ isHost: true, phase: { kind: "step", phase: 1, step: 4 } });
+    setup({ isHost: true, phase: buildPhaseStep(4) });
 
     expect(
       screen.getByRole("button", { name: "次のステップへ" }),
@@ -173,7 +174,7 @@ describe("RoomBoardView", () => {
 
   it("Step 1-5 では投票結果をダイアログ表示し、閉じると元のボードで話し合える", () => {
     setup({
-      phase: { kind: "step", phase: 1, step: 5 },
+      phase: buildPhaseStep(5),
       members: buildMembers(2, ME),
       notes: buildNotes(4).map((note, index) => ({
         ...note,
@@ -327,7 +328,7 @@ describe("RoomBoardView", () => {
       const note2 = buildNote({ id: "note-2", x: 350, y: 100 }); // 隙間 50px (閾値 60px 以下)
       setup({
         notes: [note1, note2],
-        phase: { kind: "step", phase: 1, step: 3 },
+        phase: buildPhaseStep(3),
       });
 
       expect(screen.getByTestId("note-group-card")).toBeInTheDocument();
@@ -339,7 +340,7 @@ describe("RoomBoardView", () => {
       const note2 = buildNote({ id: "note-2", x: 361, y: 100 }); // 隙間 61px (閾値 60px 超)
       setup({
         notes: [note1, note2],
-        phase: { kind: "step", phase: 1, step: 3 },
+        phase: buildPhaseStep(3),
       });
 
       expect(screen.queryByTestId("note-group-card")).not.toBeInTheDocument();
@@ -350,7 +351,7 @@ describe("RoomBoardView", () => {
       const note2 = buildNote({ id: "note-2", x: 350, y: 100 });
       setup({
         notes: [note1, note2],
-        phase: { kind: "step", phase: 1, step: 3 },
+        phase: buildPhaseStep(3),
         groups: [
           {
             id: "g1",
@@ -369,7 +370,7 @@ describe("RoomBoardView", () => {
       const note2 = buildNote({ id: "note-2", x: 350, y: 100 });
       setup({
         notes: [note1, note2],
-        phase: { kind: "step", phase: 1, step: 3 },
+        phase: buildPhaseStep(3),
         onGroupCreate,
       });
 
@@ -398,7 +399,7 @@ describe("RoomBoardView", () => {
       const note2 = buildNote({ id: "note-2", x: 350, y: 100 });
       setup({
         notes: [note1, note2],
-        phase: { kind: "step", phase: 1, step: 3 },
+        phase: buildPhaseStep(3),
         groups: [
           { id: "g1", name: "元々の名前", noteIds: ["note-1", "note-2"] },
         ],

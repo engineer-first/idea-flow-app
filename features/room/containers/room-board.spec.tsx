@@ -38,6 +38,7 @@ vi.mock("../logic/room-notify", () => ({
 }));
 
 import type { RoomPhase } from "@/contracts/phase";
+import { buildPhaseStep } from "@/contracts/phase.fixture";
 import type { ProtocolNote } from "@/contracts/room-protocol";
 import { FORCE_NEXT_PHASE_COPY } from "../molecules/force-next-phase-dialog";
 import { RoomBoard } from "./room-board";
@@ -46,10 +47,6 @@ const ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const OTHER_USER_ID = "22222222-2222-4222-8222-222222222222";
 const NOTE_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
-
-function phase1Step(step: number): Extract<RoomPhase, { kind: "step" }> {
-  return { kind: "step", phase: 1 as const, step };
-}
 
 type Listener = (event: {
   data?: unknown;
@@ -148,7 +145,7 @@ function renderBoard(options: { open?: boolean; isHost?: boolean } = {}) {
       isHost={options.isHost ?? true}
       hostUserId={USER_ID}
       initialMembers={[]}
-      initialPhase={phase1Step(1)}
+      initialPhase={buildPhaseStep(1)}
       webSocketFactory={factory}
     />,
   );
@@ -174,7 +171,7 @@ function connectWithSnapshot(
       type: "snapshot",
       notes,
       members: [],
-      phase: options?.phase ?? phase1Step(1),
+      phase: options?.phase ?? buildPhaseStep(1),
       isHost: options?.isHost ?? true,
       timer: { status: "idle" },
       serverNow: Date.now(),
@@ -216,7 +213,7 @@ describe("メンバー参加・退出の通知", () => {
           { userId: USER_ID, name: "Host", color: "yellow" },
           { userId: OTHER_USER_ID, name: "Taro", color: "green" },
         ],
-        phase: phase1Step(1),
+        phase: buildPhaseStep(1),
         isHost: true,
         timer: { status: "idle" },
         serverNow: Date.now(),
@@ -256,7 +253,7 @@ describe("サーバーメッセージ → 画面反映", () => {
   });
 
   it("forbidden エラーを受信するとポップアップ通知を表示する", () => {
-    const { socket } = connectWithSnapshot([], { phase: phase1Step(4) });
+    const { socket } = connectWithSnapshot([], { phase: buildPhaseStep(4) });
 
     act(() =>
       socket.simulateServerMessage({
@@ -272,7 +269,7 @@ describe("サーバーメッセージ → 画面反映", () => {
   it("投票未完了（voting-incomplete）を受信すると toast ではなく強制進行の確認を表示し、確認で force 付き phase:next を送信する", () => {
     const { socket } = connectWithSnapshot([], {
       isHost: true,
-      phase: phase1Step(4),
+      phase: buildPhaseStep(4),
     });
 
     act(() =>
@@ -300,7 +297,7 @@ describe("サーバーメッセージ → 画面反映", () => {
     // 保証に依存せず通常のエラー表示へ落とすことを固定する。
     const { socket } = connectWithSnapshot([], {
       isHost: false,
-      phase: phase1Step(4),
+      phase: buildPhaseStep(4),
     });
 
     act(() =>
@@ -323,7 +320,7 @@ describe("サーバーメッセージ → 画面反映", () => {
     // 別タブなど他の経路で進行が確定したら、開いていた確認は根拠が古い。
     const { socket } = connectWithSnapshot([], {
       isHost: true,
-      phase: phase1Step(4),
+      phase: buildPhaseStep(4),
     });
 
     act(() =>
@@ -338,7 +335,7 @@ describe("サーバーメッセージ → 画面反映", () => {
     act(() =>
       socket.simulateServerMessage({
         type: "phase:updated",
-        phase: phase1Step(5),
+        phase: buildPhaseStep(5),
       }),
     );
 
@@ -350,7 +347,7 @@ describe("サーバーメッセージ → 画面反映", () => {
   it("強制進行の確認ダイアログは再接続の snapshot 受信で閉じる", () => {
     const { socket } = connectWithSnapshot([], {
       isHost: true,
-      phase: phase1Step(4),
+      phase: buildPhaseStep(4),
     });
 
     act(() =>
@@ -367,7 +364,7 @@ describe("サーバーメッセージ → 画面反映", () => {
         type: "snapshot",
         notes: [],
         members: [],
-        phase: phase1Step(5),
+        phase: buildPhaseStep(5),
         isHost: true,
         timer: { status: "idle" },
         serverNow: Date.now(),
@@ -382,7 +379,7 @@ describe("サーバーメッセージ → 画面反映", () => {
   it("強制進行の確認をキャンセルすると force 付き phase:next は送信されない", () => {
     const { socket } = connectWithSnapshot([], {
       isHost: true,
-      phase: phase1Step(4),
+      phase: buildPhaseStep(4),
     });
 
     act(() =>
@@ -1006,7 +1003,7 @@ describe("ユーザー操作 → プロトコルメッセージ送信", () => {
   it("ホストが確認後に「次のステップへ」を実行すると phase:next が送信される", () => {
     const { socket } = connectWithSnapshot([], {
       isHost: true,
-      phase: phase1Step(1),
+      phase: buildPhaseStep(1),
     });
 
     fireEvent.click(screen.getByRole("button", { name: "次のステップへ" }));

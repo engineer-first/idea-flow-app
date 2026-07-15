@@ -8,9 +8,10 @@ import {
   RoomMembersResponseSchema,
   SyncUserResponseSchema,
 } from "./api";
+import { buildLobbyPhase } from "./phase.fixture";
 
 const UUID = "11111111-1111-4111-8111-111111111111";
-const LOBBY = { kind: "lobby" } as const;
+const LOBBY = buildLobbyPhase();
 
 describe("SyncUserResponseSchema", () => {
   it("userId を受け入れる", () => {

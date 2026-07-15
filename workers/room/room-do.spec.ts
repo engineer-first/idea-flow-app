@@ -5,7 +5,7 @@
 // room-protocol.spec.ts の E2E テスト（実 WS 接続）で検証する。
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import type { RoomPhase } from "../../contracts/phase";
+import { buildLobbyPhase, buildPhaseStep } from "../../contracts/phase.fixture";
 import {
   NOTE_COLOR_PALETTE,
   TIMER_MAX_DURATION_MS,
@@ -16,11 +16,7 @@ import { HOST_ID_HEADER, USER_ID_HEADER } from "./room-do";
 const USER_A = "11111111-1111-4111-8111-111111111111";
 const USER_B = "22222222-2222-4222-8222-222222222222";
 const NOTE_COLOR_PATTERN = new RegExp(`^(${NOTE_COLOR_PALETTE.join("|")})$`);
-const LOBBY = { kind: "lobby" } as const;
-
-function phase1Step(step: number): Extract<RoomPhase, { kind: "step" }> {
-  return { kind: "step", phase: 1 as const, step };
-}
+const LOBBY = buildLobbyPhase();
 
 function userIdAt(index: number): string {
   return `${index.toString().padStart(8, "0")}-0000-4000-8000-000000000000`;
@@ -201,8 +197,8 @@ describe("RoomDO 進行状態", () => {
   it("setPhase は phase を更新する（ホスト本人のみ）", async () => {
     const stub = roomStub("room-phase-set");
     await stub.initializeNewRoom(USER_A, "Host");
-    await stub.setPhase(phase1Step(1), USER_A);
-    expect(await stub.getPhase()).toEqual(phase1Step(1));
+    await stub.setPhase(buildPhaseStep(1), USER_A);
+    expect(await stub.getPhase()).toEqual(buildPhaseStep(1));
   });
 
   it("setPhase は room_owner のホスト以外なら reject（二重防御）", async () => {
@@ -210,13 +206,35 @@ describe("RoomDO 進行状態", () => {
     // runInDurableObject 経由にすれば unhandled rejection として漏れない。
     await runInRoomDO("room-phase-guard", async (instance) => {
       await instance.initializeNewRoom(USER_A, "Host");
-      await expect(instance.setPhase(phase1Step(1), USER_B)).rejects.toThrow(
-        "進行状態を変更する権限がありません。",
-      );
+      await expect(
+        instance.setPhase(buildPhaseStep(1), USER_B),
+      ).rejects.toThrow("進行状態を変更する権限がありません。");
     });
     // 状態は lobby / 既定のまま
     const stub = roomStub("room-phase-guard");
     expect(await stub.getPhase()).toEqual(LOBBY);
+  });
+
+  it.each([
+    ["writing", buildPhaseStep(1)],
+    ["phase2", buildPhaseStep(2)],
+    ["phase3", buildPhaseStep(4)],
+    ["phase4", buildPhaseStep(5)],
+    ["garbage", buildLobbyPhase()],
+    ["phase2-step1", buildLobbyPhase()],
+    ["phase1-step9", buildLobbyPhase()],
+  ])("保存済みの phase=%s を %o として復元する", async (raw, expected) => {
+    const roomId = `room-phase-decode-${raw}`;
+    const stub = roomStub(roomId);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await runInRoomDO(roomId, (_instance, state) => {
+      state.storage.sql.exec(
+        "UPDATE room_state SET phase = ?1 WHERE id = 1",
+        raw,
+      );
+    });
+
+    expect(await stub.getPhase()).toEqual(expected);
   });
 });
 
@@ -313,7 +331,7 @@ describe("RoomDO WebSocket の深層防御", () => {
     const stub = roomStub(roomId);
     await stub.initializeNewRoom(USER_A, "Host");
     await stub.upsertMember(USER_B, "Member");
-    await stub.setPhase(phase1Step(1), USER_A);
+    await stub.setPhase(buildPhaseStep(1), USER_A);
 
     const ws = await connectDirectly(roomId, USER_B, USER_B);
     ws.send(JSON.stringify({ type: "phase:next" }));
@@ -322,7 +340,7 @@ describe("RoomDO WebSocket の深層防御", () => {
       type: "error",
       code: "forbidden",
     });
-    expect(await stub.getPhase()).toEqual(phase1Step(1));
+    expect(await stub.getPhase()).toEqual(buildPhaseStep(1));
     ws.close();
   });
 });
@@ -403,7 +421,7 @@ describe("RoomDO phase:next", () => {
     const stub = roomStub("room-phase-voting-incomplete");
     await stub.initializeNewRoom(USER_A, "Host");
     await stub.upsertMember(USER_B, "Member");
-    await stub.setPhase(phase1Step(4), USER_A);
+    await stub.setPhase(buildPhaseStep(4), USER_A);
 
     const res = await stub.fetch("https://do/ws", {
       headers: {
@@ -431,7 +449,7 @@ describe("RoomDO phase:next", () => {
       type: "error",
       code: "voting-incomplete",
     });
-    expect(await stub.getPhase()).toEqual(phase1Step(4));
+    expect(await stub.getPhase()).toEqual(buildPhaseStep(4));
     ws.close();
   });
 
@@ -440,16 +458,16 @@ describe("RoomDO phase:next", () => {
     const stub = roomStub(roomName);
     await stub.initializeNewRoom(USER_A, "Host");
     await stub.upsertMember(USER_B, "Member");
-    await stub.setPhase(phase1Step(4), USER_A);
+    await stub.setPhase(buildPhaseStep(4), USER_A);
 
     const ws = await connectDirectly(roomName, USER_A, USER_A);
     ws.send(JSON.stringify({ type: "phase:next", force: true }));
 
     expect(await nextJson(ws)).toMatchObject({
       type: "phase:updated",
-      phase: phase1Step(5),
+      phase: buildPhaseStep(5),
     });
-    expect(await stub.getPhase()).toEqual(phase1Step(5));
+    expect(await stub.getPhase()).toEqual(buildPhaseStep(5));
     ws.close();
   });
 
@@ -458,7 +476,7 @@ describe("RoomDO phase:next", () => {
     const stub = roomStub(roomName);
     await stub.initializeNewRoom(USER_A, "Host");
     await stub.upsertMember(USER_B, "Member");
-    await stub.setPhase(phase1Step(4), USER_A);
+    await stub.setPhase(buildPhaseStep(4), USER_A);
 
     const ws = await connectDirectly(roomName, USER_B, USER_A);
     ws.send(JSON.stringify({ type: "phase:next", force: true }));
@@ -467,7 +485,7 @@ describe("RoomDO phase:next", () => {
       type: "error",
       code: "forbidden",
     });
-    expect(await stub.getPhase()).toEqual(phase1Step(4));
+    expect(await stub.getPhase()).toEqual(buildPhaseStep(4));
     ws.close();
   });
 
@@ -492,7 +510,7 @@ describe("RoomDO phase:next", () => {
     const stub = roomStub(roomName);
     await stub.initializeNewRoom(USER_A, "Host");
     await stub.upsertMember(USER_B, "Member");
-    await stub.setPhase(phase1Step(4), USER_A);
+    await stub.setPhase(buildPhaseStep(4), USER_A);
     // 全員が主観1票・客観3票をちょうど使い切った状態を直接作る。
     await runInRoomDO(roomName, (_instance, state) => {
       const now = new Date().toISOString();
@@ -512,7 +530,7 @@ describe("RoomDO phase:next", () => {
 
     expect(await nextJson(ws)).toMatchObject({
       type: "phase:updated",
-      phase: phase1Step(5),
+      phase: buildPhaseStep(5),
     });
     ws.close();
   });
@@ -522,7 +540,7 @@ describe("RoomDO phase:next", () => {
 
     await stub.initializeNewRoom(USER_A, "Host");
     // Step 1-1 のまま phase:next → Step 1-2
-    await stub.setPhase(phase1Step(1), USER_A);
+    await stub.setPhase(buildPhaseStep(1), USER_A);
 
     const res = await stub.fetch("https://do/ws", {
       headers: {
@@ -551,7 +569,7 @@ describe("RoomDO phase:next", () => {
     const body = JSON.parse(String(message.data));
 
     expect(body.type).toBe("phase:updated");
-    expect(body.phase).toEqual(phase1Step(2));
+    expect(body.phase).toEqual(buildPhaseStep(2));
 
     ws.close();
   });
@@ -561,7 +579,7 @@ describe("RoomDO phase:next", () => {
 
     await stub.initializeNewRoom(USER_A, "Host");
     await stub.upsertMember(USER_B, "Member");
-    await stub.setPhase(phase1Step(1), USER_A);
+    await stub.setPhase(buildPhaseStep(1), USER_A);
 
     const res = await stub.fetch("https://do/ws", {
       headers: {
@@ -601,7 +619,7 @@ describe("RoomDO phase:next", () => {
 
     await stub.initializeNewRoom(USER_A, "Host");
     await stub.upsertMember(USER_B, "Member");
-    await stub.setPhase(phase1Step(1), USER_A);
+    await stub.setPhase(buildPhaseStep(1), USER_A);
 
     const hostRes = await stub.fetch("https://do/ws", {
       headers: {
@@ -663,7 +681,7 @@ describe("RoomDO phase:next", () => {
 
     for (const msg of [hostMessage, memberMessage]) {
       expect((msg as { type: string }).type).toBe("phase:updated");
-      expect((msg as { phase: unknown }).phase).toEqual(phase1Step(2));
+      expect((msg as { phase: unknown }).phase).toEqual(buildPhaseStep(2));
     }
 
     host.close();
@@ -968,7 +986,7 @@ describe("RoomDO 課題整理ステップの境界ゲート", () => {
 
     expect(await nextJson(ws)).toMatchObject({
       type: "phase:updated",
-      phase: { kind: "step", phase: 1, step: 1 },
+      phase: buildPhaseStep(1),
     });
 
     ws.send(
@@ -1063,6 +1081,12 @@ describe("RoomDO 課題整理ステップの境界ゲート", () => {
     {
       step: 4,
       label: "1-4 ステルス投票",
+      operation: "note:create",
+      message: { type: "note:create" },
+    },
+    {
+      step: 4,
+      label: "1-4 ステルス投票",
       operation: "note:move",
       message: {
         type: "note:move",
@@ -1101,7 +1125,7 @@ describe("RoomDO 課題整理ステップの境界ゲート", () => {
     const roomName = `room-step-gate-${step}-${operation}`;
     const stub = roomStub(roomName);
     await stub.initializeNewRoom(USER_A, "Host");
-    await stub.setPhase(phase1Step(step), USER_A);
+    await stub.setPhase(buildPhaseStep(step), USER_A);
 
     const ws = await connectDirectly(roomName, USER_A, USER_A);
     ws.send(JSON.stringify(message));
@@ -1179,7 +1203,7 @@ describe("RoomDO 課題整理ステップの境界ゲート", () => {
     const roomName = `room-step-5-${message.type}`;
     const stub = roomStub(roomName);
     await stub.initializeNewRoom(USER_A, "Host");
-    await stub.setPhase(phase1Step(5), USER_A);
+    await stub.setPhase(buildPhaseStep(5), USER_A);
 
     const ws = await connectDirectly(roomName, USER_A, USER_A);
     ws.send(JSON.stringify(message));
@@ -1198,7 +1222,7 @@ describe("RoomDO Step 1-5 のボード凍結", () => {
     const stub = roomStub("room-phase4-publish-freeze");
     await stub.initializeNewRoom(USER_A, "Host");
     // lobby のままでは付箋を作れないため、ボード工程に進めてから凍結を検証する。
-    await stub.setPhase(phase1Step(1), USER_A);
+    await stub.setPhase(buildPhaseStep(1), USER_A);
 
     const res = await stub.fetch("https://do/ws", {
       headers: {
@@ -1225,7 +1249,7 @@ describe("RoomDO Step 1-5 のボード凍結", () => {
     };
     expect(inserted.type).toBe("note:inserted");
 
-    await stub.setPhase(phase1Step(5), USER_A);
+    await stub.setPhase(buildPhaseStep(5), USER_A);
     ws.send(
       JSON.stringify({
         type: "note:publish",
@@ -1249,7 +1273,7 @@ describe("RoomDO Step 1-5 のボード凍結", () => {
   it("Step 1-5 では共有付箋を非公開に戻せない", async () => {
     const stub = roomStub("room-phase4-unpublish-freeze");
     await stub.initializeNewRoom(USER_A, "Host");
-    await stub.setPhase(phase1Step(1), USER_A);
+    await stub.setPhase(buildPhaseStep(1), USER_A);
 
     const res = await stub.fetch("https://do/ws", {
       headers: {
@@ -1286,7 +1310,7 @@ describe("RoomDO Step 1-5 のボード凍結", () => {
       ws.addEventListener("message", resolve, { once: true });
     });
 
-    await stub.setPhase(phase1Step(5), USER_A);
+    await stub.setPhase(buildPhaseStep(5), USER_A);
     ws.send(JSON.stringify({ type: "note:unpublish", noteId: draft.note.id }));
 
     const errorEvent = await new Promise<MessageEvent>((resolve) => {
@@ -1303,7 +1327,7 @@ describe("RoomDO Step 1-5 のボード凍結", () => {
   it("Step 1-5 では WebSocket からの付箋本文更新を拒否し、付箋内容を維持する", async () => {
     const stub = roomStub("room-phase4-freeze");
     await stub.initializeNewRoom(USER_A, "Host");
-    await stub.setPhase(phase1Step(1), USER_A);
+    await stub.setPhase(buildPhaseStep(1), USER_A);
 
     const res = await stub.fetch("https://do/ws", {
       headers: {
@@ -1330,7 +1354,7 @@ describe("RoomDO Step 1-5 のボード凍結", () => {
     };
     expect(inserted.type).toBe("note:inserted");
 
-    await stub.setPhase(phase1Step(5), USER_A);
+    await stub.setPhase(buildPhaseStep(5), USER_A);
     ws.send(
       JSON.stringify({
         type: "note:update-content",
@@ -1457,7 +1481,7 @@ describe("RoomDO lobby のボード凍結", () => {
     ws.send(JSON.stringify({ type: "start_phase" }));
     expect(await nextJson(ws)).toMatchObject({
       type: "phase:updated",
-      phase: phase1Step(1),
+      phase: buildPhaseStep(1),
     });
 
     ws.send(JSON.stringify({ type: "note:create" }));

@@ -4,6 +4,7 @@
 // - parseClientMessage / parseServerMessage のラッパが「不正入力で null」
 //   を返すことを保証する（接続維持の挙動は workers/room-protocol.spec.ts）
 import { describe, expect, it } from "vitest";
+import { buildLobbyPhase, buildPhaseStep } from "./phase.fixture";
 import {
   ClientMessageSchema,
   MemberSchema,
@@ -18,10 +19,10 @@ import {
 
 const USER_A = "11111111-1111-4111-8111-111111111111";
 const USER_B = "22222222-2222-4222-8222-222222222222";
-const LOBBY = { kind: "lobby" } as const;
-const STEP_1_1 = { kind: "step", phase: 1, step: 1 } as const;
-const STEP_1_2 = { kind: "step", phase: 1, step: 2 } as const;
-const STEP_1_5 = { kind: "step", phase: 1, step: 5 } as const;
+const LOBBY = buildLobbyPhase();
+const STEP_1_1 = buildPhaseStep(1);
+const STEP_1_2 = buildPhaseStep(2);
+const STEP_1_5 = buildPhaseStep(5);
 
 describe("NoteColorSchema", () => {
   it("固定20色のパレットを受け入れ、重複を持たない", () => {

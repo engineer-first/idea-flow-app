@@ -18,6 +18,7 @@ vi.mock("./room-notify", () => ({
   },
 }));
 
+import { buildLobbyPhase, buildPhaseStep } from "@/contracts/phase.fixture";
 import { buildMembers } from "@/contracts/room-protocol.fixture";
 import { useRoomState } from "./use-room-state";
 
@@ -29,7 +30,7 @@ describe("useRoomState", () => {
 
   function setup() {
     return renderHook(() =>
-      useRoomState({ initialMembers: [], initialPhase: { kind: "lobby" } }),
+      useRoomState({ initialMembers: [], initialPhase: buildLobbyPhase() }),
     );
   }
 
@@ -40,7 +41,7 @@ describe("useRoomState", () => {
         type: "snapshot",
         notes: [],
         members: buildMembers(2),
-        phase: { kind: "step", phase: 1, step: 2 },
+        phase: buildPhaseStep(2),
         isHost: true,
         timer: { status: "running", endsAt: 1_000, durationMs: 60_000 },
         serverNow: 500,
@@ -48,7 +49,7 @@ describe("useRoomState", () => {
     );
 
     expect(result.current.members).toHaveLength(2);
-    expect(result.current.phase).toEqual({ kind: "step", phase: 1, step: 2 });
+    expect(result.current.phase).toEqual(buildPhaseStep(2));
     expect(result.current.timer.status).toBe("running");
   });
 

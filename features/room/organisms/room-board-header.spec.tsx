@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { buildPhaseStep } from "@/contracts/phase.fixture";
 import { buildMembers } from "@/contracts/room-protocol.fixture";
 import { RoomBoardHeader } from "./room-board-header";
 
@@ -9,7 +10,7 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardHeader>[0]> = {}) {
   const props = {
     inviteCode: "AB12CD",
     inviteUrl: "https://idea-flow.example/invite/AB12CD",
-    phase: { kind: "step", phase: 1, step: 1 } as const,
+    phase: buildPhaseStep(1),
     timer: { status: "idle" } as const,
     timerServerOffsetMs: 0,
     isHost: false,
@@ -54,7 +55,7 @@ describe("RoomBoardHeader", () => {
   });
 
   it("現在ステップのラベルと残り投票数を表示する", () => {
-    setup({ phase: { kind: "step", phase: 1, step: 2 } });
+    setup({ phase: buildPhaseStep(2) });
 
     expect(screen.getByText("1-2 共有する")).toBeInTheDocument();
     expect(screen.getByText("主観 残り5")).toBeInTheDocument();
@@ -71,7 +72,7 @@ describe("RoomBoardHeader", () => {
     it.each([
       ["未接続", { isDisconnected: true }],
       ["ステップ移行 pending", { isNextPhasePending: true }],
-      ["Step 1-5", { phase: { kind: "step", phase: 1, step: 5 } as const }],
+      ["Step 1-5", { phase: buildPhaseStep(5) }],
     ])("%s では「次のステップへ」が無効になる", (_label, overrides) => {
       setup({ isHost: true, ...overrides });
       expect(
@@ -110,7 +111,7 @@ describe("RoomBoardHeader", () => {
   describe("投票結果ボタン（Step 1-5 限定）", () => {
     it("Step 1-5 で表示され、押下で onShowVoteResult を呼ぶ", () => {
       const onShowVoteResult = vi.fn();
-      setup({ phase: { kind: "step", phase: 1, step: 5 }, onShowVoteResult });
+      setup({ phase: buildPhaseStep(5), onShowVoteResult });
 
       fireEvent.click(screen.getByRole("button", { name: "投票結果を表示" }));
 
@@ -118,7 +119,7 @@ describe("RoomBoardHeader", () => {
     });
 
     it("Step 1-5 以外では表示しない", () => {
-      setup({ phase: { kind: "step", phase: 1, step: 1 } });
+      setup({ phase: buildPhaseStep(1) });
       expect(
         screen.queryByRole("button", { name: "投票結果を表示" }),
       ).not.toBeInTheDocument();

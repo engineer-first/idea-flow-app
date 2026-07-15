@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RoomPhase } from "@/contracts/phase";
+import { buildLobbyPhase, buildPhaseStep } from "@/contracts/phase.fixture";
 import type { ProtocolMember, ServerMessage } from "@/contracts/room-protocol";
 import {
   applyMemberServerMessage,
@@ -17,11 +18,7 @@ const B: ProtocolMember = {
   name: "Taro Yamada",
   color: "green",
 };
-const LOBBY = { kind: "lobby" } as const;
-
-function phase1Step(step: number): Extract<RoomPhase, { kind: "step" }> {
-  return { kind: "step", phase: 1 as const, step };
-}
+const LOBBY = buildLobbyPhase();
 
 describe("applyMemberServerMessage", () => {
   it("snapshot.members で members state を丸ごと置き換える", () => {
@@ -86,7 +83,7 @@ describe("applyMemberServerMessage", () => {
   it("phase:updated は members を変えない", () => {
     const message: ServerMessage = {
       type: "phase:updated",
-      phase: phase1Step(1),
+      phase: buildPhaseStep(1),
     };
     expect(applyMemberServerMessage([A], message)).toEqual([A]);
   });
@@ -123,15 +120,15 @@ describe("applyPhaseServerMessage", () => {
     expect(
       applyPhaseServerMessage(LOBBY, {
         type: "phase:updated",
-        phase: phase1Step(1),
+        phase: buildPhaseStep(1),
       }),
-    ).toEqual(phase1Step(1));
+    ).toEqual(buildPhaseStep(1));
     expect(
-      applyPhaseServerMessage(phase1Step(1), {
+      applyPhaseServerMessage(buildPhaseStep(1), {
         type: "phase:updated",
-        phase: phase1Step(2),
+        phase: buildPhaseStep(2),
       }),
-    ).toEqual(phase1Step(2));
+    ).toEqual(buildPhaseStep(2));
   });
 
   it("ノート系メッセージは phase を変えない", () => {
@@ -158,8 +155,8 @@ describe("applyPhaseServerMessage", () => {
 
   it("member_joined は phase を変えない", () => {
     const message: ServerMessage = { type: "member_joined", member: B };
-    expect(applyPhaseServerMessage(phase1Step(1), message)).toEqual(
-      phase1Step(1),
+    expect(applyPhaseServerMessage(buildPhaseStep(1), message)).toEqual(
+      buildPhaseStep(1),
     );
   });
 
@@ -168,13 +165,13 @@ describe("applyPhaseServerMessage", () => {
       type: "snapshot",
       notes: [],
       members: [A],
-      phase: phase1Step(1),
+      phase: buildPhaseStep(1),
       isHost: true,
       timer: { status: "running", endsAt: 10_000, durationMs: 10_000 },
       serverNow: 1_000,
     };
     expect(applyPhaseServerMessage(LOBBY as RoomPhase, message)).toEqual(
-      phase1Step(1),
+      buildPhaseStep(1),
     );
   });
 });
@@ -185,7 +182,7 @@ describe("applyTimerServerMessage", () => {
     expect(
       applyTimerServerMessage(
         current,
-        { type: "phase:updated", phase: phase1Step(2) },
+        { type: "phase:updated", phase: buildPhaseStep(2) },
         1_000,
       ),
     ).toBe(current);
@@ -196,7 +193,7 @@ describe("applyTimerServerMessage", () => {
       type: "snapshot",
       notes: [],
       members: [A],
-      phase: phase1Step(1),
+      phase: buildPhaseStep(1),
       isHost: true,
       timer: { status: "running", endsAt: 10_000, durationMs: 10_000 },
       serverNow: 1_000,

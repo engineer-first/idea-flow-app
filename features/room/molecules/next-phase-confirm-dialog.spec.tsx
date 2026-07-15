@@ -1,12 +1,13 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { buildPhaseStep } from "@/contracts/phase.fixture";
 import { NextPhaseConfirmDialog } from "./next-phase-confirm-dialog";
 
 function setup(
   overrides: Partial<Parameters<typeof NextPhaseConfirmDialog>[0]> = {},
 ) {
   const props = {
-    phase: { kind: "step", phase: 1, step: 1 } as const,
+    phase: buildPhaseStep(1),
     disabled: false,
     onConfirm: vi.fn(),
     ...overrides,
@@ -33,7 +34,7 @@ describe("NextPhaseConfirmDialog", () => {
   });
 
   it("押下で確認ダイアログを開き、現在ステップのラベルを含む説明を出す", () => {
-    setup({ phase: { kind: "step", phase: 1, step: 2 } });
+    setup({ phase: buildPhaseStep(2) });
 
     fireEvent.click(screen.getByRole("button", { name: "次のステップへ" }));
 

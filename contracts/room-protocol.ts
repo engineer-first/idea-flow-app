@@ -8,8 +8,8 @@
 // - note:drag は永続化されない一時データ。確定は note:move だけが行う。
 //
 // フェーズモデル:
-// - lobby: 開始前ロビー（メンバー確認・招待）。start_phase で phase1 へ。
-// - phase1-3: 課題の記入・整理・投票工程。phase4 は投票結果の確認画面。
+// - lobby: 開始前ロビー（メンバー確認・招待）。
+// - step: phase × step の進行状態。現在は課題整理の phase1 step1-5 のみ。
 import { z } from "zod";
 import { BOARD_HEIGHT, BOARD_WIDTH } from "./board";
 import { RoomPhaseSchema } from "./phase";

@@ -7,6 +7,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DRAG_BROADCAST_THROTTLE_MS } from "@/contracts/board";
+import { buildPhaseStep } from "@/contracts/phase.fixture";
 import type { ProtocolNote, ServerMessage } from "@/contracts/room-protocol";
 import { buildNote } from "@/contracts/room-protocol.fixture";
 import { useRoomNotes } from "./use-room-notes";
@@ -20,7 +21,7 @@ function snapshotMessage(
     type: "snapshot",
     notes,
     members: [],
-    phase: { kind: "step", phase: 1, step: 1 },
+    phase: buildPhaseStep(1),
     isHost: true,
     timer: { status: "idle" },
     serverNow: Date.now(),

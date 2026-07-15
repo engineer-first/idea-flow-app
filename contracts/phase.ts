@@ -5,6 +5,16 @@ import { z } from "zod";
 
 export const PHASE_STEP_COUNTS = { 1: 5 } as const;
 
+export const ROOM_PHASE_STEP_LABELS = {
+  1: {
+    1: "1-1 個人で書く",
+    2: "1-2 共有する",
+    3: "1-3 グループ化",
+    4: "1-4 ステルス投票",
+    5: "1-5 結果集計・絞り込み",
+  },
+} as const;
+
 export const RoomPhaseSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("lobby") }),
   z.object({
@@ -15,6 +25,20 @@ export const RoomPhaseSchema = z.discriminatedUnion("kind", [
 ]);
 
 export type RoomPhase = z.infer<typeof RoomPhaseSchema>;
+
+type RoomPhaseLabelTarget =
+  | RoomPhase
+  | { kind: "step"; phase: number; step: number };
+
+export function getRoomPhaseLabel(phase: RoomPhaseLabelTarget): string {
+  if (phase.kind === "lobby") return "開始待ち";
+  const labels = ROOM_PHASE_STEP_LABELS[
+    phase.phase as keyof typeof ROOM_PHASE_STEP_LABELS
+  ] as Record<number, string> | undefined;
+  return (
+    labels?.[phase.step] ?? `フェーズ${phase.phase}・ステップ${phase.step}`
+  );
+}
 
 export function isLobby(
   phase: RoomPhase,

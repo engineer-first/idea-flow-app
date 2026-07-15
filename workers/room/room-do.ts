@@ -175,7 +175,7 @@ export class RoomDO extends DurableObject {
     return getTimerState(this.sql);
   }
 
-  // テスト用途限定の RPC。phase 順序や phase3 の投票ゲートを通らず任意の
+  // テスト用途限定の RPC。phase 順序や Step 1-4 の投票ゲートを通らず任意の
   // フェーズへ移動できるため、api-worker のエンドポイントなどクライアント
   // 到達経路には載せない（載せるとゲートが無言で無効化される）。
   async setPhase(phase: RoomPhase, byUserId: string): Promise<void> {

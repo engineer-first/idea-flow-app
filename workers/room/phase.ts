@@ -1,5 +1,11 @@
 // 進行状態（lobby / 課題整理のステップ）の真実と、進行操作・境界ゲート。
-import { isLobby, isVotingStep, type RoomPhase } from "../../contracts/phase";
+import {
+  getRoomPhaseLabel,
+  isLobby,
+  isVotingStep,
+  type PHASE_STEP_COUNTS,
+  type RoomPhase,
+} from "../../contracts/phase";
 import type { ClientMessage } from "../../contracts/room-protocol";
 import type { MessageHandlers } from "./handler-context";
 import { isHostUser } from "./members";
@@ -75,34 +81,20 @@ export function isBoardMutation(message: ClientMessage): boolean {
   }
 }
 
-const allowedBoardMutationsByStep: Record<
-  number,
-  readonly ClientMessage["type"][]
-> = {
-  1: ["note:create", "note:update-content", "note:delete"],
-  2: ["note:publish", "note:unpublish", "note:move", "note:drag"],
-  3: ["note:move", "note:drag", "group:create", "group:update-name"],
-  4: ["note:vote", "note:vote-reset"],
-  5: [],
+const allowedBoardMutationsByPhase: {
+  [Phase in keyof typeof PHASE_STEP_COUNTS]: Record<
+    number,
+    readonly ClientMessage["type"][]
+  >;
+} = {
+  1: {
+    1: ["note:create", "note:update-content", "note:delete"],
+    2: ["note:publish", "note:unpublish", "note:move", "note:drag"],
+    3: ["note:move", "note:drag", "group:create", "group:update-name"],
+    4: ["note:vote", "note:vote-reset"],
+    5: [],
+  },
 };
-
-function stepLabel(phase: Extract<RoomPhase, { kind: "step" }>): string {
-  if (phase.phase !== 1) return `フェーズ${phase.phase} ステップ${phase.step}`;
-  switch (phase.step) {
-    case 1:
-      return "1-1 個人で書く";
-    case 2:
-      return "1-2 共有する";
-    case 3:
-      return "1-3 グループ化";
-    case 4:
-      return "1-4 ステルス投票";
-    case 5:
-      return "1-5 結果集計・絞り込み";
-    default:
-      return `フェーズ${phase.phase} ステップ${phase.step}`;
-  }
-}
 
 // 変更系メッセージをハンドラより前に判定する。null は許可、文字列は拒否理由。
 // author / 可視性の認可は、このゲート通過後に各ハンドラで検証する。
@@ -112,9 +104,9 @@ export function getBoardMutationForbiddenMessage(
 ): string | null {
   if (!isBoardMutation(message)) return null;
   if (isLobby(phase)) return "ボード開始前はボードを変更できません。";
-  const allowed = allowedBoardMutationsByStep[phase.step] ?? [];
+  const allowed = allowedBoardMutationsByPhase[phase.phase]?.[phase.step] ?? [];
   if (allowed.includes(message.type)) return null;
-  return `${stepLabel(phase)}ではこの操作を行えません。`;
+  return `${getRoomPhaseLabel(phase)}ではこの操作を行えません。`;
 }
 
 // フェーズ進行の認可は room_owner（isHostUser）に一本化している。

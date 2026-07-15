@@ -37,6 +37,7 @@ vi.mock("../logic/room-notify", () => ({
 }));
 
 import type { RoomPhase } from "@/contracts/phase";
+import { buildLobbyPhase, buildPhaseStep } from "@/contracts/phase.fixture";
 import type { ProtocolMember } from "@/contracts/room-protocol";
 import { RoomLobby } from "./room-lobby";
 
@@ -120,7 +121,7 @@ function renderStart(
       currentUserId={options.currentUserId ?? HOST_ID}
       isHost={options.isHost ?? true}
       hostUserId={HOST_ID}
-      initialPhase={options.initialPhase ?? { kind: "lobby" }}
+      initialPhase={options.initialPhase ?? buildLobbyPhase()}
       initialMembers={options.initialMembers ?? []}
       webSocketFactory={factory}
     />,
@@ -180,7 +181,7 @@ describe("サーバーメッセージ → 画面反映", () => {
           { userId: HOST_ID, name: "Host", color: "yellow" },
           { userId: MEMBER_ID, name: "Member", color: "green" },
         ],
-        phase: { kind: "lobby" },
+        phase: buildLobbyPhase(),
         isHost: true,
         timer: { status: "idle" },
         serverNow: Date.now(),
@@ -249,7 +250,7 @@ describe("サーバーメッセージ → 画面反映", () => {
         type: "snapshot",
         notes: [],
         members: [{ userId: HOST_ID, name: "Host", color: "yellow" }],
-        phase: { kind: "lobby" },
+        phase: buildLobbyPhase(),
         isHost: true,
         timer: { status: "idle" },
         serverNow: Date.now(),
@@ -258,7 +259,7 @@ describe("サーバーメッセージ → 画面反映", () => {
     act(() =>
       socket.simulateServerMessage({
         type: "phase:updated",
-        phase: { kind: "step", phase: 1, step: 1 },
+        phase: buildPhaseStep(1),
       }),
     );
     expect(navigationMocks.replace).toHaveBeenCalledWith(`/rooms/${ROOM_ID}`);

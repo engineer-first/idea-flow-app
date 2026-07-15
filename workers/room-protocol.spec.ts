@@ -15,7 +15,7 @@ import {
   NOTE_SPAWN_X_MIN,
   NOTE_SPAWN_Y_MIN,
 } from "../contracts/board";
-import type { RoomPhase } from "../contracts/phase";
+import { buildLobbyPhase, buildPhaseStep } from "../contracts/phase.fixture";
 import {
   NOTE_COLOR_PALETTE,
   type ServerMessage,
@@ -41,12 +41,8 @@ const MEMBER: TestUser = {
   name: "Member",
 };
 const NOTE_COLOR_PATTERN = new RegExp(`^(${NOTE_COLOR_PALETTE.join("|")})$`);
-const LOBBY = { kind: "lobby" } as const;
+const LOBBY = buildLobbyPhase();
 const roomIdBySocket = new WeakMap<RoomSocket, string>();
-
-function phase1Step(step: number): Extract<RoomPhase, { kind: "step" }> {
-  return { kind: "step", phase: 1 as const, step };
-}
 
 // 2ユーザーが同じルームに接続した状態を作る（snapshot 受信済み）。
 async function setupRoom(): Promise<{
@@ -94,7 +90,7 @@ async function arrangeStep(socket: RoomSocket, step: number): Promise<void> {
   const roomId = roomIdBySocket.get(socket);
   if (!roomId) throw new Error("テスト用ルームIDが見つかりません。");
   await runInRoomDO(roomId, (instance) =>
-    instance.setPhase(phase1Step(step), OWNER.sub),
+    instance.setPhase(buildPhaseStep(step), OWNER.sub),
   );
 }
 
@@ -198,7 +194,7 @@ describe("snapshot（接続・再接続の復帰パス）", () => {
       },
     ]);
     // 移動後の Step 1-2 が復元される。
-    expect(snapshot.phase).toEqual(phase1Step(2));
+    expect(snapshot.phase).toEqual(buildPhaseStep(2));
 
     reconnected.close();
     member.close();
@@ -213,7 +209,7 @@ describe("snapshot（接続・再接続の復帰パス）", () => {
 
     const reconnected = await connectRoomAs(MEMBER, roomId);
     const snapshot = await expectType(reconnected, "snapshot");
-    expect(snapshot.phase).toEqual(phase1Step(1));
+    expect(snapshot.phase).toEqual(buildPhaseStep(1));
 
     reconnected.close();
     owner.close();
@@ -251,7 +247,7 @@ describe("メンバー色と付箋色", () => {
     }
     // 付箋色の検証はボード操作（note:create）を伴うため Step 1-1 へ進めておく。
     await runInRoomDO(roomId, (instance) =>
-      instance.setPhase(phase1Step(1), OWNER.sub),
+      instance.setPhase(buildPhaseStep(1), OWNER.sub),
     );
 
     const member = await connectRoomAs(MEMBER, roomId);
@@ -269,7 +265,7 @@ describe("メンバー色と付箋色", () => {
     const created = await expectType(member, "note:inserted");
     expect(created.note.color).toBe(memberColor);
     await runInRoomDO(roomId, (instance) =>
-      instance.setPhase(phase1Step(2), OWNER.sub),
+      instance.setPhase(buildPhaseStep(2), OWNER.sub),
     );
     send(member, {
       type: "note:publish",
@@ -514,8 +510,8 @@ describe("start_phase / phase:updated（ホストだけ進行状態を進めら�
     send(owner, { type: "start_phase" });
     const toOwner = await expectType(owner, "phase:updated");
     const toMember = await expectType(member, "phase:updated");
-    expect(toOwner.phase).toEqual(phase1Step(1));
-    expect(toMember.phase).toEqual(phase1Step(1));
+    expect(toOwner.phase).toEqual(buildPhaseStep(1));
+    expect(toMember.phase).toEqual(buildPhaseStep(1));
 
     owner.close();
     member.close();
@@ -597,7 +593,7 @@ describe("start_phase / phase:updated（ホストだけ進行状態を進めら�
 
     send(owner, { type: "start_phase" });
     const updated = await expectType(owner, "phase:updated");
-    expect(updated.phase).toEqual(phase1Step(1));
+    expect(updated.phase).toEqual(buildPhaseStep(1));
 
     owner.close();
   });
@@ -638,7 +634,7 @@ describe("start_phase / phase:updated（ホストだけ進行状態を進めら�
       headers: { Cookie: await sessionCookieFor(MEMBER) },
     });
     const body = (await res.json()) as { phase: unknown };
-    expect(body.phase).toEqual(phase1Step(1));
+    expect(body.phase).toEqual(buildPhaseStep(1));
   });
 });
 

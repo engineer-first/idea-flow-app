@@ -5,6 +5,7 @@
 // - join は冪等（複数回呼んでもメンバーは重複しない）
 import { env, SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
+import { buildLobbyPhase } from "../contracts/phase.fixture";
 import { NOTE_COLOR_PALETTE } from "../contracts/room-protocol";
 import { TOKEN_AUDIENCE } from "../contracts/session";
 import { signToken } from "../lib/session/token";
@@ -27,7 +28,7 @@ const OUTSIDER = {
   name: "Outsider",
 };
 const NOTE_COLOR_PATTERN = new RegExp(`^(${NOTE_COLOR_PALETTE.join("|")})$`);
-const LOBBY = { kind: "lobby" } as const;
+const LOBBY = buildLobbyPhase();
 
 async function sessionCookie(user: typeof OWNER): Promise<string> {
   const token = await signToken(user, {

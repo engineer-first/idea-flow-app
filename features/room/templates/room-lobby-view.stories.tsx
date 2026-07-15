@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { fn } from "storybook/test";
+import { buildLobbyPhase } from "@/contracts/phase.fixture";
 import { buildMembers } from "@/contracts/room-protocol.fixture";
 import { ROOM_MEMBERS_MAX_VISIBLE } from "@/features/room-members";
 import { RoomLobbyView, type RoomLobbyViewProps } from "./room-lobby-view";
@@ -11,7 +12,7 @@ const baseArgs: RoomLobbyViewProps = {
   currentUserId: ME,
   isHost: true,
   hostUserId: ME,
-  phase: { kind: "lobby" },
+  phase: buildLobbyPhase(),
   inviteCode: "AB12CD",
   inviteUrl: "https://idea-flow.example/invite/AB12CD",
   connectionStatus: "open",
