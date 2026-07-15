@@ -9,7 +9,7 @@ import {
   calculateRenderGroups,
   type PersistentGroup,
 } from "@/contracts/grouping";
-import { isGroupingStep, type RoomPhase } from "@/contracts/phase";
+import { isAtOrAfterGroupingStep, type RoomPhase } from "@/contracts/phase";
 import type { DotVoteKind } from "@/contracts/room-protocol";
 import type { DotVoteRemaining } from "@/features/dot-vote";
 import {
@@ -80,7 +80,7 @@ export function RoomBoardCanvas({
   onPrivateNoteDelete,
   onPrivateNoteDragStart,
 }: RoomBoardCanvasProps) {
-  const renderGroups = isGroupingStep(phase)
+  const renderGroups = isAtOrAfterGroupingStep(phase)
     ? calculateRenderGroups(notes, groups)
     : [];
 

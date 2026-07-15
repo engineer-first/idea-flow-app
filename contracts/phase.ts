@@ -1,6 +1,6 @@
 // ルームの進行状態コントラクト。lobby と、フェーズごとのステップを
-// 判別可能な直和で表す。後続フェーズを追加するときは PHASE_STEP_COUNTS と
-// RoomPhaseSchema の両方を拡張する。
+// 判別可能な直和で表す。後続フェーズを追加するときは PHASE_STEP_COUNTS、
+// ROOM_PHASE_STEP_LABELS、RoomPhaseSchema の3箇所を拡張する。
 import { z } from "zod";
 
 export const PHASE_STEP_COUNTS = { 1: 5, 2: 4, 3: 5 } as const;
@@ -92,7 +92,7 @@ export function isVotingStep(phase: RoomPhase): boolean {
   );
 }
 
-export function isGroupingStep(phase: RoomPhase): boolean {
+export function isAtOrAfterGroupingStep(phase: RoomPhase): boolean {
   return phase.kind === "step" && phase.phase === 1 && phase.step >= 3;
 }
 

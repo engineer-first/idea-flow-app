@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getRoomPhaseLabel,
-  isGroupingStep,
+  isAtOrAfterGroupingStep,
   isLobby,
   isPhaseStep,
   isResultStep,
@@ -142,7 +142,7 @@ describe("RoomPhase の判定ヘルパー", () => {
   }) => {
     expect(isLobby(phase)).toBe(lobby);
     expect(isPhaseStep(phase, expectedPhase, expectedStep)).toBe(!lobby);
-    expect(isGroupingStep(phase)).toBe(grouping);
+    expect(isAtOrAfterGroupingStep(phase)).toBe(grouping);
     expect(isVotingStep(phase)).toBe(voting);
     expect(isResultStep(phase)).toBe(result);
   });

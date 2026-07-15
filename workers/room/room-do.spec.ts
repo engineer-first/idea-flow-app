@@ -1111,6 +1111,24 @@ describe("RoomDO 課題整理ステップの境界ゲート", () => {
       },
     },
     {
+      step: 2,
+      label: "1-2 共有する",
+      operation: "group:create",
+      message: {
+        type: "group:create",
+        group: {
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          name: "未許可グループ",
+          noteIds: [
+            "99999999-9999-4999-8999-999999999999",
+            "88888888-8888-4888-8888-888888888888",
+          ],
+          createdAt: "2026-07-15T00:00:00.000Z",
+          updatedAt: "2026-07-15T00:00:00.000Z",
+        },
+      },
+    },
+    {
       step: 3,
       label: "1-3 グループ化",
       operation: "note:create",
@@ -1162,6 +1180,24 @@ describe("RoomDO 課題整理ステップの境界ゲート", () => {
         type: "group:update-name",
         groupId: "99999999-9999-4999-8999-999999999999",
         name: "未許可の更新",
+      },
+    },
+    {
+      step: 4,
+      label: "1-4 ステルス投票",
+      operation: "group:create",
+      message: {
+        type: "group:create",
+        group: {
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          name: "未許可グループ",
+          noteIds: [
+            "99999999-9999-4999-8999-999999999999",
+            "88888888-8888-4888-8888-888888888888",
+          ],
+          createdAt: "2026-07-15T00:00:00.000Z",
+          updatedAt: "2026-07-15T00:00:00.000Z",
+        },
       },
     },
   ])("Step 1-$step では $operation を個別ハンドラより前に拒否する", async ({
