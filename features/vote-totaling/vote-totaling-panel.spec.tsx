@@ -24,7 +24,7 @@ function withVotes(
 }
 
 describe("calculateVoteTotaling", () => {
-  it("主観5点・客観1点で集計し、同点なら主観票が多い付箋を取り組む課題にする", () => {
+  it("主観5点・客観1点で集計し、同点なら主観票が多い順にランキングする", () => {
     const votes = [
       [2, 3],
       [2, 3],
@@ -44,11 +44,10 @@ describe("calculateVoteTotaling", () => {
     expect(result.rows.map((row) => row.score)).toEqual([
       13, 13, 13, 13, 13, 5, 5, 5,
     ]);
-    expect(result.selectedChallenges.map((row) => row.noteId)).toEqual([
-      "note-1",
-      "note-2",
-      "note-3",
-    ]);
+    expect(result).not.toHaveProperty("selectedChallenges");
+    expect(result.rows.every((row) => "isSelectedChallenge" in row)).toBe(
+      false,
+    );
   });
 
   it("全員分の投票が終わるまでは結果を確定しない", () => {
@@ -59,10 +58,10 @@ describe("calculateVoteTotaling", () => {
     });
 
     expect(result.isComplete).toBe(false);
-    expect(result.selectedChallenges).toEqual([]);
+    expect(result).not.toHaveProperty("selectedChallenges");
   });
 
-  it("主観票なしの首位があっても、主観票ありの最上位を取り組む課題にする", () => {
+  it("主観票なしでも総合点が高い付箋をランキングの先頭に置く", () => {
     const votes = [
       [0, 20],
       [2, 3],
@@ -84,9 +83,7 @@ describe("calculateVoteTotaling", () => {
       subjectiveCount: 0,
       score: 20,
     });
-    expect(result.selectedChallenges.map((row) => row.noteId)).toEqual([
-      "note-2",
-    ]);
+    expect(result).not.toHaveProperty("selectedChallenges");
   });
 
   it("無投票の付箋も総合ポイント0としてランキングに含める", () => {
@@ -139,7 +136,7 @@ describe("VoteTotalingPanel", () => {
 
     expect(screen.getByTestId("vote-result-ranking")).toHaveClass("mx-auto");
     expect(screen.getByText("総合ポイントが高い順")).toBeInTheDocument();
-    expect(screen.getByText("取り組む課題")).toBeInTheDocument();
+    expect(screen.queryByText("取り組む課題")).not.toBeInTheDocument();
     expect(
       screen
         .getAllByTestId(/vote-totaling-row-/)

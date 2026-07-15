@@ -6,7 +6,6 @@ export type VoteTotalingRowViewModel = {
   subjectiveCount: number;
   objectiveCount: number;
   score: number;
-  isSelectedChallenge: boolean;
 };
 
 type VoteTotalingRowProps = { row: VoteTotalingRowViewModel; rank: number };
@@ -14,7 +13,7 @@ type VoteTotalingRowProps = { row: VoteTotalingRowViewModel; rank: number };
 export function VoteTotalingRow({ row, rank }: VoteTotalingRowProps) {
   return (
     <li
-      className={`grid gap-2 rounded-lg border p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center ${row.isSelectedChallenge ? "border-emerald-300 bg-emerald-50" : "border-border bg-background"}`}
+      className="grid gap-2 rounded-lg border border-border bg-background p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
       data-testid={`vote-totaling-row-${row.noteId}`}
     >
       <div className="flex min-w-0 items-center gap-3">

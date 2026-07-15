@@ -12,7 +12,6 @@ const OBJECTIVE_POINT = 1;
 export type VoteTotalingResult = {
   isComplete: boolean;
   rows: VoteTotalingRowViewModel[];
-  selectedChallenges: VoteTotalingRowViewModel[];
 };
 
 export function calculateVoteTotaling({
@@ -46,7 +45,6 @@ export function calculateVoteTotaling({
       score:
         note.dotVotes.subjective.count * SUBJECTIVE_POINT +
         note.dotVotes.objective.count * OBJECTIVE_POINT,
-      isSelectedChallenge: false,
     }))
     .sort(
       (a, b) =>
@@ -54,27 +52,9 @@ export function calculateVoteTotaling({
         b.subjectiveCount - a.subjectiveCount ||
         a.noteId.localeCompare(b.noteId),
     );
-  const leadingRow = rows.find((row) => row.subjectiveCount > 0);
-  const selectedChallenges =
-    isComplete && leadingRow
-      ? rows.filter(
-          (row) =>
-            row.score === leadingRow.score &&
-            row.subjectiveCount === leadingRow.subjectiveCount,
-        )
-      : [];
   return {
     isComplete,
-    rows: rows.map((row) => ({
-      ...row,
-      isSelectedChallenge: selectedChallenges.some(
-        (selected) => selected.noteId === row.noteId,
-      ),
-    })),
-    selectedChallenges: selectedChallenges.map((row) => ({
-      ...row,
-      isSelectedChallenge: true,
-    })),
+    rows,
   };
 }
 
@@ -119,18 +99,6 @@ export function VoteTotalingPanel({
           総合ポイントが高い順
         </p>
       </div>
-      {result.selectedChallenges.length > 0 ? (
-        <div className="mt-6 rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-center">
-          <p className="text-xs font-semibold text-emerald-800">取り組む課題</p>
-          <ul className="mt-1 grid gap-1 font-semibold text-emerald-950">
-            {result.selectedChallenges.map((challenge) => (
-              <li key={challenge.noteId}>
-                {challenge.content || "無題の付箋"}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
       <ol className="mt-6 grid gap-3">
         {result.rows.map((row, _index, ranking) => {
           const rank =

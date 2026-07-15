@@ -12,13 +12,12 @@ const meta = {
       subjectiveCount: 2,
       objectiveCount: 1,
       score: 11,
-      isSelectedChallenge: true,
     },
   },
 } satisfies Meta<typeof VoteTotalingRow>;
 export default meta;
 type Story = StoryObj<typeof meta>;
-export const Selected: Story = {};
+export const FirstPlace: Story = {};
 export const Ranked: Story = {
   args: {
     rank: 2,
@@ -28,7 +27,6 @@ export const Ranked: Story = {
       subjectiveCount: 0,
       objectiveCount: 5,
       score: 5,
-      isSelectedChallenge: false,
     },
   },
 };
