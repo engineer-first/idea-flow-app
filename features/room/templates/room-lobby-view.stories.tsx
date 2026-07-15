@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { fn } from "storybook/test";
-import type { RoomPhase } from "@/contracts/phase";
+import { buildLobbyPhase } from "@/contracts/phase.fixture";
 import { buildMembers } from "@/contracts/room-protocol.fixture";
 import { ROOM_MEMBERS_MAX_VISIBLE } from "@/features/room-members";
 import { RoomLobbyView, type RoomLobbyViewProps } from "./room-lobby-view";
 
 const ME = "11111111-1111-4111-8111-111111111111";
-const LOBBY_PHASE: RoomPhase = { kind: "lobby" };
+const LOBBY_PHASE = buildLobbyPhase();
 
 const baseArgs: RoomLobbyViewProps = {
   members: buildMembers(3, ME),

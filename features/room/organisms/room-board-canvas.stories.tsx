@@ -1,13 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { createRef } from "react";
 import { fn } from "storybook/test";
-import type { RoomStepPhase } from "@/contracts/phase";
+import { buildPhaseStep } from "@/contracts/phase.fixture";
 import { buildNote, buildNotes } from "@/contracts/room-protocol.fixture";
 import { RoomBoardCanvas } from "./room-board-canvas";
 
-const STEP_1_1: RoomStepPhase = { kind: "step", phase: 1, step: 1 };
-const STEP_1_2: RoomStepPhase = { kind: "step", phase: 1, step: 2 };
-const STEP_1_3: RoomStepPhase = { kind: "step", phase: 1, step: 3 };
+const STEP_1_1 = buildPhaseStep(1);
+const STEP_1_2 = buildPhaseStep(2);
+const STEP_1_3 = buildPhaseStep(3);
 
 const meta = {
   title: "Room/RoomBoardCanvas",

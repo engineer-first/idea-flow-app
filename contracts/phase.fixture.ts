@@ -1,3 +1,5 @@
+// RoomPhase を組み立てる spec / stories 共有のテストデータビルダー。
+// 本番コードからは import しない（テスト・カタログ専用）。
 import { type RoomPhase, RoomPhaseSchema, type RoomStepPhase } from "./phase";
 
 export function buildLobbyPhase(): Extract<RoomPhase, { kind: "lobby" }> {

@@ -1,14 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { fn } from "storybook/test";
-import type { RoomStepPhase } from "@/contracts/phase";
+import { buildPhaseStep } from "@/contracts/phase.fixture";
 import { buildMembers } from "@/contracts/room-protocol.fixture";
 import { RoomBoardHeader } from "./room-board-header";
 import { buildPausedTimer } from "./room-timer.fixture";
 
 const ME = "11111111-1111-4111-8111-111111111111";
-const STEP_1_1: RoomStepPhase = { kind: "step", phase: 1, step: 1 };
-const STEP_1_4: RoomStepPhase = { kind: "step", phase: 1, step: 4 };
-const STEP_1_5: RoomStepPhase = { kind: "step", phase: 1, step: 5 };
+const STEP_1_1 = buildPhaseStep(1);
+const STEP_1_4 = buildPhaseStep(4);
+const STEP_1_5 = buildPhaseStep(5);
 
 const meta = {
   title: "Room/RoomBoardHeader",

@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { fn, userEvent, within } from "storybook/test";
-import type { RoomStepPhase } from "@/contracts/phase";
+import { buildPhaseStep } from "@/contracts/phase.fixture";
 import { buildMembers, buildNotes } from "@/contracts/room-protocol.fixture";
 import { RoomBoardView } from "./room-board-view";
 
 const ME = "11111111-1111-4111-8111-111111111111";
-const STEP_1_1: RoomStepPhase = { kind: "step", phase: 1, step: 1 };
-const STEP_1_5: RoomStepPhase = { kind: "step", phase: 1, step: 5 };
+const STEP_1_1 = buildPhaseStep(1);
+const STEP_1_5 = buildPhaseStep(5);
 
 const meta = {
   title: "Room/RoomBoardView",

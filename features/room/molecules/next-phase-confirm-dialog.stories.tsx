@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { fn, userEvent, within } from "storybook/test";
-import type { RoomStepPhase } from "@/contracts/phase";
+import { buildPhaseStep } from "@/contracts/phase.fixture";
 import { NextPhaseConfirmDialog } from "./next-phase-confirm-dialog";
 
-const STEP_1_1: RoomStepPhase = { kind: "step", phase: 1, step: 1 };
-const STEP_1_3: RoomStepPhase = { kind: "step", phase: 1, step: 3 };
+const STEP_1_1 = buildPhaseStep(1);
+const STEP_1_3 = buildPhaseStep(3);
 
 const meta = {
   title: "Room/NextPhaseConfirmDialog",
