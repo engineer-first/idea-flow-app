@@ -45,9 +45,7 @@ describe("calculateVoteTotaling", () => {
       13, 13, 13, 13, 13, 5, 5, 5,
     ]);
     expect(result).not.toHaveProperty("selectedChallenges");
-    expect(result.rows.every((row) => "isSelectedChallenge" in row)).toBe(
-      false,
-    );
+    expect(result.rows.some((row) => "isSelectedChallenge" in row)).toBe(false);
   });
 
   it("全員分の投票が終わるまでは結果を確定しない", () => {

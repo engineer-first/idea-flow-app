@@ -249,8 +249,9 @@ describe("applyServerMessage", () => {
 
   it("decision:updated は決定UIが未実装の間も付箋配列を変更しない", () => {
     const existing = makeNote();
+    const notes = [existing];
     const result = applyServerMessage(
-      [existing],
+      notes,
       {
         type: "decision:updated",
         phase: 1,
@@ -260,6 +261,7 @@ describe("applyServerMessage", () => {
       { draggingNoteId: null },
     );
 
+    expect(result).toBe(notes);
     expect(result).toEqual([existing]);
   });
 });
