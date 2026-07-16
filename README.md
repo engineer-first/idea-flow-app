@@ -4,6 +4,8 @@
 
 ハッカソン・ビジコン・チーム制作の初期で起きる「何を作ればいいか分からない」「アイデアが出ない」「どれを選べばいいか分からない」といった課題を、発散・整理・選定の流れに沿ったブレスト体験で支援します。Miro や FigJam のような自由なホワイトボードではなく、初学者でも迷わず進められるフレームワーク型のアイデア創出支援を目指しています。
 
+本番アプリ: **<https://ideaboost.dev>**
+
 ## ドキュメント
 
 プロダクトの詳細（PRD、ペルソナ、競合分析、画面イメージなど）は [idea-flow-app Wiki](https://github.com/engineer-first/idea-flow-app/wiki) にまとめています。仕様や設計の確認は Wiki を参照してください。
@@ -84,87 +86,16 @@ Google ログインを確認する場合は、Google Cloud Console で OAuth ク
 
 ### デプロイ（Cloudflare）
 
-#### アーキテクチャ
+本番アプリは **<https://ideaboost.dev>** で利用できます。
+
+2 Worker + D1 + RoomDO 構成です。デプロイ順は **api → app**（`npm run deploy`）。
 
 | Worker          | 設定ファイル             | 役割                                                         |
 | --------------- | ------------------------ | ------------------------------------------------------------ |
 | `idea-flow-app` | `wrangler.jsonc`         | UI（Next.js / OpenNext）+ `/api/*` を service binding で転送 |
 | `idea-flow-api` | `workers/wrangler.jsonc` | REST + WebSocket（D1 / RoomDO への唯一の入口）               |
 
-本番では api-worker を service binding で呼ぶため、`API_WORKER_URL` / `NEXT_PUBLIC_API_WORKER_URL` は**設定しない**（誤設定すると到達不能になる危険があります）。
-
-#### 必要な秘密・環境変数
-
-**api-worker (`idea-flow-api`)**
-
-| 名前             | 設定方法                                              | 備考                          |
-| ---------------- | ----------------------------------------------------- | ----------------------------- |
-| `SESSION_SECRET` | `wrangler secret put --config workers/wrangler.jsonc` | 32 バイト以上。app 側と同一値 |
-
-**app-worker (`idea-flow-app`)**
-
-| 名前                          | 種別                                                             | 備考                                                                                                                                                                                   |
-| ----------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SESSION_SECRET`              | `wrangler secret put`（root の `wrangler.jsonc` に対し実行）     | api 側と同一値                                                                                                                                                                         |
-| `GOOGLE_CLIENT_ID`            | `wrangler secret put`                                            | 本番ログイン用                                                                                                                                                                         |
-| `GOOGLE_CLIENT_SECRET`        | `wrangler secret put`                                            | 本番ログイン用                                                                                                                                                                         |
-| `NEXT_PUBLIC_SITE_URL`        | `wrangler.jsonc` の `vars` または `wrangler deploy` 時の `--var` | 本番 URL（例 `https://app.example.com`）。production では必須。招待 URL・OAuth redirect のベースになる。ビルド時に埋め込まれるため、デプロイ前の `build:cf` 時点で有効である必要がある |
-| `NEXT_PUBLIC_ENABLE_DEV_AUTH` | 設定しない                                                       | 本番では development 環境以外で自動無効                                                                                                                                                |
-| `NEXT_PUBLIC_API_WORKER_URL`  | **設定しない**                                                   | 本番は同一オリジン                                                                                                                                                                     |
-| `API_WORKER_URL`              | **設定しない**                                                   | 本番は service binding                                                                                                                                                                 |
-
-#### 初回デプロイ手順
-
-デプロイ順は **api → app**（service binding 先が先に存在する必要があるため）。
-
-```bash
-# 1. D1 作成 → 出力の database_id を workers/wrangler.jsonc に書く
-npx wrangler d1 create idea-flow-lobby
-
-# 2. D1 migration をリモート適用
-npx wrangler d1 migrations apply DB --remote --config workers/wrangler.jsonc
-
-# 3. 秘密生成（例）
-openssl rand -base64 48
-
-# 4. api-worker の秘密設定
-npx wrangler secret put SESSION_SECRET --config workers/wrangler.jsonc
-
-# 5. api-worker をデプロイ
-npm run deploy:api
-
-# 6. app-worker の秘密設定（root の wrangler.jsonc を使う）
-npx wrangler secret put SESSION_SECRET
-npx wrangler secret put GOOGLE_CLIENT_ID
-npx wrangler secret put GOOGLE_CLIENT_SECRET
-
-# 7. 本番 URL を指定してビルド + デプロイ
-export NEXT_PUBLIC_SITE_URL=https://ideaboost.dev
-npm run deploy:app
-```
-
-#### カスタムドメイン設定
-
-`idea-flow-app` にだけドメインを付ける（api は service binding で閉じる）。
-本番では必須の設定。
-
-```bash
-# デプロイ時にドメインを指定
-npx wrangler deploy -c wrangler.jsonc --domains ideaboost.dev
-```
-
-または Dashboard（Workers → idea-flow-app → Settings → Domains & Routes）から設定。
-
-Google OAuth のリダイレクト URI に `https://ideaboost.dev/auth/callback` を追加する。
-ドメイン変更時は `NEXT_PUBLIC_SITE_URL` を更新して**再ビルド必須**。
-
-#### 動作確認
-
-1. トップ表示・Google ログイン
-2. ルーム作成 → 招待コード表示
-3. 別ブラウザ/シークレットで参加
-4. 付箋追加が双方にリアルタイム反映
-5. 退出・ホスト解散
+秘密・初回手順・カスタムドメイン・CI・動作確認の詳細は **[デプロイ構成図](docs/site/deploy-map/index.html)**（公開後: [GitHub Pages](https://engineer-first.github.io/idea-flow-app/deploy-map/)）を参照してください。
 
 ### MSW (Mock Service Worker)
 
