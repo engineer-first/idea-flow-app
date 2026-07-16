@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
 
 concurrency:
   group: discord-merge-notify-${{ github.event.pull_request.number }}
@@ -38,15 +37,6 @@ jobs:
             }
 
             const pr = context.payload.pull_request;
-            // listFilesは1ページ100件までしか返さないため、100件を超えるPRでは
-            // 一覧の末尾が欠落する（通知の目的上は許容し、件数超過の検知はしない）。
-            const { data: files } = await github.rest.pulls.listFiles({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: pr.number,
-              per_page: 100,
-            });
-
             const payload = buildDiscordPayload({
               number: pr.number,
               title: pr.title,
@@ -54,7 +44,7 @@ jobs:
               author: pr.user.login,
               baseRef: pr.base.ref,
               headRef: pr.head.ref,
-              files: files.map((file) => file.filename),
+              changedFilesCount: pr.changed_files,
             });
 
             const response = await fetch(webhookUrl, {
