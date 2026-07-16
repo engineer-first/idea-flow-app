@@ -259,6 +259,7 @@ describe("NoteCard", () => {
 
       view.rerender(<NoteCard {...props} editingDisabled />);
 
+      expect(getCard()).not.toHaveAttribute("data-editing");
       expect(onContentChange).not.toHaveBeenCalled();
       expect(screen.getByRole("textbox")).toHaveAttribute("readonly");
       expect(screen.getByDisplayValue("サーバー上の本文")).toBeInTheDocument();

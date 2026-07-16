@@ -12,8 +12,8 @@ describe("DecideNoteAction", () => {
     });
     expect(button).toHaveClass("absolute");
     expect(button).toHaveAttribute("data-size", "icon-lg");
-    expect(button).toHaveStyle({ left: "120px" });
-    expect(button).not.toHaveTextContent("取り組む課題");
+    expect(button).toHaveStyle({ left: "120px", top: "80px" });
+    expect(button.textContent).toBe("");
 
     fireEvent.click(button);
     expect(onDecide).toHaveBeenCalledTimes(1);
