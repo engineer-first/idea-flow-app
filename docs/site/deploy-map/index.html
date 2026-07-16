@@ -535,90 +535,87 @@
     </p>
 
     <div class="sys-legend">
-      <span><span class="edge-dot https"></span>HTTPS :443（画面・REST・OAuth）</span>
-      <span><span class="edge-dot wss"></span>WSS :443（ルーム WebSocket）</span>
-      <span><span class="edge-dot bind"></span>service / resource binding（内部・ポートなし）</span>
+      <span><span class="edge-dot https"></span>HTTP（画面・REST）</span>
+      <span><span class="edge-dot wss"></span>WSS（ルーム同期）</span>
+      <span><span class="edge-dot bind"></span>内部（binding）</span>
     </div>
 
-    <svg viewBox="0 0 920 540" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:920px;height:auto;margin:0 0 1.5rem;" font-family="sans-serif">
+    <svg viewBox="0 0 780 540" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:780px;height:auto;margin:0 0 1.5rem;" font-family="sans-serif">
       <defs>
-        <marker id="arrHttps" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10Z" fill="#35507a"/></marker>
+        <marker id="arrHttp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10Z" fill="#35507a"/></marker>
         <marker id="arrWss" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10Z" fill="#7a2f6b"/></marker>
+        <marker id="arrCb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10Z" fill="#a8681f"/></marker>
         <marker id="arrBind" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10Z" fill="#9b9686"/></marker>
       </defs>
 
-      <text x="460" y="22" text-anchor="middle" font-size="14" font-weight="bold" fill="#1e2420">IdeaFlow 全体構成図</text>
+      <text x="390" y="22" text-anchor="middle" font-size="14" font-weight="bold" fill="#1e2420">IdeaFlow 全体構成図</text>
 
       <!-- Cloudflare cluster -->
-      <rect x="10" y="40" width="900" height="470" rx="8" fill="#fff3e0" stroke="#e0a800" stroke-width="1.5"/>
+      <rect x="10" y="40" width="760" height="470" rx="8" fill="#fff3e0" stroke="#e0a800" stroke-width="1.5"/>
       <text x="24" y="62" font-family="monospace" font-size="11" font-weight="bold" fill="#35507a">CLOUDFLARE · 本番 ideaboost.dev</text>
 
       <!-- ブラウザ -->
       <ellipse cx="130" cy="105" rx="8" ry="8" fill="#f1f1f1" stroke="#181818" stroke-width="0.5"/>
       <path d="M130,113L130,140 M116,121L144,121 M130,140L116,155 M130,140L144,155" fill="none" stroke="#181818" stroke-width="0.5"/>
-      <text x="130" y="173" text-anchor="middle" font-size="13" fill="#1e2420">ブラウザ</text>
+      <text x="130" y="173" text-anchor="middle" font-size="14" fill="#1e2420">ブラウザ</text>
 
-      <!-- Google OAuth（app 右上に配置） -->
-      <rect x="620" y="130" width="136" height="46" rx="5" fill="#fce4ec" stroke="#c07080" stroke-width="1"/>
-      <text x="688" y="148" text-anchor="middle" font-family="monospace" font-size="9" font-weight="bold" fill="#9b9686">EXTERNAL</text>
-      <text x="688" y="166" text-anchor="middle" font-size="12" fill="#1e2420">Google OAuth</text>
+      <!-- Google OAuth -->
+      <rect x="590" y="130" width="110" height="46" rx="5" fill="#fce4ec" stroke="#c07080" stroke-width="1"/>
+      <text x="645" y="146" text-anchor="middle" font-family="monospace" font-size="9" font-weight="bold" fill="#9b9686">EXTERNAL</text>
+      <text x="645" y="166" text-anchor="middle" font-size="12" fill="#1e2420">Google</text>
 
-      <!-- idea-flow-app -->
-      <rect x="300" y="195" width="240" height="65" rx="5" fill="#e1e8f0" stroke="#35507a" stroke-width="1.5"/>
-      <text x="420" y="215" text-anchor="middle" font-family="monospace" font-size="9" font-weight="bold" fill="#35507a">WORKER ①</text>
-      <text x="420" y="232" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e2420">idea-flow-app</text>
-      <text x="420" y="249" text-anchor="middle" font-size="10" fill="#9b9686">OpenNext + Assets</text>
+      <!-- App -->
+      <rect x="280" y="200" width="220" height="60" rx="5" fill="#e1e8f0" stroke="#35507a" stroke-width="1.5"/>
+      <text x="390" y="222" text-anchor="middle" font-family="monospace" font-size="9" font-weight="bold" fill="#35507a">WORKER ①</text>
+      <text x="390" y="240" text-anchor="middle" font-size="14" font-weight="bold" fill="#1e2420">App</text>
+      <text x="390" y="254" text-anchor="middle" font-size="10" fill="#9b9686">OpenNext + Assets</text>
 
-      <!-- idea-flow-api -->
-      <rect x="300" y="310" width="240" height="65" rx="5" fill="#dceee8" stroke="#0b6e5c" stroke-width="1.5"/>
-      <text x="420" y="330" text-anchor="middle" font-family="monospace" font-size="9" font-weight="bold" fill="#0b6e5c">WORKER ②</text>
-      <text x="420" y="347" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e2420">idea-flow-api</text>
-      <text x="420" y="364" text-anchor="middle" font-size="10" fill="#9b9686">REST + WS 入口 · セッション / 認可</text>
+      <!-- API -->
+      <rect x="280" y="305" width="220" height="60" rx="5" fill="#dceee8" stroke="#0b6e5c" stroke-width="1.5"/>
+      <text x="390" y="327" text-anchor="middle" font-family="monospace" font-size="9" font-weight="bold" fill="#0b6e5c">WORKER ②</text>
+      <text x="390" y="345" text-anchor="middle" font-size="14" font-weight="bold" fill="#1e2420">API</text>
+      <text x="390" y="359" text-anchor="middle" font-size="10" fill="#9b9686">REST + WS · セッション / 認可</text>
 
-      <!-- D1（左側） -->
-      <path d="M355,435C355,425 410,425 410,425C410,425 465,425 465,435L465,480C465,490 410,490 410,490C410,490 355,490 355,480Z" fill="#f3e4cc" stroke="#a8681f" stroke-width="1"/>
-      <path d="M355,435C355,445 410,445 410,445C410,445 465,445 465,435" fill="none" stroke="#a8681f" stroke-width="1"/>
-      <text x="410" y="455" text-anchor="middle" font-family="monospace" font-size="9" font-weight="bold" fill="#a8681f">D1</text>
-      <text x="410" y="472" text-anchor="middle" font-size="12" font-weight="bold" fill="#1e2420">idea-flow-lobby</text>
-      <text x="410" y="486" text-anchor="middle" font-size="9" fill="#9b9686">users / rooms</text>
+      <!-- DB -->
+      <path d="M335,420C335,410 390,410 390,410C390,410 445,410 445,420L445,470C445,480 390,480 390,480C390,480 335,480 335,470Z" fill="#f3e4cc" stroke="#a8681f" stroke-width="1"/>
+      <path d="M335,420C335,430 390,430 390,430C390,430 445,430 445,420" fill="none" stroke="#a8681f" stroke-width="1"/>
+      <text x="390" y="442" text-anchor="middle" font-family="monospace" font-size="9" font-weight="bold" fill="#a8681f">D1</text>
+      <text x="390" y="460" text-anchor="middle" font-size="14" font-weight="bold" fill="#1e2420">DB</text>
+      <text x="390" y="476" text-anchor="middle" font-size="9" fill="#9b9686">users / rooms</text>
 
-      <!-- RoomDO（右側） -->
-      <rect x="520" y="425" width="240" height="65" rx="5" fill="#f0e0ec" stroke="#7a2f6b" stroke-width="1.5"/>
-      <text x="640" y="445" text-anchor="middle" font-family="monospace" font-size="9" font-weight="bold" fill="#7a2f6b">DURABLE OBJECT × N</text>
-      <text x="640" y="462" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e2420">RoomDO</text>
-      <text x="640" y="477" text-anchor="middle" font-size="10" fill="#7a2f6b" font-weight="bold">★ 1 ルーム = 1 インスタンス</text>
-      <text x="640" y="489" text-anchor="middle" font-size="8.5" fill="#9b9686">members / notes / 投票 · WS 配信</text>
+      <!-- Room -->
+      <rect x="500" y="420" width="220" height="60" rx="5" fill="#f0e0ec" stroke="#7a2f6b" stroke-width="1.5"/>
+      <text x="610" y="442" text-anchor="middle" font-family="monospace" font-size="9" font-weight="bold" fill="#7a2f6b">DURABLE OBJECT</text>
+      <text x="610" y="460" text-anchor="middle" font-size="14" font-weight="bold" fill="#1e2420">Room</text>
+      <text x="610" y="476" text-anchor="middle" font-size="9" fill="#9b9686">★ 1 room = 1 DO</text>
 
-      <!-- DO spawn note -->
-      <rect x="520" y="494" width="240" height="28" rx="4" fill="#f0e0ec" stroke-dasharray="3,3" stroke="#7a2f6b" stroke-width="0.5"/>
-      <text x="640" y="512" text-anchor="middle" font-size="9" fill="#7a2f6b">ルーム作成時に idFromName(roomId) で 1 本起動</text>
+      <!-- DO note -->
+      <rect x="500" y="484" width="220" height="26" rx="4" fill="#f0e0ec" stroke-dasharray="3,3" stroke="#7a2f6b" stroke-width="0.5"/>
+      <text x="610" y="501" text-anchor="middle" font-size="9" fill="#7a2f6b">ルーム作成時に idFromName(roomId) で起動</text>
 
-      <!-- ブラウザ → idea-flow-app -->
-      <line x1="130" y1="178" x2="284" y2="208" stroke="#35507a" stroke-width="1.5" marker-end="url(#arrHttps)"/>
-      <text x="180" y="188" text-anchor="middle" font-family="monospace" font-size="9" fill="#35507a" font-weight="bold">HTTPS :443</text>
-      <text x="230" y="188" text-anchor="middle" font-size="9" fill="#9b9686">画面 / REST</text>
-      <!-- WSS -->
-      <line x1="140" y1="178" x2="284" y2="215" stroke="#7a2f6b" stroke-width="1.5" marker-end="url(#arrWss)"/>
-      <text x="190" y="200" text-anchor="middle" font-family="monospace" font-size="9" fill="#7a2f6b" font-weight="bold">WSS :443</text>
-      <text x="230" y="200" text-anchor="middle" font-size="8.5" fill="#9b9686">/api/rooms/:id/ws</text>
+      <!-- ブラウザ → App: HTTP -->
+      <line x1="130" y1="178" x2="264" y2="210" stroke="#35507a" stroke-width="1.5" marker-end="url(#arrHttp)"/>
+      <text x="175" y="196" text-anchor="middle" font-family="monospace" font-size="10" fill="#35507a" font-weight="bold">HTTP</text>
 
-      <!-- app → api -->
-      <line x1="420" y1="260" x2="420" y2="305" stroke="#9b9686" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrBind)"/>
-      <text x="425" y="286" font-family="monospace" font-size="9" fill="#9b9686">service binding</text>
-      <text x="510" y="286" font-size="8.5" fill="#9b9686">API_WORKER · 公衆ネット外</text>
+      <!-- ブラウザ → App: WSS -->
+      <line x1="140" y1="178" x2="264" y2="240" stroke="#7a2f6b" stroke-width="1.5" marker-end="url(#arrWss)"/>
+      <text x="185" y="216" text-anchor="middle" font-family="monospace" font-size="10" fill="#7a2f6b" font-weight="bold">WSS</text>
 
-      <!-- api → D1 -->
-      <line x1="380" y1="375" x2="380" y2="425" stroke="#9b9686" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrBind)"/>
-      <text x="385" y="403" font-family="monospace" font-size="9" fill="#9b9686">binding DB</text>
+      <!-- Google → App: callback -->
+      <line x1="592" y1="155" x2="504" y2="215" stroke="#a8681f" stroke-width="1.5" marker-end="url(#arrCb)"/>
+      <text x="535" y="182" text-anchor="middle" font-family="monospace" font-size="9" fill="#a8681f">callback</text>
 
-      <!-- api → RoomDO -->
-      <line x1="460" y1="375" x2="610" y2="420" stroke="#9b9686" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrBind)"/>
-      <text x="500" y="394" font-family="monospace" font-size="9" fill="#9b9686">binding ROOM_DO</text>
+      <!-- App → API -->
+      <line x1="390" y1="260" x2="390" y2="300" stroke="#9b9686" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrBind)"/>
+      <text x="395" y="284" font-family="monospace" font-size="9" fill="#9b9686">内部転送</text>
 
-      <!-- Google OAuth → idea-flow-app（app の右辺に接続） -->
-      <line x1="622" y1="155" x2="545" y2="225" stroke="#35507a" stroke-width="1.5" marker-end="url(#arrHttps)"/>
-      <text x="560" y="185" text-anchor="middle" font-family="monospace" font-size="9" fill="#35507a" font-weight="bold">HTTPS :443</text>
-      <text x="575" y="197" text-anchor="middle" font-size="8.5" fill="#9b9686">/auth/callback</text>
+      <!-- API → DB -->
+      <line x1="340" y1="365" x2="340" y2="410" stroke="#9b9686" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrBind)"/>
+      <text x="345" y="392" font-family="monospace" font-size="9" fill="#9b9686">DB</text>
+
+      <!-- API → Room -->
+      <line x1="430" y1="365" x2="570" y2="415" stroke="#9b9686" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrBind)"/>
+      <text x="465" y="385" font-family="monospace" font-size="9" fill="#9b9686">Room</text>
     </svg>
 
     <div class="sys-callout">
