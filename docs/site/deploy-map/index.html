@@ -530,7 +530,8 @@
   <section id="runtime">
     <h2><span class="num">§1</span>全体構成図（本番）</h2>
     <p class="lede">
-      本番は <code>ideaboost.dev</code>（HTTPS/WSS :443 同一オリジン）。Cloudflare 内は binding で結合。
+      公開面は <code>https://ideaboost.dev</code> の <strong>443 のみ</strong>（HTTPS / WSS 同一オリジン）。
+      ブラウザは app だけを見、api / D1 / RoomDO は Cloudflare 内の binding でつながる。
     </p>
 
     <div class="sys-legend">
@@ -539,12 +540,99 @@
       <span><span class="edge-dot bind"></span>service / resource binding（内部・ポートなし）</span>
     </div>
 
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentStyleType="text/css" data-diagram-type="DESCRIPTION" height="658px" preserveAspectRatio="none" style="width:623px;height:658px;background:#FFFFFF;" version="1.1" viewBox="0 0 623 658" width="623px" zoomAndPan="magnify"><defs/><g><!--cluster cf--><g class="cluster" data-qualified-name="cf" data-source-line="7" id="ent0003"><rect fill="#FFF3E0" height="392.78" rx="2.5" ry="2.5" style="stroke:#181818;stroke-width:1;" width="349" x="7" y="252.1"/><text fill="#000000" font-family="sans-serif" font-size="14" font-weight="700" lengthAdjust="spacing" textLength="81.416" x="140.792" y="267.0951">Cloudflare</text></g><!--entity app--><g class="entity" data-qualified-name="cf.app" data-source-line="8" id="ent0004"><rect fill="#F1F1F1" height="62.5938" rx="2.5" ry="2.5" style="stroke:#181818;stroke-width:0.5;" width="135.2588" x="103.37" y="287.1"/><rect fill="#F1F1F1" height="10" style="stroke:#181818;stroke-width:0.5;" width="15" x="218.6288" y="292.1"/><rect fill="#F1F1F1" height="2" style="stroke:#181818;stroke-width:0.5;" width="4" x="216.6288" y="294.1"/><rect fill="#F1F1F1" height="2" style="stroke:#181818;stroke-width:0.5;" width="4" x="216.6288" y="298.1"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="95.2588" x="118.37" y="320.0951">idea-flow-app</text><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="81.1768" x="118.37" y="336.392">(OpenNext)</text></g><!--entity api--><g class="entity" data-qualified-name="cf.api" data-source-line="9" id="ent0005"><rect fill="#F1F1F1" height="62.5938" rx="2.5" ry="2.5" style="stroke:#181818;stroke-width:0.5;" width="130.2959" x="105.85" y="426.69"/><rect fill="#F1F1F1" height="10" style="stroke:#181818;stroke-width:0.5;" width="15" x="216.1459" y="431.69"/><rect fill="#F1F1F1" height="2" style="stroke:#181818;stroke-width:0.5;" width="4" x="214.1459" y="433.69"/><rect fill="#F1F1F1" height="2" style="stroke:#181818;stroke-width:0.5;" width="4" x="214.1459" y="437.69"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="90.2617" x="120.85" y="459.6851">idea-flow-api</text><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="90.2959" x="120.85" y="475.982">(REST + WS)</text></g><!--entity d1--><g class="entity" data-qualified-name="cf.d1" data-source-line="10" id="ent0006"><path d="M213.91,576.79 C213.91,566.79 277.0047,566.79 277.0047,566.79 C277.0047,566.79 340.0995,566.79 340.0995,576.79 L340.0995,618.3838 C340.0995,628.3838 277.0047,628.3838 277.0047,628.3838 C277.0047,628.3838 213.91,628.3838 213.91,618.3838 L213.91,576.79" fill="#F1F1F1" style="stroke:#181818;stroke-width:0.5;"/><path d="M213.91,576.79 C213.91,586.79 277.0047,586.79 277.0047,586.79 C277.0047,586.79 340.0995,586.79 340.0995,576.79" fill="none" style="stroke:#181818;stroke-width:0.5;"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="62.6514" x="223.91" y="603.7851">D1 lobby</text><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="106.1895" x="223.91" y="620.082">(users / rooms)</text></g><!--entity roomdo--><g class="entity" data-qualified-name="cf.roomdo" data-source-line="11" id="ent0007"><rect fill="#F1F1F1" height="62.5938" rx="2.5" ry="2.5" style="stroke:#181818;stroke-width:0.5;" width="156.5938" x="22.7" y="566.29"/><rect fill="#F1F1F1" height="10" style="stroke:#181818;stroke-width:0.5;" width="15" x="159.2938" y="571.29"/><rect fill="#F1F1F1" height="2" style="stroke:#181818;stroke-width:0.5;" width="4" x="157.2938" y="573.29"/><rect fill="#F1F1F1" height="2" style="stroke:#181818;stroke-width:0.5;" width="4" x="157.2938" y="577.29"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="89.9541" x="37.7" y="599.2851">RoomDO x N</text><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="116.5938" x="37.7" y="615.582">(1 room = 1 DO)</text></g><!--entity users--><g class="entity" data-qualified-name="users" data-source-line="3" id="ent0001"><ellipse cx="81.9999" cy="14" fill="#F1F1F1" rx="8" ry="8" style="stroke:#181818;stroke-width:0.5;"/><path d="M81.9999,22 L81.9999,49 M68.9999,30 L94.9999,30 M81.9999,49 L68.9999,64 M81.9999,49 L94.9999,64" fill="none" style="stroke:#181818;stroke-width:0.5;"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="55.9998" x="54" y="78.4951">&#12502;&#12521;&#12454;&#12470;</text></g><!--entity internet--><g class="entity" data-qualified-name="internet" data-source-line="5" id="ent0002"><path d="M26.3937,151.6458 C30.0556,146.7662 34.4441,145.8996 38.0583,151.6978 C40.9878,146.1821 46.5116,144.7046 50.344,150.7373 C53.4647,145.1437 56.8418,145.3326 60.558,150.1532 C64.6005,143.285 68.6633,144.9027 72.9682,149.8783 C75.5397,144.3486 79.0763,143.8656 82.7074,148.9017 C87.3018,143.0356 91.3481,142.74 95.2937,149.546 C98.022,144.3622 103.1176,144.8988 105.5231,149.8711 C109.2932,144.3111 114.3319,144.6595 117.3926,150.6031 C121.1479,145.8972 125.6825,145.8777 128.745,151.3741 C131.464,145.9153 136.7502,145.8778 139.6479,151.1934 C147.2335,154.3371 149.4505,161.9979 142.861,167.8724 C147.9841,173.1687 146.6502,179.2892 139.2558,181.1993 C136.2423,186.5708 130.8051,187.7675 127.0232,182.0468 C123.8732,188.0026 119.6191,187.1318 115.7707,182.8115 C112.0079,187.3838 108.4444,188.8236 104.5138,182.9931 C101.3458,188.7458 97.0062,188.9172 93.3382,183.4929 C90.4431,187.8899 86.5473,187.1569 83.8279,183.2907 C80.3654,188.1058 75.4728,188.4924 72.2996,182.9681 C69.1515,188.1602 64.018,188.4041 60.635,183.2326 C57.9757,188.3664 52.8623,189.659 49.5724,183.8712 C45.2175,188.8603 40.7762,189.6555 37.2799,182.9674 C33.8853,187.2384 30.4694,186.7184 27.7119,182.2685 C19.2378,179.5944 18.3416,172.0557 24.2432,166.2656 C17.6492,160.4629 18.3356,155.2932 26.3937,151.6458" fill="#F1F1F1" style="stroke:#181818;stroke-width:0.5;"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="97.9996" x="33" y="170.7951">&#12452;&#12531;&#12479;&#12540;&#12493;&#12483;&#12488;</text></g><!--entity oauth--><g class="entity" data-qualified-name="oauth" data-source-line="14" id="ent0008"><rect fill="#F1F1F1" height="46.2969" rx="2.5" ry="2.5" style="stroke:#181818;stroke-width:0.5;" width="137.6514" x="181.17" y="142.8"/><rect fill="#F1F1F1" height="10" style="stroke:#181818;stroke-width:0.5;" width="15" x="298.8214" y="147.8"/><rect fill="#F1F1F1" height="2" style="stroke:#181818;stroke-width:0.5;" width="4" x="296.8214" y="149.8"/><rect fill="#F1F1F1" height="2" style="stroke:#181818;stroke-width:0.5;" width="4" x="296.8214" y="153.8"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="97.6514" x="196.17" y="175.7951">Google OAuth</text></g><g class="entity" data-qualified-name="GMN15" data-source-line="24" id="ent0016"><path d="M375.27,577.45 L375.27,617.7156 L608.7388,617.7156 L608.7388,587.45 L598.7388,577.45 L375.27,577.45" fill="#FEFFDD" style="stroke:#181818;stroke-width:0.5;"/><path d="M598.7388,577.45 L598.7388,587.45 L608.7388,587.45 L598.7388,577.45" fill="#FEFFDD" style="stroke:#181818;stroke-width:1;"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="129.048" x="381.27" y="594.5169">room &#20316;&#25104;&#12539;&#21442;&#21152;&#26178;&#12395;</text><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="212.4688" x="381.27" y="609.6497">idFromName(roomId) &#12391; 1 &#26412;&#36215;&#21205;</text></g><!--link users to internet--><g class="link" data-entity-1="ent0001" data-entity-2="ent0002" data-link-type="dependency" data-source-line="16" id="lnk9"><path d="M82,82.06 C82,101.92 82,120.67 82,137.64" fill="none" id="users-to-internet" style="stroke:#181818;stroke-width:1;"/><polygon fill="#181818" points="82,142.64,86,133.64,82,137.64,78,133.64,82,142.64" style="stroke:#181818;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/></g><!--link internet to app--><g class="link" data-entity-1="ent0002" data-entity-2="ent0004" data-link-type="dependency" data-source-line="17" id="lnk10"><path d="M83.88,189.44 C85.76,203.48 89.51,221.58 97,236.1 C106.71,254.93 118.3745,269.1745 132.4845,283.2845" fill="none" id="internet-to-app" style="stroke:#181818;stroke-width:1;"/><polygon fill="#181818" points="136.02,286.82,132.4845,277.6276,132.4845,283.2845,126.8276,283.2845,136.02,286.82" style="stroke:#181818;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="108.8115" x="98" y="232.1669">HTTPS/WSS :443</text></g><!--link app to api--><g class="link" data-entity-1="ent0004" data-entity-2="ent0005" data-link-type="dependency" data-source-line="18" id="lnk11"><path d="M171,349.93 C171,372.73 171,398.76 171,421.54" fill="none" id="app-to-api" style="stroke:#181818;stroke-width:1;"/><polygon fill="#181818" points="171,426.54,175,417.54,171,421.54,167,417.54,171,426.54" style="stroke:#181818;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="99.1567" x="172" y="392.7569">service binding</text></g><!--link api to d1--><g class="link" data-entity-1="ent0005" data-entity-2="ent0006" data-link-type="dependency" data-source-line="19" id="lnk12"><path d="M201.43,489.68 C210.04,498.91 219.19,509.25 227,519.29 C238.58,534.17 247.4775,547.5091 256.5375,562.1391" fill="none" id="api-to-d1" style="stroke:#181818;stroke-width:1;"/><polygon fill="#181818" points="259.17,566.39,257.8323,556.6324,256.5375,562.1391,251.0308,560.8444,259.17,566.39" style="stroke:#181818;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="71.519" x="239.94" y="532.3569">binding DB</text></g><!--link api to roomdo--><g class="link" data-entity-1="ent0005" data-entity-2="ent0007" data-link-type="dependency" data-source-line="20" id="lnk13"><path d="M123.74,489.74 C114.53,498.13 106.15,508.06 101,519.29 C94.4,533.68 93.4303,546.2512 94.7903,560.9812" fill="none" id="api-to-roomdo" style="stroke:#181818;stroke-width:1;"/><polygon fill="#181818" points="95.25,565.96,98.4056,556.6304,94.7903,560.9812,90.4395,557.3659,95.25,565.96" style="stroke:#181818;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="120.0469" x="102" y="532.3569">binding ROOM_DO</text></g><!--link oauth to app--><g class="link" data-entity-1="ent0008" data-entity-2="ent0004" data-link-type="dependency" data-source-line="21" id="lnk14"><path d="M238.17,189.47 C224.61,215.29 204.634,253.3329 189.484,282.1929" fill="none" id="oauth-to-app" style="stroke:#181818;stroke-width:1;"/><polygon fill="#181818" points="187.16,286.62,194.8848,280.5104,189.484,282.1929,187.8015,276.7921,187.16,286.62" style="stroke:#181818;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="75.0737" x="223.19" y="232.1669">HTTPS :443</text></g><!--link roomdo to GMN15--><g class="link" data-entity-1="ent0007" data-entity-2="ent0016" data-link-type="association" data-source-line="24" id="lnk17"><path d="M140.06,565.82 C160.6,551.15 186.97,535.35 213.5,527.79 C266.93,512.56 284.2,516.02 338.5,527.79 C381.99,537.21 427.95,560.05 458.11,577.05" fill="none" id="roomdo-GMN15" style="stroke:#181818;stroke-width:1;stroke-dasharray:7,7;"/></g></g></svg>
+    <svg viewBox="0 0 920 540" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:920px;height:auto;margin:0 0 1.5rem;" font-family="sans-serif">
+      <defs>
+        <marker id="arrHttps" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10Z" fill="#35507a"/></marker>
+        <marker id="arrWss" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10Z" fill="#7a2f6b"/></marker>
+        <marker id="arrBind" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10Z" fill="#9b9686"/></marker>
+      </defs>
 
+      <text x="460" y="22" text-anchor="middle" font-size="14" font-weight="bold" fill="#1e2420">IdeaFlow 全体構成図</text>
 
+      <!-- Cloudflare cluster -->
+      <rect x="10" y="40" width="900" height="460" rx="8" fill="#fff3e0" stroke="#e0a800" stroke-width="1.5"/>
+      <text x="24" y="62" font-family="monospace" font-size="11" font-weight="bold" fill="#35507a">CLOUDFLARE · 本番 ideaboost.dev</text>
 
+      <!-- ブラウザ -->
+      <ellipse cx="100" cy="110" rx="8" ry="8" fill="#f1f1f1" stroke="#181818" stroke-width="0.5"/>
+      <path d="M100,118L100,145 M86,126L114,126 M100,145L86,160 M100,145L114,160" fill="none" stroke="#181818" stroke-width="0.5"/>
+      <text x="100" y="178" text-anchor="middle" font-size="13" fill="#1e2420">ブラウザ</text>
 
-<div class="do-spawn">
+      <!-- Google OAuth -->
+      <rect x="30" y="400" width="130" height="46" rx="5" fill="#fce4ec" stroke="#c07080" stroke-width="1"/>
+      <text x="95" y="418" text-anchor="middle" font-family="monospace" font-size="9" font-weight="bold" fill="#9b9686">EXTERNAL</text>
+      <text x="95" y="436" text-anchor="middle" font-size="12" fill="#1e2420">Google OAuth</text>
+
+      <!-- internet cloud -->
+      <path d="M700,70C715,62 735,60 740,75C760,70 775,85 770,100C785,105 780,125 765,125 L615,125C600,125 595,110 605,100C595,85 610,70 625,72C635,55 660,50 670,65Z" fill="#f1f1f1" stroke="#181818" stroke-width="0.5"/>
+      <text x="690" y="145" text-anchor="middle" font-size="12" fill="#1e2420">インターネット</text>
+
+      <!-- idea-flow-app -->
+      <rect x="400" y="170" width="220" height="65" rx="5" fill="#e1e8f0" stroke="#35507a" stroke-width="1.5"/>
+      <text x="510" y="190" text-anchor="middle" font-family="monospace" font-size="9" font-weight="bold" fill="#35507a">WORKER ①</text>
+      <text x="510" y="207" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e2420">idea-flow-app</text>
+      <text x="510" y="224" text-anchor="middle" font-size="10" fill="#9b9686">OpenNext + Assets</text>
+
+      <!-- idea-flow-api -->
+      <rect x="400" y="275" width="220" height="65" rx="5" fill="#dceee8" stroke="#0b6e5c" stroke-width="1.5"/>
+      <text x="510" y="295" text-anchor="middle" font-family="monospace" font-size="9" font-weight="bold" fill="#0b6e5c">WORKER ②</text>
+      <text x="510" y="312" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e2420">idea-flow-api</text>
+      <text x="510" y="329" text-anchor="middle" font-size="10" fill="#9b9686">REST + WS 入口 · セッション / 認可</text>
+
+      <!-- D1 -->
+      <path d="M495,387C495,377 540,377 540,377C540,377 585,377 585,387L585,437C585,447 540,447 540,447C540,447 495,447 495,437Z" fill="#f3e4cc" stroke="#a8681f" stroke-width="1"/>
+      <path d="M495,387C495,397 540,397 540,397C540,397 585,397 585,387" fill="none" stroke="#a8681f" stroke-width="1"/>
+      <text x="540" y="407" text-anchor="middle" font-family="monospace" font-size="9" font-weight="bold" fill="#a8681f">D1</text>
+      <text x="540" y="424" text-anchor="middle" font-size="12" font-weight="bold" fill="#1e2420">idea-flow-lobby</text>
+      <text x="540" y="439" text-anchor="middle" font-size="9" fill="#9b9686">users / rooms</text>
+
+      <!-- RoomDO -->
+      <rect x="650" y="377" width="230" height="70" rx="5" fill="#f0e0ec" stroke="#7a2f6b" stroke-width="1.5"/>
+      <text x="765" y="397" text-anchor="middle" font-family="monospace" font-size="9" font-weight="bold" fill="#7a2f6b">DURABLE OBJECT × N</text>
+      <text x="765" y="414" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e2420">RoomDO</text>
+      <text x="765" y="429" text-anchor="middle" font-size="10" fill="#7a2f6b" font-weight="bold">★ 1 ルーム = 1 インスタンス</text>
+      <text x="765" y="443" text-anchor="middle" font-size="9" fill="#9b9686">members / notes / 投票 · WS 配信</text>
+
+      <!-- DO spawn note -->
+      <rect x="650" y="458" width="230" height="35" rx="4" fill="#f0e0ec" stroke-dasharray="3,3" stroke="#7a2f6b" stroke-width="0.5"/>
+      <text x="765" y="473" text-anchor="middle" font-size="9" fill="#7a2f6b">ルーム作成・参加時に idFromName(roomId) で 1 本起動</text>
+
+      <!-- Arrows: ブラウザ → idea-flow-app -->
+      <line x1="107" y1="192" x2="107" y2="220" stroke="#35507a" stroke-width="1.5" marker-end="url(#arrHttps)"/>
+      <text x="112" y="210" font-family="monospace" font-size="9" fill="#35507a" font-weight="bold">HTTPS :443</text>
+      <text x="170" y="210" font-size="9" fill="#9b9686">画面 / REST</text>
+
+      <line x1="120" y1="178" x2="400" y2="200" stroke="#7a2f6b" stroke-width="1.5" marker-end="url(#arrWss)"/>
+      <text x="220" y="186" font-family="monospace" font-size="9" fill="#7a2f6b" font-weight="bold">WSS :443</text>
+      <text x="280" y="186" font-size="9" fill="#9b9686">/api/rooms/:id/ws</text>
+
+      <!-- Arrow: idea-flow-app → idea-flow-api -->
+      <line x1="470" y1="235" x2="470" y2="270" stroke="#9b9686" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrBind)"/>
+      <text x="475" y="256" font-family="monospace" font-size="9" fill="#9b9686">service binding</text>
+      <text x="560" y="256" font-size="9" fill="#9b9686">API_WORKER · 公衆ネット外</text>
+
+      <!-- Arrow: idea-flow-api → D1 -->
+      <line x1="470" y1="340" x2="470" y2="370" stroke="#9b9686" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrBind)"/>
+      <text x="475" y="360" font-family="monospace" font-size="9" fill="#9b9686">binding DB</text>
+
+      <!-- Arrow: idea-flow-api → RoomDO -->
+      <line x1="530" y1="335" x2="700" y2="370" stroke="#9b9686" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrBind)"/>
+      <text x="580" y="348" font-family="monospace" font-size="9" fill="#9b9686">binding ROOM_DO</text>
+
+      <!-- Arrow: Google OAuth → idea-flow-app -->
+      <line x1="130" y1="420" x2="380" y2="420" stroke="#35507a" stroke-width="1.5"/>
+      <path d="M380,415L395,420L380,425Z" fill="#35507a"/>
+      <text x="200" y="414" text-anchor="middle" font-family="monospace" font-size="9" fill="#35507a" font-weight="bold">HTTPS :443</text>
+      <text x="300" y="414" text-anchor="middle" font-size="9" fill="#9b9686">/auth/callback</text>
+    </svg>
+
+    <div class="sys-callout">
+      <b>★ このサービスの核: ルーム作成で RoomDO が 1 本立つ</b>
+      招待コード解決は D1、ルームに入ってからの状態（メンバー・付箋・投票・WS）は
+      そのルーム専用の Durable Object だけが権威として持つ。
+    </div>
+
+    <div class="do-spawn">
       <h3>図 B · ルーム作成で DO が立つ流れ</h3>
       <div class="do-flow">
         <div class="do-step">
@@ -580,8 +668,9 @@
     </div>
 
     <p class="sys-footnote">
-      <b>ローカル開発:</b> Next <code>:3000</code> + api-worker <code>:8787</code>。
-      <code>*_API_WORKER_URL</code> はローカル専用。本番では<strong>設定しない</strong>。
+      <b>ローカル開発（参考）:</b> Next <code>:3000</code> + api-worker <code>:8787</code>。
+      ブラウザ WS は <code>NEXT_PUBLIC_API_WORKER_URL</code>、Server は <code>API_WORKER_URL</code>。
+      本番ではどちらも<strong>設定しない</strong>（同一オリジン + service binding）。
     </p>
   </section>
 
