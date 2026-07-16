@@ -430,7 +430,7 @@ describe("サーバーメッセージ → 画面反映", () => {
     });
     fireEvent.click(
       screen.getByRole("button", {
-        name: "これを「取り組む課題」に決定",
+        name: "この付箋を取り組む課題に決定",
       }),
     );
 

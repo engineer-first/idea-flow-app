@@ -3,27 +3,19 @@ import { describe, expect, it, vi } from "vitest";
 import { DecideNoteAction } from "./decide-note-action";
 
 describe("DecideNoteAction", () => {
-  it("付箋の近くに決定ボタンを表示し、押下を親へ通知する", () => {
+  it("付箋右上にアイコンだけの決定操作を表示し、押下を親へ通知する", () => {
     const onDecide = vi.fn();
     render(<DecideNoteAction x={120} y={80} onDecide={onDecide} />);
 
     const button = screen.getByRole("button", {
-      name: "これを「取り組む課題」に決定",
+      name: "この付箋を取り組む課題に決定",
     });
     expect(button).toHaveClass("absolute");
+    expect(button).toHaveAttribute("data-size", "icon-lg");
     expect(button).toHaveStyle({ left: "120px" });
+    expect(button).not.toHaveTextContent("取り組む課題");
 
     fireEvent.click(button);
     expect(onDecide).toHaveBeenCalledTimes(1);
-  });
-
-  it("付箋が上端に近いときはボタンの上端が画面外に出ないようクランプする", () => {
-    const onDecide = vi.fn();
-    render(<DecideNoteAction x={120} y={10} onDecide={onDecide} />);
-
-    const button = screen.getByRole("button", {
-      name: "これを「取り組む課題」に決定",
-    });
-    expect(button).toHaveStyle({ top: "0px" });
   });
 });

@@ -4,7 +4,7 @@
 // ドラッグ中のゴーストを描き、下端にマイ付箋ドックを重ねる。
 // ドラッグの状態機械は持たない（logic/use-board-drag が view で束ねる）。
 import type { PointerEvent as ReactPointerEvent, RefObject } from "react";
-import { BOARD_HEIGHT, BOARD_WIDTH } from "@/contracts/board";
+import { BOARD_HEIGHT, BOARD_WIDTH, NOTE_WIDTH } from "@/contracts/board";
 import {
   calculateRenderGroups,
   type PersistentGroup,
@@ -24,7 +24,11 @@ import {
   StickyNote,
 } from "@/features/notes";
 import type { Decision } from "../logic/room-reducer";
-import { DecideNoteAction } from "../molecules/decide-note-action";
+import {
+  DECIDE_NOTE_ACTION_INSET,
+  DECIDE_NOTE_ACTION_SIZE,
+  DecideNoteAction,
+} from "../molecules/decide-note-action";
 
 export type RoomBoardCanvasProps = {
   notes: Note[];
@@ -97,7 +101,11 @@ export function RoomBoardCanvas({
     : [];
   const selectedNote = notes.find((note) => note.id === selectedNoteId);
   const canDecide = Boolean(
-    selectedNote && isHost && !isDisconnected && isResultStep(phase),
+    selectedNote &&
+      isHost &&
+      !isDisconnected &&
+      isResultStep(phase) &&
+      decision?.noteId !== selectedNote.id,
   );
 
   function handleBoardPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
@@ -174,8 +182,13 @@ export function RoomBoardCanvas({
             ))}
             {canDecide && selectedNote ? (
               <DecideNoteAction
-                x={selectedNote.x}
-                y={selectedNote.y}
+                x={
+                  selectedNote.x +
+                  NOTE_WIDTH -
+                  DECIDE_NOTE_ACTION_SIZE -
+                  DECIDE_NOTE_ACTION_INSET
+                }
+                y={selectedNote.y + DECIDE_NOTE_ACTION_INSET}
                 onDecide={() => onNoteDecide(selectedNote.id)}
               />
             ) : null}

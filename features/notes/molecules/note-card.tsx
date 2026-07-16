@@ -1,5 +1,6 @@
 "use client";
 
+import { Check } from "lucide-react";
 // 付箋1枚の表示用コンポーネント。データ層には一切依存せず、位置(x, y)や
 // 本文はすべてpropsで受け取り、変化はコールバックpropsで親へ通知するだけの
 // コンポーネントにする。状態の保持・永続化・リアルタイム配信は呼び出し側の責務。
@@ -211,8 +212,12 @@ export function NoteCard({
       }
     >
       {isDecided ? (
-        <span className="pointer-events-none absolute right-1 top-1 z-30 rounded bg-emerald-700 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-          取り組む課題
+        <span
+          role="status"
+          aria-label="取り組む課題に決定済み"
+          className="pointer-events-none absolute right-1 top-1 z-30 flex size-9 items-center justify-center rounded-full bg-emerald-700 text-white"
+        >
+          <Check aria-hidden="true" className="size-5" />
         </span>
       ) : null}
       <textarea

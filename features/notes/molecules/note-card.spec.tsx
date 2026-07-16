@@ -198,12 +198,14 @@ describe("NoteCard", () => {
       expect(getCard()).not.toHaveAttribute("data-selected");
     });
 
-    it("isDecided=true の付箋を強調し、決定バッジを表示する", () => {
+    it("isDecided=true の付箋を強調し、決定済みのstatusを表示する", () => {
       setup({ isDecided: true });
 
       expect(getCard()).toHaveAttribute("data-decided", "true");
       expect(getCard()).toHaveClass("ring-2");
-      expect(screen.getByText("取り組む課題")).toBeInTheDocument();
+      expect(
+        screen.getByRole("status", { name: "取り組む課題に決定済み" }),
+      ).toBeInTheDocument();
     });
   });
 
