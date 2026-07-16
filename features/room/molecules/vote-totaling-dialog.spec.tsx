@@ -53,7 +53,7 @@ describe("VoteTotalingDialog", () => {
 
     fireEvent.click(
       screen.getAllByRole("button", {
-        name: "この付箋を取り組む課題に決定",
+        name: "付箋 1を取り組む課題に決定",
       })[0],
     );
 

@@ -4,6 +4,7 @@ import type { ProtocolNote } from "@/contracts/room-protocol";
 import {
   buildDecision,
   buildMembers,
+  buildNote,
   buildNotes,
 } from "@/contracts/room-protocol.fixture";
 import {
@@ -187,12 +188,33 @@ describe("VoteTotalingPanel", () => {
 
     const decideButton = within(
       screen.getByTestId("vote-totaling-row-note-1"),
-    ).getByRole("button", { name: "この付箋を取り組む課題に決定" });
+    ).getByRole("button", { name: "付箋 1を取り組む課題に決定" });
     expect(decideButton).toHaveTextContent("決定する");
 
     fireEvent.click(decideButton);
 
     expect(onNoteDecide).toHaveBeenCalledWith("note-1");
+  });
+
+  it("付箋が無題（本文が空）のときは決定ボタンのaria-labelにフォールバック文言を使う", () => {
+    render(
+      <VoteTotalingPanel
+        isVotingComplete
+        members={buildMembers(1, ME)}
+        notes={[buildNote({ id: "note-1", content: "" })]}
+        decision={null}
+        isHost
+        isDisconnected={false}
+        onNoteDecide={vi.fn()}
+      />,
+    );
+
+    expect(
+      within(screen.getByTestId("vote-totaling-row-note-1")).getByRole(
+        "button",
+        { name: "無題の付箋を取り組む課題に決定" },
+      ),
+    ).toBeInTheDocument();
   });
 
   it.each([
@@ -216,7 +238,7 @@ describe("VoteTotalingPanel", () => {
 
     expect(
       screen.queryByRole("button", {
-        name: "この付箋を取り組む課題に決定",
+        name: "付箋 1を取り組む課題に決定",
       }),
     ).not.toBeInTheDocument();
   });
@@ -245,14 +267,14 @@ describe("VoteTotalingPanel", () => {
     ).toHaveTextContent("決定済み");
     expect(
       within(decidedRow).queryByRole("button", {
-        name: "この付箋を取り組む課題に決定",
+        name: "付箋 1を取り組む課題に決定",
       }),
     ).not.toBeInTheDocument();
 
     fireEvent.click(
       within(screen.getByTestId("vote-totaling-row-note-2")).getByRole(
         "button",
-        { name: "この付箋を取り組む課題に決定" },
+        { name: "付箋 2を取り組む課題に決定" },
       ),
     );
     expect(onNoteDecide).toHaveBeenCalledWith("note-2");

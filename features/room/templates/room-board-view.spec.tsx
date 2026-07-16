@@ -226,7 +226,7 @@ describe("RoomBoardView", () => {
 
     fireEvent.click(
       within(screen.getByRole("dialog")).getAllByRole("button", {
-        name: "この付箋を取り組む課題に決定",
+        name: "付箋 1を取り組む課題に決定",
       })[0],
     );
 
@@ -256,7 +256,7 @@ describe("RoomBoardView", () => {
 
     expect(
       within(screen.getByRole("dialog")).queryByRole("button", {
-        name: "この付箋を取り組む課題に決定",
+        name: "付箋 1を取り組む課題に決定",
       }),
     ).not.toBeInTheDocument();
   });

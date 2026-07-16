@@ -66,7 +66,7 @@ export function VoteTotalingRow({
             type="button"
             size="sm"
             variant="outline"
-            aria-label="この付箋を取り組む課題に決定"
+            aria-label={`${row.content || "無題の付箋"}を取り組む課題に決定`}
             onClick={onDecide}
           >
             決定する
