@@ -32,7 +32,7 @@ import {
   migrateRoomStorage,
   ROOM_DO_MIGRATIONS,
 } from "../room-do-migrations";
-import { filterVisible } from "../visibility";
+import { filterVisible, projectNoteForViewer } from "../visibility";
 import { RoomBroadcaster, type SocketAttachment } from "./broadcast";
 import { groupHandlers, listVisibleGroups } from "./groups";
 import type { HandlerCtx, MessageHandlers } from "./handler-context";
@@ -298,12 +298,18 @@ export class RoomDO extends DurableObject {
 
   // 接続直後に現在状態を丸ごと届ける（再接続の復帰パスも兼ねる）。
   private sendSnapshot(ws: WebSocket, userId: string): void {
+    const phase = getPhase(this.sql);
+    const notes = filterVisible(
+      { viewerId: userId },
+      listNotes(this.sql, userId),
+    ).map((note) => projectNoteForViewer({ viewerId: userId, phase }, note));
+
     this.broadcaster.sendTo(ws, {
       type: "snapshot",
-      notes: filterVisible({ viewerId: userId }, listNotes(this.sql, userId)),
+      notes,
       groups: listVisibleGroups(this.sql, userId),
       members: listMembers(this.sql),
-      phase: getPhase(this.sql),
+      phase,
       isHost: isHostUser(this.sql, userId),
       timer: getTimerState(this.sql),
       serverNow: Date.now(),

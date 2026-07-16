@@ -143,6 +143,19 @@ describe("NoteSchema", () => {
   it("visibility が無い付箋は拒否する", () => {
     expect(NoteSchema.safeParse(note).success).toBe(false);
   });
+
+  it("投票集計が未公開の付箋は count なしでも受け入れる", () => {
+    const result = NoteSchema.safeParse({
+      ...note,
+      visibility: "shared",
+      dotVotes: {
+        subjective: { votedByMe: true, ownCount: 1 },
+        objective: { votedByMe: false, ownCount: 0 },
+      },
+    });
+
+    expect(result.success).toBe(true);
+  });
 });
 
 describe("ServerMessageSchema", () => {

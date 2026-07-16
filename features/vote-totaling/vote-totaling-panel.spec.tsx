@@ -113,6 +113,34 @@ describe("calculateVoteTotaling", () => {
       "note-5",
     ]);
   });
+
+  it("count が未公開でも投票結果の入力として扱える", () => {
+    const [note] = buildNotes(1);
+    const result = calculateVoteTotaling({
+      notes: [
+        {
+          ...note,
+          dotVotes: {
+            subjective: { votedByMe: false, ownCount: 0 },
+            objective: { votedByMe: false, ownCount: 0 },
+          },
+        },
+      ],
+      memberCount: 1,
+      isVotingComplete: true,
+    });
+
+    expect(result.rows).toEqual([
+      {
+        noteId: note.id,
+        content: note.content,
+        subjectiveCount: 0,
+        objectiveCount: 0,
+        score: 0,
+        isSelectedChallenge: false,
+      },
+    ]);
+  });
 });
 
 describe("VoteTotalingPanel", () => {
