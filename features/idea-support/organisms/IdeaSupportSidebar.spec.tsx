@@ -13,7 +13,11 @@ describe("IdeaSupportSidebar", () => {
   it("閉じるボタンで発想支援コンテンツを非表示にする", () => {
     render(<IdeaSupportSidebar />);
 
-    fireEvent.click(screen.getByRole("button", { name: /close/i }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "発想支援を閉じる",
+      }),
+    );
 
     expect(
       screen.queryByText("オズボーンのチェックリスト"),
@@ -23,8 +27,17 @@ describe("IdeaSupportSidebar", () => {
   it("閉じた状態から開くボタンで再表示する", () => {
     render(<IdeaSupportSidebar />);
 
-    fireEvent.click(screen.getByRole("button", { name: /close/i }));
-    fireEvent.click(screen.getByRole("button", { name: "発想支援を開く" }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "発想支援を閉じる",
+      }),
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "発想支援を開く",
+      }),
+    );
 
     expect(screen.getByText("オズボーンのチェックリスト")).toBeInTheDocument();
   });
