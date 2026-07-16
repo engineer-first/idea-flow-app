@@ -129,7 +129,7 @@ jobs:
             exit 1
           fi
           for i in $(seq 1 10); do
-            if curl -fsS "$SITE_URL/api/health" | grep -q '"ok"\s*:\s*true'; then
+            if curl -fsS --connect-timeout 5 --max-time 10 "$SITE_URL/api/health" | grep -q '"ok"\s*:\s*true'; then
               echo "Health check passed: $SITE_URL/api/health"
               exit 0
             fi
