@@ -1,6 +1,6 @@
 # api-worker のローカル秘密（wrangler が workers/wrangler.jsonc と同じ場所から読む）。
 # コピーして workers/.dev.vars を作る（.dev.vars は gitignore 済み）:
 #   cp workers/.dev.vars.example workers/.dev.vars
-# 16文字以上・git 履歴の既知値でない任意の文字列にすること。
+# 32 バイト以上・git 履歴の既知値でない任意の文字列にすること。
 # Next 側（.env.local）の SESSION_SECRET と同じ値にすること。
 SESSION_SECRET=local-dev-secret-please-change-me-1234

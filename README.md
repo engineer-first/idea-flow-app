@@ -71,6 +71,9 @@ Google ログインを確認する場合は、Google Cloud Console で OAuth ク
 | `npm run new:room-do-migration -- 短い説明` | RoomDO migration の `.sql` スタブをタイムスタンプ付きで作成（例: `-- add-note-kind`）。コミットするのは `.sql` だけ（集約 `index.ts` は gitignore 済みの生成物で、`npm ci` / `test:workers` / `dev:api` などが自動再生成する） |
 | `npm run build`                             | Next.js 本番ビルド                                                                                                                                                                                                             |
 | `npm run build:cf`                          | Cloudflare Workers 向けビルド（OpenNext）                                                                                                                                                                                      |
+| `npm run deploy:api`                        | api-worker をデプロイ                                                                                                                                                                                                          |
+| `npm run deploy:app`                        | app-worker をビルド + デプロイ（api → app の順が必要な場合は `npm run deploy`）                                                                                                                                                |
+| `npm run deploy`                            | api → app の順で両方デプロイ                                                                                                                                                                                                   |
 | `npm run preview:cf`                        | Workers 向けビルドを workerd 上でローカル実行（2構成同時）                                                                                                                                                                     |
 | `npm run lint`                              | Biome による静的解析 (lint + format チェック)                                                                                                                                                                                  |
 | `npm run fix`                               | Biome の自動修正 (lint + format)                                                                                                                                                                                               |
@@ -81,10 +84,86 @@ Google ログインを確認する場合は、Google Cloud Console で OAuth ク
 
 ### デプロイ（Cloudflare）
 
-1. `wrangler d1 create idea-flow-lobby` で D1 を作成し、`workers/wrangler.jsonc` の `database_id` を置き換える
-2. `wrangler secret put SESSION_SECRET --config workers/wrangler.jsonc` で本番秘密鍵を設定する
-3. `npm run deploy:api` で api-worker をデプロイする（RoomDO migration の集約を再生成してから deploy する）
-4. `npm run build:cf && wrangler deploy` で Next.js ワーカーをデプロイする
+#### アーキテクチャ
+
+| Worker          | 設定ファイル             | 役割                                                         |
+| --------------- | ------------------------ | ------------------------------------------------------------ |
+| `idea-flow-app` | `wrangler.jsonc`         | UI（Next.js / OpenNext）+ `/api/*` を service binding で転送 |
+| `idea-flow-api` | `workers/wrangler.jsonc` | REST + WebSocket（D1 / RoomDO への唯一の入口）               |
+
+本番では api-worker を service binding で呼ぶため、`API_WORKER_URL` / `NEXT_PUBLIC_API_WORKER_URL` は**設定しない**（誤設定すると到達不能になる危険があります）。
+
+#### 必要な秘密・環境変数
+
+**api-worker (`idea-flow-api`)**
+
+| 名前             | 設定方法                                              | 備考                          |
+| ---------------- | ----------------------------------------------------- | ----------------------------- |
+| `SESSION_SECRET` | `wrangler secret put --config workers/wrangler.jsonc` | 32 バイト以上。app 側と同一値 |
+
+**app-worker (`idea-flow-app`)**
+
+| 名前                          | 種別                                                             | 備考                                                                                                                                                                                   |
+| ----------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SESSION_SECRET`              | `wrangler secret put`（root の `wrangler.jsonc` に対し実行）     | api 側と同一値                                                                                                                                                                         |
+| `GOOGLE_CLIENT_ID`            | `wrangler secret put`                                            | 本番ログイン用                                                                                                                                                                         |
+| `GOOGLE_CLIENT_SECRET`        | `wrangler secret put`                                            | 本番ログイン用                                                                                                                                                                         |
+| `NEXT_PUBLIC_SITE_URL`        | `wrangler.jsonc` の `vars` または `wrangler deploy` 時の `--var` | 本番 URL（例 `https://app.example.com`）。production では必須。招待 URL・OAuth redirect のベースになる。ビルド時に埋め込まれるため、デプロイ前の `build:cf` 時点で有効である必要がある |
+| `NEXT_PUBLIC_ENABLE_DEV_AUTH` | 設定しない                                                       | 本番では development 環境以外で自動無効                                                                                                                                                |
+| `NEXT_PUBLIC_API_WORKER_URL`  | **設定しない**                                                   | 本番は同一オリジン                                                                                                                                                                     |
+| `API_WORKER_URL`              | **設定しない**                                                   | 本番は service binding                                                                                                                                                                 |
+
+#### 初回デプロイ手順
+
+デプロイ順は **api → app**（service binding 先が先に存在する必要があるため）。
+
+```bash
+# 1. D1 作成 → 出力の database_id を workers/wrangler.jsonc に書く
+npx wrangler d1 create idea-flow-lobby
+
+# 2. D1 migration をリモート適用
+npx wrangler d1 migrations apply DB --remote --config workers/wrangler.jsonc
+
+# 3. 秘密生成（例）
+openssl rand -base64 48
+
+# 4. api-worker の秘密設定
+npx wrangler secret put SESSION_SECRET --config workers/wrangler.jsonc
+
+# 5. api-worker をデプロイ
+npm run deploy:api
+
+# 6. app-worker の秘密設定（root の wrangler.jsonc を使う）
+npx wrangler secret put SESSION_SECRET
+npx wrangler secret put GOOGLE_CLIENT_ID
+npx wrangler secret put GOOGLE_CLIENT_SECRET
+
+# 7. 本番 URL を指定してビルド + デプロイ
+export NEXT_PUBLIC_SITE_URL=https://idea-flow-app.<subdomain>.workers.dev
+npm run deploy:app
+```
+
+#### カスタムドメイン設定
+
+`idea-flow-app` にだけドメインを付ける（api は service binding で閉じる）。
+
+```bash
+# デプロイ時にドメインを指定
+npx wrangler deploy -c wrangler.jsonc --domains app.example.com
+```
+
+または Dashboard（Workers → idea-flow-app → Settings → Domains & Routes）から設定。
+
+Google OAuth のリダイレクト URI に `https://app.example.com/auth/callback` を追加する。
+ドメイン変更時は `NEXT_PUBLIC_SITE_URL` を更新して**再ビルド必須**。
+
+#### 動作確認
+
+1. トップ表示・Google ログイン
+2. ルーム作成 → 招待コード表示
+3. 別ブラウザ/シークレットで参加
+4. 付箋追加が双方にリアルタイム反映
+5. 退出・ホスト解散
 
 ### MSW (Mock Service Worker)
 

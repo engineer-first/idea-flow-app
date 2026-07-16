@@ -1,0 +1,774 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="IdeaFlow の Cloudflare 本番デプロイ構成図。2 Worker の runtime 経路、秘密の置き場所、デプロイ順、release ブランチ CI を1ページで俯瞰する。">
+<title>IdeaFlow — デプロイ構成図</title>
+<style>
+  :root {
+    --paper: #f6f3ec;
+    --paper-raised: #ffffff;
+    --ink: #1e2420;
+    --muted: #6e6a5c;
+    --line: #dbd4c4;
+    --accent: #0b6e5c;
+    --accent-soft: #dceee8;
+    --edge: #35507a;
+    --edge-soft: #e1e8f0;
+    --data: #a8681f;
+    --data-soft: #f3e4cc;
+    --core: #7a2f6b;
+    --core-soft: #f0e0ec;
+    --danger: #a33a2f;
+    --danger-soft: #f5e0dc;
+    --shadow: 0 1px 2px rgba(30, 36, 32, 0.06), 0 8px 24px -12px rgba(30, 36, 32, 0.14);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #12181a;
+      --paper-raised: #1a2224;
+      --ink: #e7e3d8;
+      --muted: #9b9686;
+      --line: rgba(255, 255, 255, 0.14);
+      --accent: #4fd9bb;
+      --accent-soft: rgba(79, 217, 187, 0.14);
+      --edge: #86abdd;
+      --edge-soft: rgba(134, 171, 221, 0.14);
+      --data: #d9a15c;
+      --data-soft: rgba(217, 161, 92, 0.14);
+      --core: #e0a0d0;
+      --core-soft: rgba(224, 160, 208, 0.14);
+      --danger: #f0a090;
+      --danger-soft: rgba(240, 160, 144, 0.14);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic Medium", "Segoe UI", system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono {
+    font-family: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  }
+  a { color: var(--accent); }
+  .masthead {
+    border-bottom: 1px solid var(--line);
+    padding: 2.75rem 2rem 2rem;
+    background: linear-gradient(180deg, var(--accent-soft) 0%, transparent 65%);
+  }
+  .masthead-inner { max-width: 1100px; margin: 0 auto; }
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin: 0 0 0.6rem;
+  }
+  h1.wordmark {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: clamp(1.8rem, 4vw, 2.4rem);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 0.55rem;
+  }
+  .wordmark .flow { color: var(--accent); }
+  .tagline {
+    max-width: 68ch;
+    color: var(--muted);
+    margin: 0 0 1.35rem;
+    font-size: 1.02rem;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .chip {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+    padding: 0.3rem 0.65rem;
+    border-radius: 5px;
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+  }
+  .chip.meta { color: var(--muted); border-style: dashed; }
+  .layout {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2.5rem 2rem 6rem;
+  }
+  section { margin-bottom: 3.5rem; scroll-margin-top: 1.5rem; }
+  section h2 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin: 0 0 0.35rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+  }
+  section h2 .num {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+    color: var(--accent);
+  }
+  section > p.lede {
+    color: var(--muted);
+    max-width: 72ch;
+    margin: 0 0 1.5rem;
+  }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.88em;
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 0.05em 0.4em;
+  }
+
+  /* ---------- runtime diagram ---------- */
+  .runtime {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 1.5rem 0 2rem;
+  }
+  .box {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1rem 1.15rem;
+    box-shadow: var(--shadow);
+  }
+  .box .role {
+    font-weight: 700;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+  }
+  .box .entry {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-bottom: 0.35rem;
+  }
+  .box .note {
+    font-size: 0.86rem;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+  .box .url {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+    margin-top: 0.55rem;
+    padding: 0.35rem 0.55rem;
+    background: var(--accent-soft);
+    border-radius: 5px;
+    color: var(--accent);
+    word-break: break-all;
+  }
+  .swatch {
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 2px;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  .swatch.browser { background: var(--muted); }
+  .swatch.app { background: var(--edge); }
+  .swatch.api { background: var(--accent); }
+  .swatch.d1 { background: var(--data); }
+  .swatch.do { background: var(--core); }
+  .box.app { border-left: 4px solid var(--edge); }
+  .box.api { border-left: 4px solid var(--accent); }
+  .box.store-d1 { border-left: 4px solid var(--data); background: var(--data-soft); }
+  .box.store-do { border-left: 4px solid var(--core); background: var(--core-soft); }
+
+  .conn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.35rem 0;
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  .conn .arr { font-size: 0.9rem; line-height: 1; color: var(--line); }
+  .conn .lbl {
+    background: var(--paper);
+    padding: 0.1rem 0.5rem;
+    border: 1px dashed var(--line);
+    border-radius: 999px;
+    margin: 0.15rem 0;
+  }
+
+  .children {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-top: 0.85rem;
+  }
+  .bindings {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.55rem;
+  }
+  .binding {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.72rem;
+    padding: 0.2rem 0.45rem;
+    border-radius: 4px;
+    background: var(--edge-soft);
+    color: var(--edge);
+    border: 1px solid var(--line);
+  }
+  .binding.secret {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
+
+  /* ---------- pipeline ---------- */
+  .pipeline {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin: 1.5rem 0 1rem;
+    align-items: stretch;
+  }
+  .step {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 0.85rem 0.75rem;
+    position: relative;
+    box-shadow: var(--shadow);
+  }
+  .step .n {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.7rem;
+    color: var(--accent);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+  .step .title {
+    font-weight: 700;
+    font-size: 0.88rem;
+    margin: 0.25rem 0 0.35rem;
+  }
+  .step .cmd {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.68rem;
+    color: var(--muted);
+    line-height: 1.45;
+    word-break: break-word;
+  }
+  .step.api { border-top: 3px solid var(--accent); }
+  .step.app { border-top: 3px solid var(--edge); }
+  .step.gate { border-top: 3px solid var(--data); }
+  .step-arrow {
+    display: none;
+  }
+  @media (min-width: 900px) {
+    .pipeline { gap: 0.35rem; }
+  }
+
+  /* ---------- env matrix ---------- */
+  .table-wrap { overflow-x: auto; margin: 1.25rem 0 1.5rem; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.85rem;
+    min-width: 36rem;
+  }
+  th {
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 1.5px solid var(--line);
+    padding: 0.5rem 0.75rem 0.5rem 0;
+  }
+  td {
+    border-bottom: 1px solid var(--line);
+    padding: 0.65rem 0.75rem 0.65rem 0;
+    vertical-align: top;
+  }
+  td.mono, th.mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.8rem; }
+  .badge {
+    display: inline-block;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.68rem;
+    padding: 0.12rem 0.4rem;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+  .badge.yes { background: var(--accent-soft); color: var(--accent); }
+  .badge.no { background: var(--danger-soft); color: var(--danger); }
+  .badge.opt { background: var(--data-soft); color: var(--data); }
+
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 0.85rem 1rem;
+    border-radius: 0 8px 8px 0;
+    margin: 1.25rem 0;
+    font-size: 0.9rem;
+  }
+  .callout.warn {
+    border-left-color: var(--danger);
+    background: var(--danger-soft);
+  }
+  .callout b { display: block; margin-bottom: 0.2rem; }
+
+  /* ---------- CI flow ---------- */
+  .ci-flow {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    margin: 1.25rem 0;
+  }
+  .ci-row {
+    display: grid;
+    grid-template-columns: 8.5rem 1fr;
+    gap: 0.75rem;
+    align-items: stretch;
+  }
+  .ci-label {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 0.75rem 0.85rem;
+    border-radius: 8px;
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+  }
+  .ci-body {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-size: 0.86rem;
+    color: var(--muted);
+  }
+  .ci-body strong { color: var(--ink); }
+  .ci-body .mono { font-size: 0.8rem; }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.25rem;
+    margin: 0 0 1.25rem;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
+
+  footer.doc-footer {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 2rem 3rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+    border-top: 1px solid var(--line);
+    padding-top: 1.5rem;
+  }
+
+  @media (max-width: 800px) {
+    .children { grid-template-columns: 1fr; }
+    .pipeline { grid-template-columns: 1fr; }
+    .ci-row { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+  }
+</style>
+</head>
+<body>
+<header class="masthead">
+  <div class="masthead-inner">
+    <p class="eyebrow">deploy architecture</p>
+    <h1 class="wordmark">Idea<span class="flow">Flow</span> — デプロイ構成図</h1>
+    <p class="tagline">
+      本番は 2 Worker + D1 + RoomDO。ブラウザは同一オリジンのまま、
+      app-worker が <code>/api/*</code> を service binding で api-worker へ転送する。
+    </p>
+    <div class="chips">
+      <span class="chip">idea-flow-app</span>
+      <span class="chip">idea-flow-api</span>
+      <span class="chip">D1 lobby</span>
+      <span class="chip">RoomDO</span>
+      <span class="chip">OpenNext</span>
+      <span class="chip meta">workers.dev live</span>
+      <span class="chip meta">2026-07-16</span>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <section id="runtime">
+    <h2><span class="num">§1</span>ランタイム構成（本番）</h2>
+    <p class="lede">
+      リクエストが辿る経路。カスタムドメイン未設定時は <code>*.prompt-tem.workers.dev</code>。
+      api の workers.dev は直叩き可能だが、ブラウザは app 経由の同一オリジンだけを使う。
+    </p>
+
+    <div class="legend">
+      <span><span class="swatch browser"></span>クライアント</span>
+      <span><span class="swatch app"></span>UI Worker</span>
+      <span><span class="swatch api"></span>API Worker</span>
+      <span><span class="swatch d1"></span>D1</span>
+      <span><span class="swatch do"></span>Durable Object</span>
+    </div>
+
+    <div class="runtime">
+      <div class="box">
+        <div class="role"><span class="swatch browser"></span>ブラウザ</div>
+        <div class="note">
+          HTTPS で画面、REST / WebSocket は同一オリジンの <code>/api/*</code>。
+          セッション Cookie（HttpOnly）がそのまま流れる。
+        </div>
+      </div>
+
+      <div class="conn">
+        <span class="arr">│</span>
+        <span class="lbl">https / wss · 同一オリジン</span>
+        <span class="arr">▼</span>
+      </div>
+
+      <div class="box app">
+        <div class="role"><span class="swatch app"></span>idea-flow-app</div>
+        <div class="entry">wrangler.jsonc · workers/app-worker.ts</div>
+        <div class="note">
+          OpenNext（Next.js）+ Assets。
+          <code>/api/*</code> 以外 → Next ハンドラ / 静的配信。
+          <code>/api/*</code> → <code>env.API_WORKER.fetch</code> で丸ごと転送（WS 含む）。
+        </div>
+        <div class="bindings">
+          <span class="binding">ASSETS</span>
+          <span class="binding">API_WORKER → idea-flow-api</span>
+          <span class="binding secret">SESSION_SECRET</span>
+          <span class="binding secret">GOOGLE_*</span>
+        </div>
+        <div class="url">https://idea-flow-app.prompt-tem.workers.dev</div>
+      </div>
+
+      <div class="conn">
+        <span class="arr">│</span>
+        <span class="lbl">service binding · 公衆ネット非経由</span>
+        <span class="arr">▼</span>
+      </div>
+
+      <div class="box api">
+        <div class="role"><span class="swatch api"></span>idea-flow-api</div>
+        <div class="entry">workers/wrangler.jsonc · workers/api-worker.ts</div>
+        <div class="note">
+          D1 / RoomDO への唯一の入口。セッション検証 + zod 入力検証。
+          Next サーバー側は <code>apiFetch</code> が同じ binding を使う（本番では <code>API_WORKER_URL</code> 未設定）。
+        </div>
+        <div class="bindings">
+          <span class="binding">DB → idea-flow-lobby</span>
+          <span class="binding">ROOM_DO → RoomDO</span>
+          <span class="binding secret">SESSION_SECRET</span>
+        </div>
+        <div class="url">https://idea-flow-api.prompt-tem.workers.dev（直公開。通常は app 経由）</div>
+
+        <div class="children">
+          <div class="box store-d1">
+            <div class="role"><span class="swatch d1"></span>D1 · idea-flow-lobby</div>
+            <div class="note">users / rooms。招待コード → ルーム解決のディレクトリのみ。</div>
+            <div class="entry">database_id: 8e57430c-…</div>
+          </div>
+          <div class="box store-do">
+            <div class="role"><span class="swatch do"></span>RoomDO（SQLite）</div>
+            <div class="note">1 ルーム = 1 インスタンス。members / notes / 投票 / Hibernatable WS。</div>
+            <div class="entry">配信は visibleTo() 経由</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <b>本番で置かないもの</b>
+      <code>API_WORKER_URL</code> と <code>NEXT_PUBLIC_API_WORKER_URL</code>。
+      ローカル専用。誤設定すると binding より HTTP が優先され、同一オリジン設計が壊れる。
+    </div>
+  </section>
+
+  <section id="paths">
+    <h2><span class="num">§2</span>通信経路の対応表</h2>
+    <p class="lede">誰が誰をどう呼ぶか。ローカルと本番で経路が分岐する箇所だけ意識する。</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>経路</th>
+            <th>本番</th>
+            <th>ローカル</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ブラウザ → UI</td>
+            <td>HTTPS（OpenNext / Assets）</td>
+            <td><code>next dev :3000</code></td>
+          </tr>
+          <tr>
+            <td>ブラウザ → REST/WS</td>
+            <td>同一オリジン <code>/api/*</code> → service binding</td>
+            <td><code>NEXT_PUBLIC_API_WORKER_URL=http://localhost:8787</code></td>
+          </tr>
+          <tr>
+            <td>Next Server → API</td>
+            <td><code>getCloudflareContext().env.API_WORKER</code></td>
+            <td><code>API_WORKER_URL=http://localhost:8787</code></td>
+          </tr>
+          <tr>
+            <td>ヘルスチェック</td>
+            <td><code>GET /api/health</code>（app 経由 = proxy → api）</td>
+            <td><code>npm run smoke</code>（preview 相当）</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="secrets">
+    <h2><span class="num">§3</span>秘密・環境変数の置き場所</h2>
+    <p class="lede">
+      vars に秘密を載せない。<code>SESSION_SECRET</code> は両 Worker で同一値（32 バイト以上）。
+      <code>NEXT_PUBLIC_*</code> はビルド時に埋め込まれるため、ドメイン変更時は再ビルド必須。
+    </p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>名前</th>
+            <th>app</th>
+            <th>api</th>
+            <th>設定方法</th>
+            <th>備考</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">SESSION_SECRET</td>
+            <td><span class="badge yes">secret</span></td>
+            <td><span class="badge yes">secret</span></td>
+            <td class="mono">wrangler secret put</td>
+            <td>両側同一。既知漏洩値はコードで拒否</td>
+          </tr>
+          <tr>
+            <td class="mono">GOOGLE_CLIENT_ID</td>
+            <td><span class="badge yes">secret</span></td>
+            <td><span class="badge no">—</span></td>
+            <td class="mono">wrangler secret put</td>
+            <td>本番ログイン用（未設定でも UI は起動可）</td>
+          </tr>
+          <tr>
+            <td class="mono">GOOGLE_CLIENT_SECRET</td>
+            <td><span class="badge yes">secret</span></td>
+            <td><span class="badge no">—</span></td>
+            <td class="mono">wrangler secret put</td>
+            <td>同上</td>
+          </tr>
+          <tr>
+            <td class="mono">NEXT_PUBLIC_SITE_URL</td>
+            <td><span class="badge yes">build env</span></td>
+            <td><span class="badge no">—</span></td>
+            <td>build 前の env / GH vars</td>
+            <td>OAuth redirect・招待 URL のベース。production で必須</td>
+          </tr>
+          <tr>
+            <td class="mono">API_WORKER_URL</td>
+            <td><span class="badge no">禁止</span></td>
+            <td><span class="badge no">—</span></td>
+            <td>—</td>
+            <td>本番は binding。設定すると HTTP 優先で事故</td>
+          </tr>
+          <tr>
+            <td class="mono">NEXT_PUBLIC_API_WORKER_URL</td>
+            <td><span class="badge no">禁止</span></td>
+            <td><span class="badge no">—</span></td>
+            <td>—</td>
+            <td>本番は同一オリジン WS</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="order">
+    <h2><span class="num">§4</span>初回・手動デプロイ順</h2>
+    <p class="lede">
+      順は固定: <strong>api → app</strong>（service binding 先が先に存在する）。
+      スクリプトは <code>npm run deploy</code>（api → app）/ <code>deploy:api</code> / <code>deploy:app</code>。
+    </p>
+
+    <div class="pipeline">
+      <div class="step gate">
+        <div class="n">STEP 1</div>
+        <div class="title">D1 作成</div>
+        <div class="cmd">wrangler d1 create idea-flow-lobby<br>→ database_id を wrangler に反映</div>
+      </div>
+      <div class="step gate">
+        <div class="n">STEP 2</div>
+        <div class="title">Remote migrate</div>
+        <div class="cmd">wrangler d1 migrations apply DB --remote --config workers/wrangler.jsonc</div>
+      </div>
+      <div class="step api">
+        <div class="n">STEP 3</div>
+        <div class="title">api secret + deploy</div>
+        <div class="cmd">secret put SESSION_SECRET<br>npm run deploy:api</div>
+      </div>
+      <div class="step app">
+        <div class="n">STEP 4</div>
+        <div class="title">app secret + build</div>
+        <div class="cmd">secret put（SESSION / Google）<br>NEXT_PUBLIC_SITE_URL=…</div>
+      </div>
+      <div class="step app">
+        <div class="n">STEP 5</div>
+        <div class="title">app deploy</div>
+        <div class="cmd">npm run deploy:app<br>= build:cf && wrangler deploy</div>
+      </div>
+    </div>
+
+    <div class="callout warn">
+      <b>Durable Objects は Workers Paid が実質前提</b>
+      Free プランでは RoomDO を本番運用できない。ハッカソン規模でも課金確認が必要。
+    </div>
+  </section>
+
+  <section id="cicd">
+    <h2><span class="num">§5</span>継続デプロイ（release）</h2>
+    <p class="lede">
+      <code>feature/* → develop</code>（開発）/ <code>develop → release</code>（本番トリガ）。
+      PR は <code>ci.yml</code> のみ。Worker 本番デプロイは <code>deploy.yml</code>（push to <code>release</code>）。
+    </p>
+
+    <div class="ci-flow">
+      <div class="ci-row">
+        <div class="ci-label">gate</div>
+        <div class="ci-body">
+          <strong>品質ゲート</strong> — lint / boundaries / typecheck / migrations 不変 / unit + workers テスト / <code>build:cf</code> / <code>smoke</code>
+        </div>
+      </div>
+      <div class="ci-row">
+        <div class="ci-label" style="border-left: 3px solid var(--accent);">deploy-api</div>
+        <div class="ci-body">
+          <strong>D1 remote migrate（冪等）→ <span class="mono">npm run deploy:api</span></strong>
+        </div>
+      </div>
+      <div class="ci-row">
+        <div class="ci-label" style="border-left: 3px solid var(--edge);">deploy-app</div>
+        <div class="ci-body">
+          <strong><span class="mono">npm run deploy:app</span></strong>（env: <span class="mono">NEXT_PUBLIC_SITE_URL</span>）
+        </div>
+      </div>
+      <div class="ci-row">
+        <div class="ci-label">health</div>
+        <div class="ci-body">
+          <strong><span class="mono">GET $SITE_URL/api/health</span></strong> — proxy 経路の疎通（Server Action 経路はブラウザ E2E で確認）
+        </div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>GitHub 設定</th><th>用途</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">secrets.CLOUDFLARE_API_TOKEN</td>
+            <td>Workers / D1 編集権限</td>
+          </tr>
+          <tr>
+            <td class="mono">secrets.CLOUDFLARE_ACCOUNT_ID</td>
+            <td>アカウント ID</td>
+          </tr>
+          <tr>
+            <td class="mono">vars.NEXT_PUBLIC_SITE_URL</td>
+            <td>公開 URL（ビルド焼き込み + health チェック）</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout">
+      <b>Worker の SESSION_SECRET / Google は Actions から毎回 put しない</b>
+      初回手動（または Dashboard）で維持。ローテ時だけ人手で両 Worker を同時更新。
+    </div>
+  </section>
+
+  <section id="domain">
+    <h2><span class="num">§6</span>カスタムドメイン（任意・後続）</h2>
+    <p class="lede">
+      同一オリジンのため <strong>app にだけ</strong> ドメインを付ける。api は service binding で閉じるので公開 URL 不要。
+    </p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>作業</th><th>内容</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>DNS</td>
+            <td>ドメインを Cloudflare に接続（NS 切替 or Registrar）</td>
+          </tr>
+          <tr>
+            <td>Worker ルート</td>
+            <td class="mono">wrangler deploy -c wrangler.jsonc --domains app.example.com</td>
+          </tr>
+          <tr>
+            <td>OAuth</td>
+            <td class="mono">https://app.example.com/auth/callback を Google Console に追加</td>
+          </tr>
+          <tr>
+            <td>SITE_URL</td>
+            <td><code>NEXT_PUBLIC_SITE_URL</code> を新 URL にして再ビルド + 再デプロイ</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="checklist">
+    <h2><span class="num">§7</span>動作確認チェックリスト</h2>
+    <p class="lede">health は proxy 経路のみ。ログイン〜WS は Server Action / binding / RoomDO まで含む。</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>#</th><th>確認</th><th>期待</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td class="mono">GET /api/health</td><td><code>{"ok":true}</code></td></tr>
+          <tr><td>2</td><td>トップ → ログイン画面</td><td>307 → /login、Google ボタン表示</td></tr>
+          <tr><td>3</td><td>Google ログイン（secret 設定後）</td><td>セッション Cookie 発行・/home</td></tr>
+          <tr><td>4</td><td>ルーム作成</td><td>招待コード表示</td></tr>
+          <tr><td>5</td><td>別ブラウザで参加</td><td>メンバー一覧に反映</td></tr>
+          <tr><td>6</td><td>付箋追加</td><td>双方にリアルタイム反映（WS）</td></tr>
+          <tr><td>7</td><td>退出・ホスト解散</td><td>状態が権威どおり更新</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<footer class="doc-footer">
+  実デプロイ（idea-flow-app / idea-flow-api · prompt-tem.workers.dev）と
+  wrangler.jsonc / app-worker.ts / api-client.ts / deploy.yml / README に基づく。
+  関連: <a href="../architecture/">構成 &amp; デプロイ概観</a> ·
+  <a href="../cloudflare-map/">Cloudflare の地図</a>
+</footer>
+</body>
+</html>
