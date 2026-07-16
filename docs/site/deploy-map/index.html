@@ -652,7 +652,9 @@
     <h2><span class="num">§5</span>継続デプロイ（release）</h2>
     <p class="lede">
       <code>feature/* → develop</code>（開発）/ <code>develop → release</code>（本番トリガ）。
+      <code>release</code> への push または merge で <code>deploy.yml</code> が自動実行される。
       PR は <code>ci.yml</code> のみ。Worker 本番デプロイは <code>deploy.yml</code>（push to <code>release</code>）。
+      手動デプロイは <code>npm run deploy</code> = D1 remote migrate → api → app（CI と同じ順）。
     </p>
 
     <div class="ci-flow">
