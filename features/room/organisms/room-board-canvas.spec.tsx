@@ -129,6 +129,12 @@ describe("RoomBoardCanvas", () => {
     expect(screen.getByRole("button", { name: "付箋を追加" })).toBeDisabled();
   });
 
+  it("発想支援サイドバーを表示する", () => {
+    setup();
+
+    expect(screen.getByText("Inspiration Tools")).toBeInTheDocument();
+  });
+
   describe("決定操作", () => {
     it("ホストが結果ステップで選択した未決定の付箋右上に決定操作を表示し、押下を通知する", () => {
       const onNoteDecide = vi.fn();
