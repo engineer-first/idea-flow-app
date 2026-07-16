@@ -173,6 +173,7 @@ function connectWithSnapshot(
       members: [],
       phase: options?.phase ?? buildPhaseStep(1),
       isHost: options?.isHost ?? true,
+      decision: null,
       timer: { status: "idle" },
       serverNow: Date.now(),
     }),
@@ -215,6 +216,7 @@ describe("メンバー参加・退出の通知", () => {
         ],
         phase: buildPhaseStep(1),
         isHost: true,
+        decision: null,
         timer: { status: "idle" },
         serverNow: Date.now(),
       }),
@@ -366,6 +368,7 @@ describe("サーバーメッセージ → 画面反映", () => {
         members: [],
         phase: buildPhaseStep(5),
         isHost: true,
+        decision: null,
         timer: { status: "idle" },
         serverNow: Date.now(),
       }),
@@ -404,6 +407,36 @@ describe("サーバーメッセージ → 画面反映", () => {
   it("snapshot の付箋がボードに描画される", () => {
     connectWithSnapshot([protocolNote()]);
     expect(screen.getByDisplayValue("最初の付箋")).toBeInTheDocument();
+  });
+
+  it("結果ステップのホストが付箋を決定すると note:decide を送信する", () => {
+    const { socket } = connectWithSnapshot([protocolNote()], {
+      phase: buildPhaseStep(5),
+      isHost: true,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
+    const card = screen.getByTestId("note-card");
+    const surface = within(card).getByRole("button", { name: "付箋" });
+    fireEvent.pointerDown(surface, {
+      pointerId: 1,
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.pointerUp(surface, {
+      pointerId: 1,
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "この付箋を取り組む課題に決定",
+      }),
+    );
+
+    expect(socket.sent).toContain(
+      JSON.stringify({ type: "note:decide", noteId: NOTE_ID }),
+    );
   });
 
   it("note:inserted で付箋が追加される", () => {

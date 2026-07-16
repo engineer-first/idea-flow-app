@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { RoomPhase } from "@/contracts/phase";
 import { buildLobbyPhase, buildPhaseStep } from "@/contracts/phase.fixture";
 import type { ProtocolMember, ServerMessage } from "@/contracts/room-protocol";
+import { buildDecision } from "@/contracts/room-protocol.fixture";
 import {
+  applyDecisionServerMessage,
   applyMemberServerMessage,
   applyPhaseServerMessage,
   applyTimerServerMessage,
@@ -28,6 +30,7 @@ describe("applyMemberServerMessage", () => {
       members: [A, B],
       phase: LOBBY,
       isHost: true,
+      decision: null,
       timer: { status: "idle" },
       serverNow: 1_000,
     };
@@ -84,6 +87,16 @@ describe("applyMemberServerMessage", () => {
     const message: ServerMessage = {
       type: "phase:updated",
       phase: buildPhaseStep(1),
+    };
+    expect(applyMemberServerMessage([A], message)).toEqual([A]);
+  });
+
+  it("decision:updated は members を変えない", () => {
+    const message: ServerMessage = {
+      type: "decision:updated",
+      phase: 1,
+      noteId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      decidedBy: A.userId,
     };
     expect(applyMemberServerMessage([A], message)).toEqual([A]);
   });
@@ -160,6 +173,18 @@ describe("applyPhaseServerMessage", () => {
     );
   });
 
+  it("decision:updated は phase を変えない", () => {
+    const message: ServerMessage = {
+      type: "decision:updated",
+      phase: 1,
+      noteId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      decidedBy: A.userId,
+    };
+    expect(applyPhaseServerMessage(buildPhaseStep(5), message)).toEqual(
+      buildPhaseStep(5),
+    );
+  });
+
   it("snapshot.phase で再接続後の進行状態を復元する", () => {
     const message: ServerMessage = {
       type: "snapshot",
@@ -167,6 +192,7 @@ describe("applyPhaseServerMessage", () => {
       members: [A],
       phase: buildPhaseStep(1),
       isHost: true,
+      decision: null,
       timer: { status: "running", endsAt: 10_000, durationMs: 10_000 },
       serverNow: 1_000,
     };
@@ -195,6 +221,7 @@ describe("applyTimerServerMessage", () => {
       members: [A],
       phase: buildPhaseStep(1),
       isHost: true,
+      decision: null,
       timer: { status: "running", endsAt: 10_000, durationMs: 10_000 },
       serverNow: 1_000,
     };
@@ -221,5 +248,51 @@ describe("applyTimerServerMessage", () => {
         1_850,
       ),
     ).toEqual({ timer: updated.timer, serverOffsetMs: 150 });
+  });
+});
+
+describe("applyDecisionServerMessage", () => {
+  const decision = buildDecision({ decidedBy: A.userId });
+
+  it("decision:updated で最新の決定を反映する", () => {
+    expect(
+      applyDecisionServerMessage(null, {
+        type: "decision:updated",
+        ...decision,
+      }),
+    ).toEqual(decision);
+  });
+
+  it("snapshot の決定状態で再接続後の表示を復元する", () => {
+    expect(
+      applyDecisionServerMessage(null, {
+        type: "snapshot",
+        notes: [],
+        members: [A],
+        phase: buildPhaseStep(5),
+        isHost: true,
+        decision,
+        timer: { status: "idle" },
+        serverNow: 1_000,
+      }),
+    ).toEqual(decision);
+  });
+
+  it("phase:updated で前フェーズの決定をクリアする", () => {
+    expect(
+      applyDecisionServerMessage(decision, {
+        type: "phase:updated",
+        phase: buildPhaseStep(2),
+      }),
+    ).toBeNull();
+  });
+
+  it("決定に関係しないメッセージでは現在の決定を維持する", () => {
+    expect(
+      applyDecisionServerMessage(decision, {
+        type: "member_joined",
+        member: B,
+      }),
+    ).toEqual(decision);
   });
 });

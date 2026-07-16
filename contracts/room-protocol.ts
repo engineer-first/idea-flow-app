@@ -112,6 +112,13 @@ export const MemberSchema = z.object({
 });
 export type ProtocolMember = z.infer<typeof MemberSchema>;
 
+export const DecisionSchema = z.object({
+  phase: z.number().int().min(1).max(3),
+  noteId: z.string().uuid(),
+  decidedBy: z.string().uuid(),
+});
+export type Decision = z.infer<typeof DecisionSchema>;
+
 const NotePositionSchema = {
   x: z.number().finite().min(0).max(BOARD_WIDTH),
   y: z.number().finite().min(0).max(BOARD_HEIGHT),
@@ -172,6 +179,10 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
     noteId: z.string().uuid(),
     kind: DotVoteKindSchema,
   }),
+  z.object({
+    type: z.literal("note:decide"),
+    noteId: z.string().uuid(),
+  }),
   // ロビーから課題整理 Step 1-1 へ。ホストのみ。
   z.object({ type: z.literal("start_phase") }),
   // 課題整理の次ステップへ。ホストのみ。
@@ -211,6 +222,7 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
     members: z.array(MemberSchema),
     phase: RoomPhaseSchema,
     isHost: z.boolean(),
+    decision: DecisionSchema.nullable(),
     timer: TimerStateSchema,
     serverNow: TimerMillisecondsSchema,
   }),
@@ -244,6 +256,7 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
     type: z.literal("phase:updated"),
     phase: RoomPhaseSchema,
   }),
+  z.object({ type: z.literal("decision:updated"), ...DecisionSchema.shape }),
   z.object({
     type: z.literal("timer:updated"),
     timer: TimerStateSchema,

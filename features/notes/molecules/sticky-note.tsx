@@ -9,6 +9,7 @@ export type StickyNoteProps = {
   noteId: string;
   isLifted?: boolean;
   isSelected?: boolean;
+  isDecided?: boolean;
   color?: NoteColor;
   children: React.ReactNode;
   className?: string;
@@ -22,6 +23,7 @@ export function StickyNote({
   noteId,
   isLifted = false,
   isSelected = false,
+  isDecided = false,
   color = "yellow",
   children,
   className,
@@ -34,12 +36,14 @@ export function StickyNote({
       data-slot="sticky-note"
       data-testid={testId}
       data-selected={isSelected || undefined}
+      data-decided={isDecided || undefined}
       data-editing={dataEditing || undefined}
       className={cn(
-        "isolate flex flex-col overflow-hidden rounded-[2px]",
+        "relative isolate flex flex-col overflow-hidden rounded-[2px]",
         isSelected
           ? "outline-2 outline-blue-500 dark:outline-blue-400"
           : "outline-none",
+        isDecided ? "ring-2 ring-emerald-500 ring-offset-2" : "",
         className,
       )}
       style={{

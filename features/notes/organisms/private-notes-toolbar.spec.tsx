@@ -120,4 +120,25 @@ describe("PrivateNotesToolbar", () => {
     expect(surface).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByRole("textbox")).toHaveAttribute("readonly");
   });
+
+  it("editingDisabled中はマイ付箋の編集開始を無効化する", () => {
+    const props = {
+      notes: [buildNote({ visibility: "private", content: "非公開の考え" })],
+      disabled: false,
+      editingDisabled: true,
+      selectedNoteId: "note-1",
+      onSelect: vi.fn(),
+      onAdd: vi.fn(),
+      onContentChange: vi.fn(),
+      onDelete: vi.fn(),
+      onDragStart: vi.fn(),
+    };
+    render(<PrivateNotesToolbar {...props} />);
+
+    const surface = screen.getByRole("button", { name: "付箋" });
+    fireEvent.pointerDown(surface, { pointerId: 1 });
+    fireEvent.pointerUp(surface, { pointerId: 1 });
+
+    expect(screen.getByRole("textbox")).toHaveAttribute("readonly");
+  });
 });

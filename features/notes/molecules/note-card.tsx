@@ -1,5 +1,6 @@
 "use client";
 
+import { Check } from "lucide-react";
 // 付箋1枚の表示用コンポーネント。データ層には一切依存せず、位置(x, y)や
 // 本文はすべてpropsで受け取り、変化はコールバックpropsで親へ通知するだけの
 // コンポーネントにする。状態の保持・永続化・リアルタイム配信は呼び出し側の責務。
@@ -23,6 +24,8 @@ export type NoteCardProps = {
   // 自分自身が現在ドラッグ中かどうか。trueの間は影を深くして「持ち上げた」見た目にする。
   isOwnDrag: boolean;
   isSelected: boolean;
+  editingDisabled?: boolean;
+  isDecided?: boolean;
   // WebSocket未接続時（connecting/closed）に親から渡す。true の間は選択・
   // ドラッグ・編集開始・削除を無効化する。room-client.send() は未openだと
   // メッセージを黙って破棄するため、UI操作自体を止めないと「入力したのに
@@ -57,6 +60,8 @@ export function NoteCard({
   note,
   isOwnDrag,
   isSelected,
+  editingDisabled = false,
+  isDecided = false,
   disabled = false,
   onSelect,
   onDragStart,
@@ -99,6 +104,15 @@ export function NoteCard({
       setLocalContent(note.content);
     }
   }, [disabled, isEditing, note.content]);
+
+  // 結果ステップへ切り替わりeditingDisabledになったら、編集中でも
+  // 未送信の下書きを送らずに編集を強制終了する（disabledと同じ二重の安全策）。
+  useEffect(() => {
+    if (editingDisabled && isEditing) {
+      setIsEditing(false);
+      setLocalContent(note.content);
+    }
+  }, [editingDisabled, isEditing, note.content]);
 
   // 状態に応じてフォーカスを移す。サーフェスにフォーカスがないと
   // Backspace削除などのキー操作を受け取れない。
@@ -160,7 +174,7 @@ export function NoteCard({
     if (!origin) {
       return;
     }
-    if (origin.wasSelected) {
+    if (origin.wasSelected && !editingDisabled) {
       setIsEditing(true);
     }
   }
@@ -174,7 +188,7 @@ export function NoteCard({
       onDelete(note.id);
       return;
     }
-    if (event.key === "Enter") {
+    if (event.key === "Enter" && !editingDisabled) {
       event.preventDefault();
       setIsEditing(true);
     }
@@ -185,6 +199,7 @@ export function NoteCard({
       noteId={note.id}
       isLifted={isOwnDrag}
       isSelected={isSelected}
+      isDecided={isDecided}
       color={note.color}
       testId="note-card"
       data-editing={isEditing || undefined}
@@ -196,6 +211,15 @@ export function NoteCard({
         }
       }
     >
+      {isDecided ? (
+        <span
+          role="status"
+          aria-label="取り組む課題に決定済み"
+          className="pointer-events-none absolute right-1 top-1 z-30 flex size-9 items-center justify-center rounded-full bg-emerald-700 text-white"
+        >
+          <Check aria-hidden="true" className="size-5" />
+        </span>
+      ) : null}
       <textarea
         ref={textareaRef}
         value={localContent}
@@ -207,7 +231,7 @@ export function NoteCard({
         onChange={(event) => setLocalContent(event.target.value)}
         onBlur={(event) => {
           setIsEditing(false);
-          if (disabled) {
+          if (disabled || editingDisabled) {
             return;
           }
           onContentChange(note.id, event.target.value);

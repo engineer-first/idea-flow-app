@@ -34,6 +34,8 @@ import {
 } from "../room-do-migrations";
 import { filterVisible, projectNoteForViewer } from "../visibility";
 import { RoomBroadcaster, type SocketAttachment } from "./broadcast";
+import { decisionHandlers } from "./decision-handlers";
+import { getDecision } from "./decisions";
 import { groupHandlers, listVisibleGroups } from "./groups";
 import type { HandlerCtx, MessageHandlers } from "./handler-context";
 import {
@@ -71,6 +73,7 @@ export const HOST_ID_HEADER = "X-Idea-Flow-Host-Id";
 // ここでキー漏れがコンパイルエラーになる（旧 switch の never 網羅性チェック相当）。
 const clientMessageHandlers: MessageHandlers<ClientMessage["type"]> = {
   ...noteHandlers,
+  ...decisionHandlers,
   ...groupHandlers,
   ...phaseHandlers,
   ...timerHandlers,
@@ -324,6 +327,8 @@ export class RoomDO extends DurableObject {
       members: listMembers(this.sql),
       phase,
       isHost: isHostUser(this.sql, userId),
+      decision:
+        phase.kind === "step" ? getDecision(this.sql, phase.phase) : null,
       timer: getTimerState(this.sql),
       serverNow: Date.now(),
     });

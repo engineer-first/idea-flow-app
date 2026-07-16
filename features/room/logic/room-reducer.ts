@@ -9,12 +9,14 @@
 
 import type { RoomPhase } from "@/contracts/phase";
 import type {
+  Decision as ProtocolDecision,
   ProtocolMember,
   ServerMessage,
   TimerState,
 } from "@/contracts/room-protocol";
 
 export type Member = ProtocolMember;
+export type Decision = ProtocolDecision;
 
 // snapshot / member_joined / member_left を受けて members state を更新する純粋関数。
 // 進行状態メッセージは早期 return。
@@ -54,6 +56,7 @@ export function applyMemberServerMessage(
     case "timer:updated":
     case "group:updated":
     case "group:deleted":
+    case "decision:updated":
     case "error":
       return members;
     default: {
@@ -82,6 +85,41 @@ export function applyTimerServerMessage(
   };
 }
 
+// 決定状態はフェーズ単位のサーバー権威。snapshot で再接続を復元し、
+// フェーズが進んだら前フェーズの決定を表示し続けないようクリアする。
+export function applyDecisionServerMessage(
+  decision: Decision | null,
+  message: ServerMessage,
+): Decision | null {
+  switch (message.type) {
+    case "decision:updated":
+      return {
+        phase: message.phase,
+        noteId: message.noteId,
+        decidedBy: message.decidedBy,
+      };
+    case "snapshot":
+      return message.decision;
+    case "phase:updated":
+      return null;
+    case "note:inserted":
+    case "note:updated":
+    case "note:deleted":
+    case "note:drag":
+    case "member_joined":
+    case "member_left":
+    case "group:updated":
+    case "group:deleted":
+    case "timer:updated":
+    case "error":
+      return decision;
+    default: {
+      const _exhaustive: never = message;
+      return _exhaustive;
+    }
+  }
+}
+
 // phase state を更新する純粋関数。phase 以外のメッセージは何もしない。
 export function applyPhaseServerMessage(
   phase: RoomPhase,
@@ -105,6 +143,7 @@ export function applyPhaseServerMessage(
     case "group:updated":
     case "group:deleted":
     case "timer:updated":
+    case "decision:updated":
     case "error":
       return phase;
     default: {

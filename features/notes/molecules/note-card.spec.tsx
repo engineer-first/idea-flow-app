@@ -197,6 +197,16 @@ describe("NoteCard", () => {
 
       expect(getCard()).not.toHaveAttribute("data-selected");
     });
+
+    it("isDecided=true の付箋を強調し、決定済みのstatusを表示する", () => {
+      setup({ isDecided: true });
+
+      expect(getCard()).toHaveAttribute("data-decided", "true");
+      expect(getCard()).toHaveClass("ring-2");
+      expect(
+        screen.getByRole("status", { name: "取り組む課題に決定済み" }),
+      ).toBeInTheDocument();
+    });
   });
 
   describe("編集モード", () => {
@@ -216,6 +226,53 @@ describe("NoteCard", () => {
       clickNote();
 
       expect(screen.getByRole("textbox")).toHaveAttribute("readonly");
+    });
+
+    it("editingDisabled 中は選択済みの付箋をクリックしても編集モードに入らない", () => {
+      setup({ isSelected: true, editingDisabled: true });
+
+      clickNote();
+
+      expect(screen.getByRole("textbox")).toHaveAttribute("readonly");
+    });
+
+    it("editingDisabled 中は選択済みの付箋でEnterを押しても編集モードに入らない", () => {
+      setup({ isSelected: true, editingDisabled: true });
+
+      fireEvent.keyDown(getNoteSurface(), { key: "Enter" });
+
+      expect(screen.getByRole("textbox")).toHaveAttribute("readonly");
+    });
+
+    it("編集中にeditingDisabledになると編集を強制終了し、onContentChangeを呼ばずに本文を巻き戻す", () => {
+      const onContentChange = vi.fn();
+      const { props, view } = setup({
+        isSelected: true,
+        onContentChange,
+        note: buildNote({ content: "サーバー上の本文" }),
+      });
+
+      clickNote();
+      fireEvent.change(screen.getByRole("textbox"), {
+        target: { value: "未送信の下書き" },
+      });
+
+      view.rerender(<NoteCard {...props} editingDisabled />);
+
+      expect(getCard()).not.toHaveAttribute("data-editing");
+      expect(onContentChange).not.toHaveBeenCalled();
+      expect(screen.getByRole("textbox")).toHaveAttribute("readonly");
+      expect(screen.getByDisplayValue("サーバー上の本文")).toBeInTheDocument();
+    });
+
+    it("editingDisabled 中に手動でblurしてもonContentChangeを呼ばない", () => {
+      const onContentChange = vi.fn();
+      setup({ isSelected: true, editingDisabled: true, onContentChange });
+
+      const textarea = screen.getByRole("textbox");
+      fireEvent.blur(textarea);
+
+      expect(onContentChange).not.toHaveBeenCalled();
     });
 
     it("選択中にEnterで編集モードに入る", () => {

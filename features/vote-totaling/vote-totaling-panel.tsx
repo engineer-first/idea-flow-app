@@ -1,4 +1,5 @@
 import {
+  type Decision,
   DOT_VOTE_LIMITS,
   type ProtocolMember,
   type ProtocolNote,
@@ -12,7 +13,6 @@ const OBJECTIVE_POINT = 1;
 export type VoteTotalingResult = {
   isComplete: boolean;
   rows: VoteTotalingRowViewModel[];
-  selectedChallenges: VoteTotalingRowViewModel[];
 };
 
 function publicVoteCount(count: number | undefined): number {
@@ -50,7 +50,6 @@ export function calculateVoteTotaling({
       score:
         publicVoteCount(note.dotVotes.subjective.count) * SUBJECTIVE_POINT +
         publicVoteCount(note.dotVotes.objective.count) * OBJECTIVE_POINT,
-      isSelectedChallenge: false,
     }))
     .sort(
       (a, b) =>
@@ -58,27 +57,9 @@ export function calculateVoteTotaling({
         b.subjectiveCount - a.subjectiveCount ||
         a.noteId.localeCompare(b.noteId),
     );
-  const leadingRow = rows.find((row) => row.subjectiveCount > 0);
-  const selectedChallenges =
-    isComplete && leadingRow
-      ? rows.filter(
-          (row) =>
-            row.score === leadingRow.score &&
-            row.subjectiveCount === leadingRow.subjectiveCount,
-        )
-      : [];
   return {
     isComplete,
-    rows: rows.map((row) => ({
-      ...row,
-      isSelectedChallenge: selectedChallenges.some(
-        (selected) => selected.noteId === row.noteId,
-      ),
-    })),
-    selectedChallenges: selectedChallenges.map((row) => ({
-      ...row,
-      isSelectedChallenge: true,
-    })),
+    rows,
   };
 }
 
@@ -86,12 +67,20 @@ export function VoteTotalingPanel({
   notes,
   members,
   isVotingComplete,
+  decision,
+  isHost,
+  isDisconnected,
+  onNoteDecide,
 }: {
   notes: ProtocolNote[];
   members: ProtocolMember[];
   // phase4 への遷移時に RoomDO が投票完了を保証する。以後にメンバーが
   // 退出しても、確定済み結果を待機状態へ戻さないための明示的な状態。
   isVotingComplete?: boolean;
+  decision: Decision | null;
+  isHost: boolean;
+  isDisconnected: boolean;
+  onNoteDecide: (noteId: string) => void;
 }) {
   const result = calculateVoteTotaling({
     notes,
@@ -123,18 +112,6 @@ export function VoteTotalingPanel({
           総合ポイントが高い順
         </p>
       </div>
-      {result.selectedChallenges.length > 0 ? (
-        <div className="mt-6 rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-center">
-          <p className="text-xs font-semibold text-emerald-800">取り組む課題</p>
-          <ul className="mt-1 grid gap-1 font-semibold text-emerald-950">
-            {result.selectedChallenges.map((challenge) => (
-              <li key={challenge.noteId}>
-                {challenge.content || "無題の付箋"}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
       <ol className="mt-6 grid gap-3">
         {result.rows.map((row, _index, ranking) => {
           const rank =
@@ -143,7 +120,16 @@ export function VoteTotalingPanel({
                 candidate.score === row.score &&
                 candidate.subjectiveCount === row.subjectiveCount,
             ) + 1;
-          return <VoteTotalingRow key={row.noteId} row={row} rank={rank} />;
+          return (
+            <VoteTotalingRow
+              key={row.noteId}
+              row={row}
+              rank={rank}
+              canDecide={isHost && !isDisconnected}
+              isDecided={decision?.noteId === row.noteId}
+              onDecide={() => onNoteDecide(row.noteId)}
+            />
+          );
         })}
       </ol>
     </section>

@@ -2,7 +2,11 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { createRef } from "react";
 import { fn } from "storybook/test";
 import { buildPhaseStep } from "@/contracts/phase.fixture";
-import { buildNote, buildNotes } from "@/contracts/room-protocol.fixture";
+import {
+  buildDecision,
+  buildNote,
+  buildNotes,
+} from "@/contracts/room-protocol.fixture";
 import { RoomBoardCanvas } from "./room-board-canvas";
 
 const STEP_1_1 = buildPhaseStep(1);
@@ -19,6 +23,8 @@ const meta = {
     notes: buildNotes(3),
     groups: [],
     phase: STEP_1_1,
+    decision: null,
+    isHost: true,
     privateNotes: [],
     selectedNoteId: null,
     draggingNoteId: null,
@@ -34,6 +40,7 @@ const meta = {
     onNoteDelete: fn(),
     onNoteVote: fn(),
     onNoteVoteReset: fn(),
+    onNoteDecide: fn(),
     onGroupCreate: fn(),
     onGroupUpdateName: fn(),
     onAddPrivateNote: fn(),
@@ -112,5 +119,22 @@ export const WithPrivateNotes: Story = {
 export const Disconnected: Story = {
   args: {
     isDisconnected: true,
+  },
+};
+
+export const ReadyToDecide: Story = {
+  args: {
+    phase: buildPhaseStep(5),
+    selectedNoteId: "note-1",
+  },
+};
+
+export const Decided: Story = {
+  args: {
+    phase: buildPhaseStep(5),
+    decision: buildDecision({
+      noteId: "note-1",
+      decidedBy: "11111111-1111-4111-8111-111111111111",
+    }),
   },
 };

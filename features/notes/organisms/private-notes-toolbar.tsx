@@ -10,6 +10,7 @@ import { NoteCard } from "../molecules/note-card";
 export type PrivateNotesToolbarProps = {
   notes: Note[];
   disabled: boolean;
+  editingDisabled?: boolean;
   className?: string;
   toolbarRef?: React.RefObject<HTMLDivElement | null>;
   isReturnDropTarget?: boolean;
@@ -27,6 +28,7 @@ export type PrivateNotesToolbarProps = {
 export function PrivateNotesToolbar({
   notes,
   disabled,
+  editingDisabled = false,
   className,
   toolbarRef,
   isReturnDropTarget = false,
@@ -72,6 +74,7 @@ export function PrivateNotesToolbar({
                 isOwnDrag={false}
                 isSelected={selectedNoteId === note.id}
                 disabled={disabled}
+                editingDisabled={editingDisabled}
                 onSelect={onSelect}
                 onDragStart={onDragStart}
                 onContentChange={onContentChange}

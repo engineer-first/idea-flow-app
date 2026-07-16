@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { buildPhaseStep } from "@/contracts/phase.fixture";
 import {
+  buildDecision,
   buildMembers,
   buildNote,
   buildNotes,
@@ -17,6 +18,7 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardView>[0]> = {}) {
     inviteCode: "AB12CD",
     inviteUrl: "https://idea-flow.example/invite/AB12CD",
     phase: buildPhaseStep(1),
+    decision: null,
     timer: { status: "idle" } as const,
     timerServerOffsetMs: 0,
     isHost: false,
@@ -48,6 +50,7 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardView>[0]> = {}) {
     isLeaving: false,
     onNoteVote: vi.fn(),
     onNoteVoteReset: vi.fn(),
+    onNoteDecide: vi.fn(),
     connectionStatus: "open" as const,
     groups: [],
     ...overrides,
@@ -213,6 +216,51 @@ describe("RoomBoardView", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
+  it("結果ダイアログのランキング行からホストの決定操作を通知する", () => {
+    const onNoteDecide = vi.fn();
+    setup({
+      phase: buildPhaseStep(5),
+      isHost: true,
+      onNoteDecide,
+    });
+
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getAllByRole("button", {
+        name: "付箋 1を取り組む課題に決定",
+      })[0],
+    );
+
+    expect(onNoteDecide).toHaveBeenCalledWith("note-1");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("結果ダイアログは決定済み付箋をstatusとして表示する", () => {
+    setup({
+      phase: buildPhaseStep(5),
+      decision: buildDecision({ noteId: "note-1", decidedBy: ME }),
+    });
+
+    expect(
+      within(screen.getByRole("dialog")).getByRole("status", {
+        name: "取り組む課題に決定済み",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("切断中は結果ダイアログの決定操作を出さない", () => {
+    setup({
+      phase: buildPhaseStep(5),
+      isHost: true,
+      connectionStatus: "closed",
+    });
+
+    expect(
+      within(screen.getByRole("dialog")).queryByRole("button", {
+        name: "付箋 1を取り組む課題に決定",
+      }),
+    ).not.toBeInTheDocument();
+  });
+
   it("付箋のドット投票ボタンでonNoteVoteを呼ぶ", () => {
     const onNoteVote = vi.fn();
     setup({ onNoteVote });
@@ -222,6 +270,27 @@ describe("RoomBoardView", () => {
     );
 
     expect(onNoteVote).toHaveBeenCalledWith("note-1", "subjective");
+  });
+
+  it("結果ステップのホストが選択した付箋を決定するとonNoteDecideを呼ぶ", () => {
+    const onNoteDecide = vi.fn();
+    setup({
+      phase: buildPhaseStep(5),
+      isHost: true,
+      onNoteDecide,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
+
+    const [first] = screen.getAllByTestId("note-card");
+    clickNote(first);
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "この付箋を取り組む課題に決定",
+      }),
+    );
+
+    expect(onNoteDecide).toHaveBeenCalledWith("note-1");
   });
 
   describe("接続状態の表示", () => {

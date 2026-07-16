@@ -65,6 +65,7 @@ export function isBoardMutation(message: ClientMessage): boolean {
     case "note:delete":
     case "note:vote":
     case "note:vote-reset":
+    case "note:decide":
     case "group:create":
     case "group:update-name":
       return true;
@@ -96,7 +97,7 @@ const allowedBoardMutationsByPhase: {
     ],
     3: ["note:move", "note:drag", "group:create", "group:update-name"],
     4: ["note:vote", "note:vote-reset"],
-    5: [],
+    5: ["note:decide"],
   },
   2: {
     1: [],
@@ -190,6 +191,13 @@ export const phaseHandlers: MessageHandlers<"start_phase" | "phase:next"> = {
       return;
     }
     const next = nextRoomPhase(current);
+    // Step 1-5 など「次のフェーズがまだ実装されていない」状態では
+    // nextRoomPhase が current をそのまま返す。ここで no-op を配信すると
+    // クライアントの decision 表示がフェーズ単位で無条件クリアされてしまう
+    // （DB上の decision は残るため、再接続時の snapshot で復活し不整合になる）。
+    if (next === current) {
+      return;
+    }
     savePhase(ctx.sql, next);
     // 投票ステップでは note:updated の count を秘匿している。結果ステップへ
     // 遷移した接続中の参加者も、再接続を待たず完全な投票集計を受け取れるよう

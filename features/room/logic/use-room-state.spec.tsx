@@ -19,7 +19,7 @@ vi.mock("./room-notify", () => ({
 }));
 
 import { buildLobbyPhase, buildPhaseStep } from "@/contracts/phase.fixture";
-import { buildMembers } from "@/contracts/room-protocol.fixture";
+import { buildDecision, buildMembers } from "@/contracts/room-protocol.fixture";
 import { useRoomState } from "./use-room-state";
 
 describe("useRoomState", () => {
@@ -36,6 +36,7 @@ describe("useRoomState", () => {
 
   it("snapshot で members / phase / timer を復元する", () => {
     const { result } = setup();
+    const decision = buildDecision();
     act(() =>
       result.current.applyMessage({
         type: "snapshot",
@@ -43,6 +44,7 @@ describe("useRoomState", () => {
         members: buildMembers(2),
         phase: buildPhaseStep(2),
         isHost: true,
+        decision,
         timer: { status: "running", endsAt: 1_000, durationMs: 60_000 },
         serverNow: 500,
       }),
@@ -51,6 +53,25 @@ describe("useRoomState", () => {
     expect(result.current.members).toHaveLength(2);
     expect(result.current.phase).toEqual(buildPhaseStep(2));
     expect(result.current.timer.status).toBe("running");
+    expect(result.current.decision).toEqual(decision);
+  });
+
+  it("decision:updated を反映し、phase:updated で決定をクリアする", () => {
+    const { result } = setup();
+    const decision = buildDecision();
+
+    act(() =>
+      result.current.applyMessage({ type: "decision:updated", ...decision }),
+    );
+    expect(result.current.decision).toEqual(decision);
+
+    act(() =>
+      result.current.applyMessage({
+        type: "phase:updated",
+        phase: buildPhaseStep(2),
+      }),
+    );
+    expect(result.current.decision).toBeNull();
   });
 
   it("member_joined で追加し、memberJoined を toast する", () => {

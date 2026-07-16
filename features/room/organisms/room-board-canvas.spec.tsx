@@ -2,7 +2,11 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { buildPhaseStep } from "@/contracts/phase.fixture";
-import { buildNote, buildNotes } from "@/contracts/room-protocol.fixture";
+import {
+  buildDecision,
+  buildNote,
+  buildNotes,
+} from "@/contracts/room-protocol.fixture";
 import { RoomBoardCanvas } from "./room-board-canvas";
 
 function setup(overrides: Partial<Parameters<typeof RoomBoardCanvas>[0]> = {}) {
@@ -10,6 +14,8 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardCanvas>[0]> = {}) {
     notes: buildNotes(2),
     groups: [],
     phase: buildPhaseStep(1),
+    decision: null,
+    isHost: false,
     privateNotes: [],
     selectedNoteId: null,
     draggingNoteId: null,
@@ -25,6 +31,7 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardCanvas>[0]> = {}) {
     onNoteDelete: vi.fn(),
     onNoteVote: vi.fn(),
     onNoteVoteReset: vi.fn(),
+    onNoteDecide: vi.fn(),
     onGroupCreate: vi.fn(),
     onGroupUpdateName: vi.fn(),
     onAddPrivateNote: vi.fn(),
@@ -122,9 +129,97 @@ describe("RoomBoardCanvas", () => {
     expect(screen.getByRole("button", { name: "付箋を追加" })).toBeDisabled();
   });
 
-  it("発想支援サイドバーを表示する", () => {
+  it("発想支援サイドバーを閉じた状態で表示する", () => {
     setup();
 
-    expect(screen.getByText("Inspiration Tools")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "発想支援を開く" }),
+    ).toBeInTheDocument();
+  });
+
+  describe("決定操作", () => {
+    it("ホストが結果ステップで選択した未決定の付箋右上に決定操作を表示し、押下を通知する", () => {
+      const onNoteDecide = vi.fn();
+      setup({
+        notes: [buildNote({ id: "note-1", x: 100, y: 80 })],
+        phase: buildPhaseStep(5),
+        isHost: true,
+        selectedNoteId: "note-1",
+        onNoteDecide,
+      });
+
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: "この付箋を取り組む課題に決定",
+        }),
+      );
+      expect(onNoteDecide).toHaveBeenCalledWith("note-1");
+      expect(
+        screen.getByRole("button", {
+          name: "この付箋を取り組む課題に決定",
+        }),
+      ).toHaveStyle({ left: "260px", top: "84px" });
+    });
+
+    it.each([
+      {
+        phase: buildPhaseStep(5),
+        isHost: false,
+        isDisconnected: false,
+        selectedNoteId: "note-1",
+      },
+      {
+        phase: buildPhaseStep(4),
+        isHost: true,
+        isDisconnected: false,
+        selectedNoteId: "note-1",
+      },
+      {
+        phase: buildPhaseStep(5),
+        isHost: true,
+        isDisconnected: true,
+        selectedNoteId: "note-1",
+      },
+      {
+        phase: buildPhaseStep(5),
+        isHost: true,
+        isDisconnected: false,
+        selectedNoteId: null,
+      },
+    ])("非ホスト・結果ステップ以外・切断中・未選択では決定操作を表示しない", ({
+      phase,
+      isHost,
+      isDisconnected,
+      selectedNoteId,
+    }) => {
+      setup({ phase, isHost, isDisconnected, selectedNoteId });
+
+      expect(
+        screen.queryByRole("button", {
+          name: "この付箋を取り組む課題に決定",
+        }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("現在の決定と一致する付箋はstatus表示だけにし、決定操作を重ねない", () => {
+      setup({
+        phase: buildPhaseStep(5),
+        isHost: true,
+        selectedNoteId: "note-1",
+        decision: buildDecision({
+          noteId: "note-1",
+          decidedBy: "11111111-1111-4111-8111-111111111111",
+        }),
+      });
+
+      expect(
+        screen.getByRole("status", { name: "取り組む課題に決定済み" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", {
+          name: "この付箋を取り組む課題に決定",
+        }),
+      ).not.toBeInTheDocument();
+    });
   });
 });

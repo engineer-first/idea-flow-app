@@ -4,12 +4,16 @@
 // ドラッグ中のゴーストを描き、下端にマイ付箋ドックを重ねる。
 // ドラッグの状態機械は持たない（logic/use-board-drag が view で束ねる）。
 import type { PointerEvent as ReactPointerEvent, RefObject } from "react";
-import { BOARD_HEIGHT, BOARD_WIDTH } from "@/contracts/board";
+import { BOARD_HEIGHT, BOARD_WIDTH, NOTE_WIDTH } from "@/contracts/board";
 import {
   calculateRenderGroups,
   type PersistentGroup,
 } from "@/contracts/grouping";
-import { isAtOrAfterGroupingStep, type RoomPhase } from "@/contracts/phase";
+import {
+  isAtOrAfterGroupingStep,
+  isResultStep,
+  type RoomPhase,
+} from "@/contracts/phase";
 import type { DotVoteKind } from "@/contracts/room-protocol";
 import type { DotVoteRemaining } from "@/features/dot-vote";
 import { IdeaSupportSidebar } from "@/features/idea-support";
@@ -20,11 +24,19 @@ import {
   PrivateNotesToolbar,
   StickyNote,
 } from "@/features/notes";
+import type { Decision } from "../logic/room-reducer";
+import {
+  DECIDE_NOTE_ACTION_INSET,
+  DECIDE_NOTE_ACTION_SIZE,
+  DecideNoteAction,
+} from "../molecules/decide-note-action";
 
 export type RoomBoardCanvasProps = {
   notes: Note[];
   groups: PersistentGroup[];
   phase: RoomPhase;
+  decision: Decision | null;
+  isHost: boolean;
   privateNotes: Note[];
   selectedNoteId: string | null;
   draggingNoteId: string | null;
@@ -44,6 +56,7 @@ export type RoomBoardCanvasProps = {
   onNoteDelete: (noteId: string) => void;
   onNoteVote: (noteId: string, kind: DotVoteKind) => void;
   onNoteVoteReset: (noteId: string, kind: DotVoteKind) => void;
+  onNoteDecide: (noteId: string) => void;
   onGroupCreate?: (name: string, noteIds: string[]) => void;
   onGroupUpdateName?: (groupId: string, name: string) => void;
   onAddPrivateNote: () => void;
@@ -59,6 +72,8 @@ export function RoomBoardCanvas({
   notes,
   groups,
   phase,
+  decision,
+  isHost,
   privateNotes,
   selectedNoteId,
   draggingNoteId,
@@ -74,6 +89,7 @@ export function RoomBoardCanvas({
   onNoteDelete,
   onNoteVote,
   onNoteVoteReset,
+  onNoteDecide,
   onGroupCreate,
   onGroupUpdateName,
   onAddPrivateNote,
@@ -84,6 +100,14 @@ export function RoomBoardCanvas({
   const renderGroups = isAtOrAfterGroupingStep(phase)
     ? calculateRenderGroups(notes, groups)
     : [];
+  const selectedNote = notes.find((note) => note.id === selectedNoteId);
+  const canDecide = Boolean(
+    selectedNote &&
+      isHost &&
+      !isDisconnected &&
+      isResultStep(phase) &&
+      decision?.noteId !== selectedNote.id,
+  );
 
   function handleBoardPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     // 付箋の上のpointerdownはバブリングしてくるので、ボード背景を
@@ -145,6 +169,8 @@ export function RoomBoardCanvas({
                 note={note}
                 isOwnDrag={draggingNoteId === note.id}
                 isSelected={selectedNoteId === note.id}
+                editingDisabled={isResultStep(phase)}
+                isDecided={decision?.noteId === note.id}
                 disabled={isDisconnected}
                 onSelect={onSelect}
                 onDragStart={onNoteDragStart}
@@ -155,6 +181,18 @@ export function RoomBoardCanvas({
                 onVoteReset={onNoteVoteReset}
               />
             ))}
+            {canDecide && selectedNote ? (
+              <DecideNoteAction
+                x={
+                  selectedNote.x +
+                  NOTE_WIDTH -
+                  DECIDE_NOTE_ACTION_SIZE -
+                  DECIDE_NOTE_ACTION_INSET
+                }
+                y={selectedNote.y + DECIDE_NOTE_ACTION_INSET}
+                onDecide={() => onNoteDecide(selectedNote.id)}
+              />
+            ) : null}
             {dragGhost ? (
               <StickyNote
                 noteId={dragGhost.note.id}
@@ -177,6 +215,7 @@ export function RoomBoardCanvas({
           <PrivateNotesToolbar
             notes={privateNotes}
             disabled={isDisconnected}
+            editingDisabled={isResultStep(phase)}
             className="pointer-events-auto max-w-5xl"
             toolbarRef={privateToolbarRef}
             isReturnDropTarget={isReturnDropTarget}

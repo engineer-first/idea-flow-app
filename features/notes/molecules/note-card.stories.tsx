@@ -76,3 +76,16 @@ export const Voted: Story = {
     voteRemaining: { subjective: 0, objective: 1 },
   },
 };
+
+export const Decided: Story = {
+  args: {
+    isDecided: true,
+  },
+};
+
+export const ResultStep: Story = {
+  args: {
+    isSelected: true,
+    editingDisabled: true,
+  },
+};

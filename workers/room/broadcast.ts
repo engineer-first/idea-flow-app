@@ -58,7 +58,7 @@ export class RoomBroadcaster {
     }
   }
 
-  // ノート以外の共有情報（member / phase / timer）を全員に送る。
+  // ノート以外の共有情報（member / phase / timer / decision）を全員に送る。
   broadcastToAll(message: ServerMessage): void {
     const payload = JSON.stringify(message);
     for (const socket of this.connections.getWebSockets()) {

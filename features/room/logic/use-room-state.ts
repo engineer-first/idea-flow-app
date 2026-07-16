@@ -9,9 +9,11 @@ import type { RoomPhase } from "@/contracts/phase";
 import type { ServerMessage, TimerState } from "@/contracts/room-protocol";
 import { roomNotify } from "./room-notify";
 import {
+  applyDecisionServerMessage,
   applyMemberServerMessage,
   applyPhaseServerMessage,
   applyTimerServerMessage,
+  type Decision,
   type Member,
   type TimerClientState,
 } from "./room-reducer";
@@ -19,6 +21,7 @@ import {
 export type UseRoomStateResult = {
   members: Member[];
   phase: RoomPhase;
+  decision: Decision | null;
   timer: TimerState;
   timerServerOffsetMs: number;
   applyMessage: (message: ServerMessage, receivedAt?: number) => void;
@@ -31,6 +34,7 @@ export function useRoomState(options: {
 }): UseRoomStateResult {
   const [members, setMembers] = useState<Member[]>(options.initialMembers);
   const [phase, setPhase] = useState<RoomPhase>(options.initialPhase);
+  const [decision, setDecision] = useState<Decision | null>(null);
   const [timerState, setTimerState] = useState<TimerClientState>({
     timer: { status: "idle" },
     serverOffsetMs: 0,
@@ -59,6 +63,7 @@ export function useRoomState(options: {
       membersRef.current = nextMembers;
       setMembers(nextMembers);
       setPhase((current) => applyPhaseServerMessage(current, message));
+      setDecision((current) => applyDecisionServerMessage(current, message));
       setTimerState((current) =>
         applyTimerServerMessage(current, message, receivedAt),
       );
@@ -69,6 +74,7 @@ export function useRoomState(options: {
   return {
     members,
     phase,
+    decision,
     timer: timerState.timer,
     timerServerOffsetMs: timerState.serverOffsetMs,
     applyMessage,
