@@ -942,6 +942,47 @@ describe("note:update-content / note:move（pgTAP: メンバーの共同編集�
 });
 
 describe("note:vote（課題ドット投票）", () => {
+  it("Step 1-5 へ接続を維持したまま進むと、全参加者の集計を復元する", async () => {
+    const { owner, member } = await setupStartedRoom();
+    const noteId = await createNote({ owner, member });
+
+    await arrangeStep(owner, 4);
+    send(member, { type: "note:vote", noteId, kind: "subjective" });
+    await expectType(owner, "note:updated");
+    await expectType(member, "note:updated");
+
+    send(owner, { type: "phase:next", force: true });
+
+    const ownerSnapshot = await expectType(owner, "snapshot");
+    const memberSnapshot = await expectType(member, "snapshot");
+    expect(ownerSnapshot.phase).toEqual(buildPhaseStep(5));
+    expect(memberSnapshot.phase).toEqual(buildPhaseStep(5));
+
+    const ownerNote = ownerSnapshot.notes.find((note) => note.id === noteId);
+    expect(ownerNote?.dotVotes.subjective).toEqual({
+      count: 1,
+      votedByMe: false,
+      ownCount: 0,
+    });
+
+    const memberNote = memberSnapshot.notes.find((note) => note.id === noteId);
+    expect(memberNote?.dotVotes.subjective).toEqual({
+      count: 1,
+      votedByMe: true,
+      ownCount: 1,
+    });
+
+    expect((await expectType(owner, "phase:updated")).phase).toEqual(
+      buildPhaseStep(5),
+    );
+    expect((await expectType(member, "phase:updated")).phase).toEqual(
+      buildPhaseStep(5),
+    );
+
+    owner.close();
+    member.close();
+  });
+
   it("投票ステップの note:updated と再接続 snapshot では count を送らない", async () => {
     const { roomId, owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });

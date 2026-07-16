@@ -293,7 +293,20 @@ export class RoomDO extends DurableObject {
       ws,
       reply: (message) => this.broadcaster.sendTo(ws, message),
       broadcaster: this.broadcaster,
+      refreshSnapshots: () => this.refreshSnapshots(),
     };
+  }
+
+  // 結果ステップへ進んだ既存接続も、再接続時と同じ受信者別 snapshot で
+  // ノートの射影を更新する。添付情報がないソケットは有効な Room 接続ではない
+  // ためスキップする。
+  private refreshSnapshots(): void {
+    for (const socket of this.ctx.getWebSockets()) {
+      const attachment =
+        socket.deserializeAttachment() as SocketAttachment | null;
+      if (!attachment) continue;
+      this.sendSnapshot(socket, attachment.userId);
+    }
   }
 
   // 接続直後に現在状態を丸ごと届ける（再接続の復帰パスも兼ねる）。
