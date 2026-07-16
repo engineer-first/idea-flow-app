@@ -418,7 +418,7 @@
   <section id="runtime">
     <h2><span class="num">§1</span>ランタイム構成（本番）</h2>
     <p class="lede">
-      リクエストが辿る経路。カスタムドメイン未設定時は <code>*.prompt-tem.workers.dev</code>。
+      リクエストが辿る経路。本番は <code>https://ideaboost.dev</code>。
       api の workers.dev は直叩き可能だが、ブラウザは app 経由の同一オリジンだけを使う。
     </p>
 
@@ -459,7 +459,7 @@
           <span class="binding secret">SESSION_SECRET</span>
           <span class="binding secret">GOOGLE_*</span>
         </div>
-        <div class="url">https://idea-flow-app.prompt-tem.workers.dev</div>
+        <div class="url">https://ideaboost.dev</div>
       </div>
 
       <div class="conn">
@@ -711,9 +711,10 @@
   </section>
 
   <section id="domain">
-    <h2><span class="num">§6</span>カスタムドメイン（任意・後続）</h2>
+    <h2><span class="num">§6</span>カスタムドメイン（本番必須）</h2>
     <p class="lede">
       同一オリジンのため <strong>app にだけ</strong> ドメインを付ける。api は service binding で閉じるので公開 URL 不要。
+      本番リリースには必須の設定。
     </p>
     <div class="table-wrap">
       <table>
@@ -727,11 +728,11 @@
           </tr>
           <tr>
             <td>Worker ルート</td>
-            <td class="mono">wrangler deploy -c wrangler.jsonc --domains app.example.com</td>
+            <td class="mono">wrangler deploy -c wrangler.jsonc --domains ideaboost.dev</td>
           </tr>
           <tr>
             <td>OAuth</td>
-            <td class="mono">https://app.example.com/auth/callback を Google Console に追加</td>
+            <td class="mono">https://ideaboost.dev/auth/callback を Google Console に追加</td>
           </tr>
           <tr>
             <td>SITE_URL</td>
@@ -765,7 +766,7 @@
 </div>
 
 <footer class="doc-footer">
-  実デプロイ（idea-flow-app / idea-flow-api · prompt-tem.workers.dev）と
+  実デプロイ（idea-flow-app · ideaboost.dev）と
   wrangler.jsonc / app-worker.ts / api-client.ts / deploy.yml / README に基づく。
   関連: <a href="../architecture/">構成 &amp; デプロイ概観</a> ·
   <a href="../cloudflare-map/">Cloudflare の地図</a>

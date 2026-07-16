@@ -125,11 +125,11 @@ jobs:
       - name: Check health
         run: |
           if [ -z "$SITE_URL" ]; then
-            echo "SITE_URL is not set. Skipping health check." >&2
-            exit 0
+            echo "SITE_URL is not set." >&2
+            exit 1
           fi
           for i in $(seq 1 10); do
-            if curl -sf "$SITE_URL/api/health" >/dev/null 2>&1; then
+            if curl -fsS "$SITE_URL/api/health" | grep -q '"ok"\s*:\s*true'; then
               echo "Health check passed: $SITE_URL/api/health"
               exit 0
             fi

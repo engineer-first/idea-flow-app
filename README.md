@@ -139,22 +139,23 @@ npx wrangler secret put GOOGLE_CLIENT_ID
 npx wrangler secret put GOOGLE_CLIENT_SECRET
 
 # 7. 本番 URL を指定してビルド + デプロイ
-export NEXT_PUBLIC_SITE_URL=https://idea-flow-app.<subdomain>.workers.dev
+export NEXT_PUBLIC_SITE_URL=https://ideaboost.dev
 npm run deploy:app
 ```
 
 #### カスタムドメイン設定
 
 `idea-flow-app` にだけドメインを付ける（api は service binding で閉じる）。
+本番では必須の設定。
 
 ```bash
 # デプロイ時にドメインを指定
-npx wrangler deploy -c wrangler.jsonc --domains app.example.com
+npx wrangler deploy -c wrangler.jsonc --domains ideaboost.dev
 ```
 
 または Dashboard（Workers → idea-flow-app → Settings → Domains & Routes）から設定。
 
-Google OAuth のリダイレクト URI に `https://app.example.com/auth/callback` を追加する。
+Google OAuth のリダイレクト URI に `https://ideaboost.dev/auth/callback` を追加する。
 ドメイン変更時は `NEXT_PUBLIC_SITE_URL` を更新して**再ビルド必須**。
 
 #### 動作確認
