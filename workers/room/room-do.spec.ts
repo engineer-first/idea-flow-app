@@ -716,6 +716,10 @@ describe("RoomDO phase:next", () => {
     ws.send(JSON.stringify({ type: "phase:next", force: true }));
 
     expect(await nextJson(ws)).toMatchObject({
+      type: "snapshot",
+      phase: buildPhaseStep(5),
+    });
+    expect(await nextJson(ws)).toMatchObject({
       type: "phase:updated",
       phase: buildPhaseStep(5),
     });
@@ -794,6 +798,10 @@ describe("RoomDO phase:next", () => {
     const ws = await connectDirectly(roomName, USER_A, USER_A);
     ws.send(JSON.stringify({ type: "phase:next" }));
 
+    expect(await nextJson(ws)).toMatchObject({
+      type: "snapshot",
+      phase: buildPhaseStep(5),
+    });
     expect(await nextJson(ws)).toMatchObject({
       type: "phase:updated",
       phase: buildPhaseStep(5),

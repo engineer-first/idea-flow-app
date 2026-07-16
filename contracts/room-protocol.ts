@@ -25,7 +25,8 @@ export const DotVoteKindSchema = z.enum(["subjective", "objective"]);
 export type DotVoteKind = z.infer<typeof DotVoteKindSchema>;
 
 const DotVoteSummarySchema = z.object({
-  count: z.number().int().min(0),
+  // 投票中は受信者向け射影で総数自体を除外する。
+  count: z.number().int().min(0).optional(),
   votedByMe: z.boolean(),
   ownCount: z.number().int().min(0),
 });

@@ -15,6 +15,10 @@ export type VoteTotalingResult = {
   rows: VoteTotalingRowViewModel[];
 };
 
+function publicVoteCount(count: number | undefined): number {
+  return count ?? 0;
+}
+
 export function calculateVoteTotaling({
   notes,
   memberCount,
@@ -25,11 +29,11 @@ export function calculateVoteTotaling({
   isVotingComplete?: boolean;
 }): VoteTotalingResult {
   const subjective = notes.reduce(
-    (total, note) => total + note.dotVotes.subjective.count,
+    (total, note) => total + publicVoteCount(note.dotVotes.subjective.count),
     0,
   );
   const objective = notes.reduce(
-    (total, note) => total + note.dotVotes.objective.count,
+    (total, note) => total + publicVoteCount(note.dotVotes.objective.count),
     0,
   );
   const allMembersCompletedVoting =
@@ -41,11 +45,11 @@ export function calculateVoteTotaling({
     .map((note) => ({
       noteId: note.id,
       content: note.content,
-      subjectiveCount: note.dotVotes.subjective.count,
-      objectiveCount: note.dotVotes.objective.count,
+      subjectiveCount: publicVoteCount(note.dotVotes.subjective.count),
+      objectiveCount: publicVoteCount(note.dotVotes.objective.count),
       score:
-        note.dotVotes.subjective.count * SUBJECTIVE_POINT +
-        note.dotVotes.objective.count * OBJECTIVE_POINT,
+        publicVoteCount(note.dotVotes.subjective.count) * SUBJECTIVE_POINT +
+        publicVoteCount(note.dotVotes.objective.count) * OBJECTIVE_POINT,
     }))
     .sort(
       (a, b) =>

@@ -2,6 +2,7 @@
 import {
   getRoomPhaseLabel,
   isLobby,
+  isResultStep,
   isVotingStep,
   type PHASE_STEP_COUNTS,
   type RoomPhase,
@@ -198,6 +199,12 @@ export const phaseHandlers: MessageHandlers<"start_phase" | "phase:next"> = {
       return;
     }
     savePhase(ctx.sql, next);
+    // 投票ステップでは note:updated の count を秘匿している。結果ステップへ
+    // 遷移した接続中の参加者も、再接続を待たず完全な投票集計を受け取れるよう
+    // 受信者別 snapshot を先に再送する。
+    if (!isResultStep(current) && isResultStep(next)) {
+      ctx.refreshSnapshots();
+    }
     ctx.broadcaster.broadcastToAll({ type: "phase:updated", phase: next });
   },
 };
