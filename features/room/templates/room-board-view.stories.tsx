@@ -6,6 +6,7 @@ import { RoomBoardView } from "./room-board-view";
 
 const ME = "11111111-1111-4111-8111-111111111111";
 const STEP_1_1 = buildPhaseStep(1);
+const STEP_1_4 = buildPhaseStep(4);
 const STEP_1_5 = buildPhaseStep(5);
 
 const meta = {
@@ -117,6 +118,26 @@ export const DotVoting: Story = {
         },
         objective: {
           count: index + 1,
+          votedByMe: index < 2,
+          ownCount: index < 2 ? 1 : 0,
+        },
+      },
+    })),
+  },
+};
+
+// 投票中は受信者向け射影で count を持たず、本人の投票状態だけを表示する。
+export const StealthVoting: Story = {
+  args: {
+    phase: STEP_1_4,
+    notes: buildNotes(3).map((note, index) => ({
+      ...note,
+      dotVotes: {
+        subjective: {
+          votedByMe: index === 0,
+          ownCount: index === 0 ? 1 : 0,
+        },
+        objective: {
           votedByMe: index < 2,
           ownCount: index < 2 ? 1 : 0,
         },

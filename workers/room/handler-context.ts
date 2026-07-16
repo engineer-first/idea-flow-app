@@ -17,6 +17,9 @@ export type HandlerCtx = {
   // 送信元ソケットへの返信。
   reply: (message: ServerMessage) => void;
   broadcaster: RoomBroadcaster;
+  // 結果ステップ遷移時に、接続を維持した各参加者へ受信者別の完全な状態を
+  // 再送する。RoomDO が snapshot 構築を一元管理するためのコールバック。
+  refreshSnapshots: () => void;
 };
 
 // 各ドメインモジュールが担当メッセージのハンドラ表を export し、

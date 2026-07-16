@@ -40,7 +40,8 @@ export function DotVoteControls({
           <div key={kind} className="flex items-center gap-1">
             <DotVoteButton
               kind={kind}
-              count={summary.count}
+              // 投票中は総数が非公開なので、未公開値を UI の型境界で扱う。
+              count={summary.count ?? 0}
               votedByMe={summary.votedByMe}
               disabled={isDisabled}
               onClick={() => onVote(noteId, kind)}

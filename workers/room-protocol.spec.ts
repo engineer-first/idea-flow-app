@@ -942,7 +942,93 @@ describe("note:update-content / note:move（pgTAP: メンバーの共同編集�
 });
 
 describe("note:vote（課題ドット投票）", () => {
-  it("主観ドットは1票まで投票でき、全員へ集計が届く", async () => {
+  it("Step 1-5 へ接続を維持したまま進むと、全参加者の集計を復元する", async () => {
+    const { owner, member } = await setupStartedRoom();
+    const noteId = await createNote({ owner, member });
+
+    await arrangeStep(owner, 4);
+    send(member, { type: "note:vote", noteId, kind: "subjective" });
+    await expectType(owner, "note:updated");
+    await expectType(member, "note:updated");
+
+    send(owner, { type: "phase:next", force: true });
+
+    const ownerSnapshot = await expectType(owner, "snapshot");
+    const memberSnapshot = await expectType(member, "snapshot");
+    expect(ownerSnapshot.phase).toEqual(buildPhaseStep(5));
+    expect(memberSnapshot.phase).toEqual(buildPhaseStep(5));
+
+    const ownerNote = ownerSnapshot.notes.find((note) => note.id === noteId);
+    expect(ownerNote?.dotVotes.subjective).toEqual({
+      count: 1,
+      votedByMe: false,
+      ownCount: 0,
+    });
+
+    const memberNote = memberSnapshot.notes.find((note) => note.id === noteId);
+    expect(memberNote?.dotVotes.subjective).toEqual({
+      count: 1,
+      votedByMe: true,
+      ownCount: 1,
+    });
+
+    expect((await expectType(owner, "phase:updated")).phase).toEqual(
+      buildPhaseStep(5),
+    );
+    expect((await expectType(member, "phase:updated")).phase).toEqual(
+      buildPhaseStep(5),
+    );
+
+    owner.close();
+    member.close();
+  });
+
+  it("投票ステップの note:updated と再接続 snapshot では count を送らない", async () => {
+    const { roomId, owner, member } = await setupStartedRoom();
+    const noteId = await createNote({ owner, member });
+
+    await arrangeStep(owner, 4);
+    send(member, { type: "note:vote", noteId, kind: "subjective" });
+
+    const toOwner = await expectType(owner, "note:updated");
+    const toMember = await expectType(member, "note:updated");
+    for (const message of [toOwner, toMember]) {
+      expect(message.note.dotVotes.subjective).toEqual({
+        votedByMe: message === toMember,
+        ownCount: message === toMember ? 1 : 0,
+      });
+      expect(message.note.dotVotes.subjective).not.toHaveProperty("count");
+      expect(message.note.dotVotes.objective).not.toHaveProperty("count");
+    }
+
+    member.close();
+    const reconnected = await connectRoomAs(MEMBER, roomId);
+    const hiddenSnapshot = await expectType(reconnected, "snapshot");
+    const hiddenNote = hiddenSnapshot.notes.find((note) => note.id === noteId);
+    expect(hiddenNote?.dotVotes.subjective).toEqual({
+      votedByMe: true,
+      ownCount: 1,
+    });
+    expect(hiddenNote?.dotVotes.subjective).not.toHaveProperty("count");
+    expect(hiddenNote?.dotVotes.objective).not.toHaveProperty("count");
+
+    reconnected.close();
+    await arrangeStep(owner, 5);
+
+    const resultView = await connectRoomAs(MEMBER, roomId);
+    const publicSnapshot = await expectType(resultView, "snapshot");
+    const publicNote = publicSnapshot.notes.find((note) => note.id === noteId);
+    expect(publicNote?.dotVotes.subjective).toMatchObject({
+      count: 1,
+      votedByMe: true,
+      ownCount: 1,
+    });
+
+    resultView.close();
+    owner.close();
+  });
+
+  it("主観ドットは1票まで投票でき、投票中は総数を除いて全員へ届く", async () => {
     const { owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
 
@@ -953,12 +1039,10 @@ describe("note:vote（課題ドット投票）", () => {
     const toMember = await expectType(member, "note:updated");
 
     expect(toOwner.note.dotVotes.subjective).toEqual({
-      count: 1,
       votedByMe: false,
       ownCount: 0,
     });
     expect(toMember.note.dotVotes.subjective).toEqual({
-      count: 1,
       votedByMe: true,
       ownCount: 1,
     });
@@ -981,12 +1065,12 @@ describe("note:vote（課題ドット投票）", () => {
     const toOwner = await expectType(owner, "note:updated");
     const toMember = await expectType(member, "note:updated");
 
-    expect(toOwner.note.dotVotes.subjective.count).toBe(0);
+    expect(toOwner.note.dotVotes.subjective).not.toHaveProperty("count");
     expect(toMember.note.dotVotes.subjective).toMatchObject({
-      count: 0,
       votedByMe: false,
       ownCount: 0,
     });
+    expect(toMember.note.dotVotes.subjective).not.toHaveProperty("count");
 
     owner.close();
     member.close();
@@ -1090,13 +1174,13 @@ describe("note:vote（課題ドット投票）", () => {
       const toOwner = await expectType(owner, "note:updated");
       const toMember = await expectType(member, "note:updated");
 
-      expect(toOwner.note.dotVotes.objective.count).toBe(expected);
+      expect(toOwner.note.dotVotes.objective).not.toHaveProperty("count");
       expect(toOwner.note.dotVotes.objective.ownCount).toBe(0);
       expect(toMember.note.dotVotes.objective).toEqual({
-        count: expected,
         votedByMe: true,
         ownCount: expected,
       });
+      expect(toMember.note.dotVotes.objective).not.toHaveProperty("count");
     }
 
     send(member, { type: "note:vote", noteId, kind: "objective" });
@@ -1124,15 +1208,15 @@ describe("note:vote（課題ドット投票）", () => {
     const toMember = await expectType(member, "note:updated");
 
     expect(toOwner.note.dotVotes.objective).toMatchObject({
-      count: 0,
       votedByMe: false,
       ownCount: 0,
     });
+    expect(toOwner.note.dotVotes.objective).not.toHaveProperty("count");
     expect(toMember.note.dotVotes.objective).toEqual({
-      count: 0,
       votedByMe: false,
       ownCount: 0,
     });
+    expect(toMember.note.dotVotes.objective).not.toHaveProperty("count");
 
     owner.close();
     member.close();

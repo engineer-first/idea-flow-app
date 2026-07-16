@@ -1,9 +1,10 @@
 // 付箋（notes）の真実。ストレージアクセス・可視性判定・プロトコル射影と、
 // 受信者ごとの可視性を踏まえたノート配信ヘルパをここに集約する。
 import type { NoteColor, ProtocolNote } from "../../contracts/room-protocol";
-import { visibleTo } from "../visibility";
+import { projectNoteForViewer, visibleTo } from "../visibility";
 import type { RoomBroadcaster } from "./broadcast";
 import { type HandlerCtx, replyNotFound } from "./handler-context";
+import { getPhase } from "./phase";
 import { countNoteVotes, countUserNoteVotes, hasVote } from "./votes";
 
 export type NoteRow = {
@@ -206,9 +207,13 @@ export function broadcastNoteInserted(
   broadcaster: RoomBroadcaster,
   row: NoteRow,
 ): void {
+  const phase = getPhase(sql);
   broadcaster.broadcastNote((viewerId) => ({
     type: "note:inserted",
-    note: toProtocolNote(sql, row, viewerId),
+    note: projectNoteForViewer(
+      { viewerId, phase },
+      toProtocolNote(sql, row, viewerId),
+    ),
   }));
 }
 
@@ -217,8 +222,12 @@ export function broadcastNoteUpdated(
   broadcaster: RoomBroadcaster,
   row: NoteRow,
 ): void {
+  const phase = getPhase(sql);
   broadcaster.broadcastNote((viewerId) => ({
     type: "note:updated",
-    note: toProtocolNote(sql, row, viewerId),
+    note: projectNoteForViewer(
+      { viewerId, phase },
+      toProtocolNote(sql, row, viewerId),
+    ),
   }));
 }

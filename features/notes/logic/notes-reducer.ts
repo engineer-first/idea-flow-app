@@ -113,6 +113,16 @@ function mergeLocalDotVote(
     return incoming;
   }
 
+  if (incoming.count === undefined) {
+    const projected = {
+      ...incoming,
+      votedByMe: true,
+      ownCount: current.ownCount,
+    };
+    delete projected.count;
+    return projected;
+  }
+
   return {
     count: incoming.count + current.ownCount - incoming.ownCount,
     votedByMe: true,
@@ -168,7 +178,7 @@ export function voteNoteLocally(
             dotVotes: {
               ...note.dotVotes,
               [kind]: {
-                count: summary.count + 1,
+                ...withUpdatedCount(summary, (summary.count ?? 0) + 1),
                 votedByMe: true,
                 ownCount: summary.ownCount + 1,
               },
@@ -203,7 +213,10 @@ export function resetNoteVoteLocally(
             dotVotes: {
               ...note.dotVotes,
               [kind]: {
-                count: Math.max(0, summary.count - summary.ownCount),
+                ...withUpdatedCount(
+                  summary,
+                  Math.max(0, (summary.count ?? 0) - summary.ownCount),
+                ),
                 votedByMe: false,
                 ownCount: 0,
               },
@@ -212,4 +225,11 @@ export function resetNoteVoteLocally(
         : note,
     ),
   };
+}
+
+function withUpdatedCount(
+  summary: Note["dotVotes"][DotVoteKind],
+  count: number,
+): Pick<Note["dotVotes"][DotVoteKind], "count"> | Record<string, never> {
+  return summary.count === undefined ? {} : { count };
 }
