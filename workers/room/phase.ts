@@ -190,6 +190,13 @@ export const phaseHandlers: MessageHandlers<"start_phase" | "phase:next"> = {
       return;
     }
     const next = nextRoomPhase(current);
+    // Step 1-5 など「次のフェーズがまだ実装されていない」状態では
+    // nextRoomPhase が current をそのまま返す。ここで no-op を配信すると
+    // クライアントの decision 表示がフェーズ単位で無条件クリアされてしまう
+    // （DB上の decision は残るため、再接続時の snapshot で復活し不整合になる）。
+    if (next === current) {
+      return;
+    }
     savePhase(ctx.sql, next);
     ctx.broadcaster.broadcastToAll({ type: "phase:updated", phase: next });
   },

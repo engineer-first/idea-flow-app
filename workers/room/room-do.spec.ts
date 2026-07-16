@@ -741,6 +741,20 @@ describe("RoomDO phase:next", () => {
     ws.close();
   });
 
+  it("Step 1-5 で phase:next を送っても no-op で phase:updated を配信しない", async () => {
+    const roomName = "room-phase-step5-noop";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(5), USER_A);
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "phase:next" }));
+
+    expect(await nextJsonWithin(ws)).toBeUndefined();
+    expect(await stub.getPhase()).toEqual(buildPhaseStep(5));
+    ws.close();
+  });
+
   it("lobby では force を付けても phase:next できない", async () => {
     const roomName = "room-phase-force-lobby";
     const stub = roomStub(roomName);
