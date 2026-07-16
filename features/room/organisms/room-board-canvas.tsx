@@ -11,6 +11,7 @@ import {
 } from "@/contracts/grouping";
 import type { DotVoteKind } from "@/contracts/room-protocol";
 import type { DotVoteRemaining } from "@/features/dot-vote";
+import { IdeaSupportSidebar } from "@/features/idea-support";
 import {
   type Note,
   NoteCard,
@@ -181,6 +182,9 @@ export function RoomBoardCanvas({
             onDelete={onPrivateNoteDelete}
             onDragStart={onPrivateNoteDragStart}
           />
+        </div>
+        <div className="pointer-events-none absolute inset-y-3 right-3 z-30">
+          <IdeaSupportSidebar />
         </div>
       </div>
     </div>
