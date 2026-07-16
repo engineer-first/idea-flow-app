@@ -129,10 +129,12 @@ describe("RoomBoardCanvas", () => {
     expect(screen.getByRole("button", { name: "付箋を追加" })).toBeDisabled();
   });
 
-  it("発想支援サイドバーを表示する", () => {
+  it("発想支援サイドバーを閉じた状態で表示する", () => {
     setup();
 
-    expect(screen.getByText("Inspiration Tools")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "発想支援を開く" }),
+    ).toBeInTheDocument();
   });
 
   describe("決定操作", () => {

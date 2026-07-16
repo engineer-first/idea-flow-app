@@ -9,7 +9,7 @@ import { IdeaSupportSidebarContent } from "../molecules/idea-support-sidebar-con
 import { IdeaSupportSidebarHeader } from "../molecules/idea-support-sidebar-header";
 
 export function IdeaSupportSidebar() {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
     <Card
