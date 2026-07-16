@@ -104,6 +104,15 @@ export function NoteCard({
     }
   }, [disabled, isEditing, note.content]);
 
+  // 結果ステップへ切り替わりeditingDisabledになったら、編集中でも
+  // 未送信の下書きを送らずに編集を強制終了する（disabledと同じ二重の安全策）。
+  useEffect(() => {
+    if (editingDisabled && isEditing) {
+      setIsEditing(false);
+      setLocalContent(note.content);
+    }
+  }, [editingDisabled, isEditing, note.content]);
+
   // 状態に応じてフォーカスを移す。サーフェスにフォーカスがないと
   // Backspace削除などのキー操作を受け取れない。
   useEffect(() => {
@@ -217,7 +226,7 @@ export function NoteCard({
         onChange={(event) => setLocalContent(event.target.value)}
         onBlur={(event) => {
           setIsEditing(false);
-          if (disabled) {
+          if (disabled || editingDisabled) {
             return;
           }
           onContentChange(note.id, event.target.value);

@@ -242,6 +242,36 @@ describe("NoteCard", () => {
       expect(screen.getByRole("textbox")).toHaveAttribute("readonly");
     });
 
+    it("編集中にeditingDisabledになると編集を強制終了し、onContentChangeを呼ばずに本文を巻き戻す", () => {
+      const onContentChange = vi.fn();
+      const { props, view } = setup({
+        isSelected: true,
+        onContentChange,
+        note: buildNote({ content: "サーバー上の本文" }),
+      });
+
+      clickNote();
+      fireEvent.change(screen.getByRole("textbox"), {
+        target: { value: "未送信の下書き" },
+      });
+
+      view.rerender(<NoteCard {...props} editingDisabled />);
+
+      expect(onContentChange).not.toHaveBeenCalled();
+      expect(screen.getByRole("textbox")).toHaveAttribute("readonly");
+      expect(screen.getByDisplayValue("サーバー上の本文")).toBeInTheDocument();
+    });
+
+    it("editingDisabled 中に手動でblurしてもonContentChangeを呼ばない", () => {
+      const onContentChange = vi.fn();
+      setup({ isSelected: true, editingDisabled: true, onContentChange });
+
+      const textarea = screen.getByRole("textbox");
+      fireEvent.blur(textarea);
+
+      expect(onContentChange).not.toHaveBeenCalled();
+    });
+
     it("選択中にEnterで編集モードに入る", () => {
       setup({ isSelected: true });
 
