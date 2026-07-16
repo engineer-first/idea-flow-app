@@ -96,7 +96,9 @@ export function RoomBoardCanvas({
     ? calculateRenderGroups(notes, groups)
     : [];
   const selectedNote = notes.find((note) => note.id === selectedNoteId);
-  const canDecide = Boolean(selectedNote && isHost && isResultStep(phase));
+  const canDecide = Boolean(
+    selectedNote && isHost && !isDisconnected && isResultStep(phase),
+  );
 
   function handleBoardPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     // 付箋の上のpointerdownはバブリングしてくるので、ボード背景を

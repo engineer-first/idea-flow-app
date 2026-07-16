@@ -148,13 +148,15 @@ describe("RoomBoardCanvas", () => {
     });
 
     it.each([
-      { phase: buildPhaseStep(5), isHost: false },
-      { phase: buildPhaseStep(4), isHost: true },
-    ])("非ホストまたは結果ステップ以外では決定ボタンを表示しない", ({
+      { phase: buildPhaseStep(5), isHost: false, isDisconnected: false },
+      { phase: buildPhaseStep(4), isHost: true, isDisconnected: false },
+      { phase: buildPhaseStep(5), isHost: true, isDisconnected: true },
+    ])("非ホスト・結果ステップ以外・切断中では決定ボタンを表示しない", ({
       phase,
       isHost,
+      isDisconnected,
     }) => {
-      setup({ phase, isHost, selectedNoteId: "note-1" });
+      setup({ phase, isHost, isDisconnected, selectedNoteId: "note-1" });
 
       expect(
         screen.queryByRole("button", {

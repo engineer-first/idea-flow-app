@@ -13,7 +13,7 @@ export function DecideNoteAction({ x, y, onDecide }: DecideNoteActionProps) {
       type="button"
       size="sm"
       className="absolute z-30 shadow-md"
-      style={{ left: x, top: y - 36 }}
+      style={{ left: x, top: Math.max(0, y - 36) }}
       onClick={onDecide}
     >
       これを「取り組む課題」に決定

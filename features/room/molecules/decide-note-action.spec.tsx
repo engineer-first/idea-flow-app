@@ -16,4 +16,14 @@ describe("DecideNoteAction", () => {
     fireEvent.click(button);
     expect(onDecide).toHaveBeenCalledTimes(1);
   });
+
+  it("付箋が上端に近いときはボタンの上端が画面外に出ないようクランプする", () => {
+    const onDecide = vi.fn();
+    render(<DecideNoteAction x={120} y={10} onDecide={onDecide} />);
+
+    const button = screen.getByRole("button", {
+      name: "これを「取り組む課題」に決定",
+    });
+    expect(button).toHaveStyle({ top: "0px" });
+  });
 });
