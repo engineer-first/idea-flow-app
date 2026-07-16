@@ -215,6 +215,7 @@ export function RoomBoardCanvas({
           <PrivateNotesToolbar
             notes={privateNotes}
             disabled={isDisconnected}
+            editingDisabled={isResultStep(phase)}
             className="pointer-events-auto max-w-5xl"
             toolbarRef={privateToolbarRef}
             isReturnDropTarget={isReturnDropTarget}
