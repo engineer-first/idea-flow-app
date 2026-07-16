@@ -1,3 +1,5 @@
+import { Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { VoteCountBadge } from "./vote-count-badge";
 
 export type VoteTotalingRowViewModel = {
@@ -8,9 +10,21 @@ export type VoteTotalingRowViewModel = {
   score: number;
 };
 
-type VoteTotalingRowProps = { row: VoteTotalingRowViewModel; rank: number };
+type VoteTotalingRowProps = {
+  row: VoteTotalingRowViewModel;
+  rank: number;
+  canDecide: boolean;
+  isDecided: boolean;
+  onDecide: () => void;
+};
 
-export function VoteTotalingRow({ row, rank }: VoteTotalingRowProps) {
+export function VoteTotalingRow({
+  row,
+  rank,
+  canDecide,
+  isDecided,
+  onDecide,
+}: VoteTotalingRowProps) {
   return (
     <li
       className="grid gap-2 rounded-lg border border-border bg-background p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
@@ -38,6 +52,26 @@ export function VoteTotalingRow({ row, rank }: VoteTotalingRowProps) {
           value={row.objectiveCount}
           tone="objective"
         />
+        {isDecided ? (
+          <span
+            role="status"
+            aria-label="取り組む課題に決定済み"
+            className="inline-flex h-7 items-center gap-1 rounded-md bg-emerald-700 px-2 text-xs font-medium text-white"
+          >
+            <Check aria-hidden="true" className="size-3.5" />
+            決定済み
+          </span>
+        ) : canDecide ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            aria-label="この付箋を取り組む課題に決定"
+            onClick={onDecide}
+          >
+            決定する
+          </Button>
+        ) : null}
       </div>
     </li>
   );

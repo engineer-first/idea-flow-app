@@ -259,6 +259,10 @@ export function RoomBoardView({
         isVotingComplete={isResultStep(phase)}
         members={members}
         notes={notes}
+        decision={decision}
+        isHost={isHost}
+        isDisconnected={isDisconnected}
+        onNoteDecide={onNoteDecide}
       />
 
       <LeaveConfirmDialog

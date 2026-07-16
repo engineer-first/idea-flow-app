@@ -1,4 +1,5 @@
 import {
+  type Decision,
   DOT_VOTE_LIMITS,
   type ProtocolMember,
   type ProtocolNote,
@@ -62,12 +63,20 @@ export function VoteTotalingPanel({
   notes,
   members,
   isVotingComplete,
+  decision,
+  isHost,
+  isDisconnected,
+  onNoteDecide,
 }: {
   notes: ProtocolNote[];
   members: ProtocolMember[];
   // phase4 への遷移時に RoomDO が投票完了を保証する。以後にメンバーが
   // 退出しても、確定済み結果を待機状態へ戻さないための明示的な状態。
   isVotingComplete?: boolean;
+  decision: Decision | null;
+  isHost: boolean;
+  isDisconnected: boolean;
+  onNoteDecide: (noteId: string) => void;
 }) {
   const result = calculateVoteTotaling({
     notes,
@@ -107,7 +116,16 @@ export function VoteTotalingPanel({
                 candidate.score === row.score &&
                 candidate.subjectiveCount === row.subjectiveCount,
             ) + 1;
-          return <VoteTotalingRow key={row.noteId} row={row} rank={rank} />;
+          return (
+            <VoteTotalingRow
+              key={row.noteId}
+              row={row}
+              rank={rank}
+              canDecide={isHost && !isDisconnected}
+              isDecided={decision?.noteId === row.noteId}
+              onDecide={() => onNoteDecide(row.noteId)}
+            />
+          );
         })}
       </ol>
     </section>

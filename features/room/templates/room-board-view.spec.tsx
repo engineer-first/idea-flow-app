@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { buildPhaseStep } from "@/contracts/phase.fixture";
 import {
+  buildDecision,
   buildMembers,
   buildNote,
   buildNotes,
@@ -213,6 +214,51 @@ describe("RoomBoardView", () => {
     fireEvent.click(screen.getByRole("button", { name: "投票結果を表示" }));
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("結果ダイアログのランキング行からホストの決定操作を通知する", () => {
+    const onNoteDecide = vi.fn();
+    setup({
+      phase: buildPhaseStep(5),
+      isHost: true,
+      onNoteDecide,
+    });
+
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getAllByRole("button", {
+        name: "この付箋を取り組む課題に決定",
+      })[0],
+    );
+
+    expect(onNoteDecide).toHaveBeenCalledWith("note-1");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("結果ダイアログは決定済み付箋をstatusとして表示する", () => {
+    setup({
+      phase: buildPhaseStep(5),
+      decision: buildDecision({ noteId: "note-1", decidedBy: ME }),
+    });
+
+    expect(
+      within(screen.getByRole("dialog")).getByRole("status", {
+        name: "取り組む課題に決定済み",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("切断中は結果ダイアログの決定操作を出さない", () => {
+    setup({
+      phase: buildPhaseStep(5),
+      isHost: true,
+      connectionStatus: "closed",
+    });
+
+    expect(
+      within(screen.getByRole("dialog")).queryByRole("button", {
+        name: "この付箋を取り組む課題に決定",
+      }),
+    ).not.toBeInTheDocument();
   });
 
   it("付箋のドット投票ボタンでonNoteVoteを呼ぶ", () => {

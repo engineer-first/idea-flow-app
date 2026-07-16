@@ -1,7 +1,11 @@
-import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import type { ProtocolNote } from "@/contracts/room-protocol";
-import { buildMembers, buildNotes } from "@/contracts/room-protocol.fixture";
+import {
+  buildDecision,
+  buildMembers,
+  buildNotes,
+} from "@/contracts/room-protocol.fixture";
 import {
   calculateVoteTotaling,
   VoteTotalingPanel,
@@ -119,6 +123,10 @@ describe("VoteTotalingPanel", () => {
         isVotingComplete
         members={[]}
         notes={[withVotes(note, 1, 3)]}
+        decision={null}
+        isHost={false}
+        isDisconnected={false}
+        onNoteDecide={vi.fn()}
       />,
     );
 
@@ -130,7 +138,16 @@ describe("VoteTotalingPanel", () => {
       withVotes(note, [2, 0, 0, 0, 0][index], [0, 3, 2, 1, 0][index]),
     );
 
-    render(<VoteTotalingPanel members={buildMembers(2, ME)} notes={notes} />);
+    render(
+      <VoteTotalingPanel
+        members={buildMembers(2, ME)}
+        notes={notes}
+        decision={null}
+        isHost={false}
+        isDisconnected={false}
+        onNoteDecide={vi.fn()}
+      />,
+    );
 
     expect(screen.getByTestId("vote-result-ranking")).toHaveClass("mx-auto");
     expect(screen.getByText("総合ポイントが高い順")).toBeInTheDocument();
@@ -150,5 +167,94 @@ describe("VoteTotalingPanel", () => {
     expect(
       within(screen.getByTestId("vote-totaling-row-note-1")).getByText("10点"),
     ).toBeInTheDocument();
+  });
+
+  it("ホストが接続中なら未決定のランキング行から決定を通知する", () => {
+    const notes = buildNotes(2);
+    const onNoteDecide = vi.fn();
+
+    render(
+      <VoteTotalingPanel
+        isVotingComplete
+        members={buildMembers(2, ME)}
+        notes={notes}
+        decision={null}
+        isHost
+        isDisconnected={false}
+        onNoteDecide={onNoteDecide}
+      />,
+    );
+
+    const decideButton = within(
+      screen.getByTestId("vote-totaling-row-note-1"),
+    ).getByRole("button", { name: "この付箋を取り組む課題に決定" });
+    expect(decideButton).toHaveTextContent("決定する");
+
+    fireEvent.click(decideButton);
+
+    expect(onNoteDecide).toHaveBeenCalledWith("note-1");
+  });
+
+  it.each([
+    { isHost: false, isDisconnected: false },
+    { isHost: true, isDisconnected: true },
+  ])("非ホストまたは切断中はランキング行に決定操作を出さない", ({
+    isHost,
+    isDisconnected,
+  }) => {
+    render(
+      <VoteTotalingPanel
+        isVotingComplete
+        members={buildMembers(2, ME)}
+        notes={buildNotes(2)}
+        decision={null}
+        isHost={isHost}
+        isDisconnected={isDisconnected}
+        onNoteDecide={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", {
+        name: "この付箋を取り組む課題に決定",
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("決定済み行はstatusを表示し、別の行から決定し直せる", () => {
+    const notes = buildNotes(2);
+    const onNoteDecide = vi.fn();
+
+    render(
+      <VoteTotalingPanel
+        isVotingComplete
+        members={buildMembers(2, ME)}
+        notes={notes}
+        decision={buildDecision({ noteId: "note-1", decidedBy: ME })}
+        isHost
+        isDisconnected={false}
+        onNoteDecide={onNoteDecide}
+      />,
+    );
+
+    const decidedRow = screen.getByTestId("vote-totaling-row-note-1");
+    expect(
+      within(decidedRow).getByRole("status", {
+        name: "取り組む課題に決定済み",
+      }),
+    ).toHaveTextContent("決定済み");
+    expect(
+      within(decidedRow).queryByRole("button", {
+        name: "この付箋を取り組む課題に決定",
+      }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(
+      within(screen.getByTestId("vote-totaling-row-note-2")).getByRole(
+        "button",
+        { name: "この付箋を取り組む課題に決定" },
+      ),
+    );
+    expect(onNoteDecide).toHaveBeenCalledWith("note-2");
   });
 });

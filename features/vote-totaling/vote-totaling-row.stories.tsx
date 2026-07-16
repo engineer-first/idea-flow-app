@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { fn } from "storybook/test";
 import { VoteTotalingRow } from "./vote-totaling-row";
 
 const meta = {
@@ -6,6 +7,9 @@ const meta = {
   component: VoteTotalingRow,
   args: {
     rank: 1,
+    canDecide: false,
+    isDecided: false,
+    onDecide: fn(),
     row: {
       noteId: "note-1",
       content: "初学者が作るものを決められない",
@@ -28,5 +32,18 @@ export const Ranked: Story = {
       objectiveCount: 5,
       score: 5,
     },
+  },
+};
+
+export const ReadyToDecide: Story = {
+  args: {
+    canDecide: true,
+  },
+};
+
+export const Decided: Story = {
+  args: {
+    canDecide: true,
+    isDecided: true,
   },
 };
