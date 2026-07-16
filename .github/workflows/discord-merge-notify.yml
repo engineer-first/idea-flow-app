@@ -3,6 +3,8 @@ name: Discord Merge Notify
 on:
   pull_request:
     types: [closed]
+    branches:
+      - develop
 
 permissions:
   contents: read
