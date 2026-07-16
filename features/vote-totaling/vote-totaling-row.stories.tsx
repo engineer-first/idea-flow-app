@@ -47,3 +47,16 @@ export const Decided: Story = {
     isDecided: true,
   },
 };
+
+export const Untitled: Story = {
+  args: {
+    canDecide: true,
+    row: {
+      noteId: "note-3",
+      content: "",
+      subjectiveCount: 0,
+      objectiveCount: 0,
+      score: 0,
+    },
+  },
+};

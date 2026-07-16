@@ -40,3 +40,7 @@ export const Empty: Story = {
 export const Disconnected: Story = {
   args: { disabled: true },
 };
+
+export const ResultStep: Story = {
+  args: { editingDisabled: true },
+};
