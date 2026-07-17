@@ -22,14 +22,16 @@ jobs:
       - name: Notify Discord
         uses: actions/github-script@v7
         env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          # マージ通知（discord-merge-notify.yml）とはあえて別チャンネル・別secretにしている。
+          # 同じチャンネルだと、着手通知に付いた質問スレッドがマージ通知に埋もれてしまうため。
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL_ISSUE_ASSIGN }}
         with:
           script: |
             const { buildDiscordAssignPayload } = require("./.github/scripts/discord-issue-assign-notify.js");
 
             const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
             if (!webhookUrl) {
-              core.warning("DISCORD_WEBHOOK_URL が未設定のため通知をスキップしました");
+              core.warning("DISCORD_WEBHOOK_URL_ISSUE_ASSIGN が未設定のため通知をスキップしました");
               return;
             }
 
