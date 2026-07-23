@@ -29,6 +29,7 @@ import {
   PrivateNotesToolbar,
   StickyNote,
 } from "@/features/notes";
+import { cn } from "@/lib/utils";
 import type { Decision } from "../logic/room-reducer";
 import {
   DECIDE_NOTE_ACTION_INSET,
@@ -221,7 +222,14 @@ export function RoomBoardCanvas({
         {/* バナー（top）とパネル（left）は別条件で出す: Step 2-2 以降は
             テンプレートを出さないが、決定課題の掲示は続ける（#165 で再利用）。 */}
         {hmwDecidedIssue !== null ? (
-          <div className="pointer-events-none absolute inset-x-3 top-3 z-30 flex justify-center">
+          <div
+            className={cn(
+              "pointer-events-none absolute inset-x-3 top-3 z-30 flex justify-center",
+              // テンプレートパネル（left-3 + w-64）と重なる帯を、
+              // パネル表示中はバナー側の左余白として予約する。
+              isHmwWritingStep(phase) && "left-72",
+            )}
+          >
             {/* 長文でも左端のテンプレートパネルと同じ帯を侵食しないよう
                 幅を抑える（本文は truncate + title 属性で全文可読）。 */}
             <HmwDecidedIssueBanner
