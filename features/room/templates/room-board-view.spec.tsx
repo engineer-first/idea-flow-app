@@ -348,6 +348,20 @@ describe("RoomBoardView", () => {
       ).toBeDisabled();
     });
 
+    it("openの間は Step 2-1 の HMW テンプレートを選ぶと onHmwTemplateSelect が呼ばれる", () => {
+      const onHmwTemplateSelect = vi.fn();
+      setup({
+        phase: buildPhaseStep(1, 2),
+        notes: [],
+        connectionStatus: "open",
+        onHmwTemplateSelect,
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: HMW_TEMPLATES[0] }));
+
+      expect(onHmwTemplateSelect).toHaveBeenCalledWith(HMW_TEMPLATES[0]);
+    });
+
     it("closedの間は付箋をクリックしても選択されない", () => {
       setup({ connectionStatus: "closed" });
 
