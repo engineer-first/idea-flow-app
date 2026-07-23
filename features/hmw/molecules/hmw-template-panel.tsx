@@ -5,7 +5,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { HMW_EXAMPLES, HMW_HEADING, HMW_TEMPLATES } from "./hmw-content";
+import { HMW_EXAMPLES, HMW_HEADING, HMW_TEMPLATES } from "../logic/hmw-content";
 
 export type HmwTemplatePanelProps = {
   // テンプレートを選んだとき、その文言を起点に付箋を作る

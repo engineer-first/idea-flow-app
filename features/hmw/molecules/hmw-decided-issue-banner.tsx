@@ -3,7 +3,7 @@
 // パネルから独立した1要素にしている。
 import { Pin } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { DECIDED_ISSUE_LABEL } from "./hmw-content";
+import { DECIDED_ISSUE_LABEL } from "../logic/hmw-content";
 
 export type HmwDecidedIssueBannerProps = {
   // フェーズ1から持ち越された決定課題の本文

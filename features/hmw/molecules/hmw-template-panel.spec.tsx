@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { HMW_EXAMPLES, HMW_HEADING, HMW_TEMPLATES } from "./hmw-content";
+import { HMW_EXAMPLES, HMW_HEADING, HMW_TEMPLATES } from "../logic/hmw-content";
 import { HmwTemplatePanel } from "./hmw-template-panel";
 
 describe("HmwTemplatePanel", () => {

@@ -4,9 +4,9 @@ export {
   HMW_EXAMPLES,
   HMW_HEADING,
   HMW_TEMPLATES,
-} from "./hmw-content";
-export type { HmwDecidedIssueBannerProps } from "./hmw-decided-issue-banner";
-export { HmwDecidedIssueBanner } from "./hmw-decided-issue-banner";
-export { isHmwWritingStep } from "./hmw-step";
-export type { HmwTemplatePanelProps } from "./hmw-template-panel";
-export { HmwTemplatePanel } from "./hmw-template-panel";
+} from "./logic/hmw-content";
+export { isHmwWritingStep } from "./logic/hmw-step";
+export type { HmwDecidedIssueBannerProps } from "./molecules/hmw-decided-issue-banner";
+export { HmwDecidedIssueBanner } from "./molecules/hmw-decided-issue-banner";
+export type { HmwTemplatePanelProps } from "./molecules/hmw-template-panel";
+export { HmwTemplatePanel } from "./molecules/hmw-template-panel";

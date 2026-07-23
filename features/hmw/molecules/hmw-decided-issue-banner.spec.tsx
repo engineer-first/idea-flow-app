@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { DECIDED_ISSUE_LABEL } from "./hmw-content";
+import { DECIDED_ISSUE_LABEL } from "../logic/hmw-content";
 import { HmwDecidedIssueBanner } from "./hmw-decided-issue-banner";
 import { LONG_DECIDED_ISSUE } from "./hmw-decided-issue-banner.fixture";
 
