@@ -3,6 +3,7 @@ import { createRef } from "react";
 import { fn } from "storybook/test";
 import { buildPhaseStep } from "@/contracts/phase.fixture";
 import {
+  buildCarryover,
   buildDecision,
   buildNote,
   buildNotes,
@@ -32,9 +33,11 @@ const meta = {
     voteRemaining: { subjective: 5, objective: 10 },
     dragGhost: null,
     isReturnDropTarget: false,
+    hmwDecidedIssue: null,
     boardScrollerRef: createRef<HTMLDivElement>(),
     privateToolbarRef: createRef<HTMLDivElement>(),
     onSelect: fn(),
+    onHmwTemplateSelect: fn(),
     onNoteDragStart: fn(),
     onNoteContentChange: fn(),
     onNoteDelete: fn(),
@@ -136,5 +139,37 @@ export const Decided: Story = {
       noteId: "note-1",
       decidedBy: "11111111-1111-4111-8111-111111111111",
     }),
+  },
+};
+
+// Step 2-1: 決定課題バナー（上端中央）と HMW テンプレートパネル（左端）が
+// ボード上に浮かぶ。オーバーレイの位置決めはこのコンポーネントの責務。
+export const HmwWritingStep: Story = {
+  args: {
+    phase: buildPhaseStep(1, 2),
+    notes: [],
+    hmwDecidedIssue: buildCarryover().content,
+  },
+};
+
+// 長文の決定課題は max-w-xl + truncate で収まり、左端パネルの帯を侵食しない。
+export const HmwWritingStepLongIssue: Story = {
+  args: {
+    phase: buildPhaseStep(1, 2),
+    notes: [],
+    hmwDecidedIssue: buildCarryover({
+      content:
+        "宿題や家事や仕事のタスクが積み重なって優先順位を決められない。".repeat(
+          3,
+        ),
+    }).content,
+  },
+};
+
+// Step 2-2 以降相当: テンプレートパネルは消えても決定課題の掲示だけは残る。
+export const HmwCarryoverOnly: Story = {
+  args: {
+    phase: buildPhaseStep(2, 2),
+    hmwDecidedIssue: buildCarryover().content,
   },
 };

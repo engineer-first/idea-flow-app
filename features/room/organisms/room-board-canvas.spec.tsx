@@ -23,9 +23,11 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardCanvas>[0]> = {}) {
     voteRemaining: { subjective: 5, objective: 10 },
     dragGhost: null,
     isReturnDropTarget: false,
+    hmwDecidedIssue: null,
     boardScrollerRef: createRef<HTMLDivElement>(),
     privateToolbarRef: createRef<HTMLDivElement>(),
     onSelect: vi.fn(),
+    onHmwTemplateSelect: vi.fn(),
     onNoteDragStart: vi.fn(),
     onNoteContentChange: vi.fn(),
     onNoteDelete: vi.fn(),
@@ -135,6 +137,38 @@ describe("RoomBoardCanvas", () => {
     expect(
       screen.getByRole("button", { name: "発想支援を開く" }),
     ).toBeInTheDocument();
+  });
+
+  describe("HMW オーバーレイ", () => {
+    it("hmwDecidedIssue があるとボード上に決定課題バナーを表示する", () => {
+      setup({ hmwDecidedIssue: "宿題を後回しにしてしまう" });
+
+      expect(
+        screen.getByTestId("hmw-decided-issue-banner"),
+      ).toBeInTheDocument();
+    });
+
+    it("hmwDecidedIssue が null のときは決定課題バナーを表示しない", () => {
+      setup({ hmwDecidedIssue: null });
+
+      expect(
+        screen.queryByTestId("hmw-decided-issue-banner"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("Step 2-1 では HMW テンプレートパネルを表示する", () => {
+      setup({ phase: buildPhaseStep(1, 2), notes: [] });
+
+      expect(screen.getByTestId("hmw-template-panel")).toBeInTheDocument();
+    });
+
+    it("フェーズ1のステップでは HMW テンプレートパネルを表示しない", () => {
+      setup({ phase: buildPhaseStep(1) });
+
+      expect(
+        screen.queryByTestId("hmw-template-panel"),
+      ).not.toBeInTheDocument();
+    });
   });
 
   describe("決定操作", () => {

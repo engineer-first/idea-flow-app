@@ -158,15 +158,15 @@ describe("snapshot（接続・再接続の復帰パス）", () => {
     const noteId = await createNote({ owner, member });
 
     // owner が切断している間に member が本文と位置を確定する。
+    // 共有付箋の共同編集・移動は Step 1-2（共有する）の仕様。
     owner.close();
-    await arrangeStep(member, 1);
+    await arrangeStep(member, 2);
     send(member, {
       type: "note:update-content",
       noteId,
       content: "切断中の更新",
     });
     await expectType(member, "note:updated");
-    await arrangeStep(member, 2);
     send(member, { type: "note:move", noteId, x: 640, y: 480 });
     await expectType(member, "note:updated");
 
@@ -891,7 +891,9 @@ describe("note:update-content / note:move（pgTAP: メンバーの共同編集�
     const { owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
 
-    await arrangeStep(owner, 1);
+    // 共有付箋の共同編集は Step 1-2（共有する）の仕様。個人執筆ステップでは
+    // 共有付箋は凍結されるため、ここでは 1-2 で検証する。
+    await arrangeStep(owner, 2);
 
     send(member, {
       type: "note:update-content",
@@ -1224,17 +1226,18 @@ describe("note:vote（課題ドット投票）", () => {
 });
 
 describe("note:delete（pgTAP: DELETE は author のみ）", () => {
-  it("author は削除でき、全員に note:deleted が届く", async () => {
+  it("個人執筆ステップでは author でも共有付箋を削除できない（前フェーズの記録の凍結）", async () => {
     const { owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
 
+    // note:delete がゲートで許可されるのは個人執筆ステップ（1-1 / 2-1）だけで、
+    // そこでは共有付箋が凍結される。つまり共有済みの付箋はどのステップでも
+    // 削除できない（戻したいときは 1-2 の note:unpublish を使う）。
     await arrangeStep(owner, 1);
 
     send(owner, { type: "note:delete", noteId });
-    const toOwner = await expectType(owner, "note:deleted");
-    const toMember = await expectType(member, "note:deleted");
-    expect(toOwner.noteId).toBe(noteId);
-    expect(toMember.noteId).toBe(noteId);
+    const error = await expectType(owner, "error");
+    expect(error.code).toBe("forbidden");
 
     owner.close();
     member.close();

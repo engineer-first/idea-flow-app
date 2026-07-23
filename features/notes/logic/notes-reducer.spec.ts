@@ -52,6 +52,7 @@ describe("applyServerMessage", () => {
       phase: buildPhaseStep(1),
       isHost: false,
       decision: null,
+      carryovers: [],
       timer: { status: "idle" },
       serverNow: 1_000,
     };
@@ -71,6 +72,7 @@ describe("applyServerMessage", () => {
       phase: buildPhaseStep(1),
       isHost: false,
       decision: null,
+      carryovers: [],
       timer: { status: "idle" },
       serverNow: 1_000,
     };

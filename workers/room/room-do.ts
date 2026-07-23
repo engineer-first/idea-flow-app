@@ -35,7 +35,7 @@ import {
 import { filterVisible, projectNoteForViewer } from "../visibility";
 import { RoomBroadcaster, type SocketAttachment } from "./broadcast";
 import { decisionHandlers } from "./decision-handlers";
-import { getDecision } from "./decisions";
+import { getCarryovers, getDecision } from "./decisions";
 import { groupHandlers, listVisibleGroups } from "./groups";
 import type { HandlerCtx, MessageHandlers } from "./handler-context";
 import {
@@ -329,6 +329,8 @@ export class RoomDO extends DurableObject {
       isHost: isHostUser(this.sql, userId),
       decision:
         phase.kind === "step" ? getDecision(this.sql, phase.phase) : null,
+      carryovers:
+        phase.kind === "step" ? getCarryovers(this.sql, phase.phase) : [],
       timer: getTimerState(this.sql),
       serverNow: Date.now(),
     });

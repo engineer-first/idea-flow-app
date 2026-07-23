@@ -19,7 +19,11 @@ vi.mock("./room-notify", () => ({
 }));
 
 import { buildLobbyPhase, buildPhaseStep } from "@/contracts/phase.fixture";
-import { buildDecision, buildMembers } from "@/contracts/room-protocol.fixture";
+import {
+  buildCarryover,
+  buildDecision,
+  buildMembers,
+} from "@/contracts/room-protocol.fixture";
 import { useRoomState } from "./use-room-state";
 
 describe("useRoomState", () => {
@@ -45,6 +49,7 @@ describe("useRoomState", () => {
         phase: buildPhaseStep(2),
         isHost: true,
         decision,
+        carryovers: [],
         timer: { status: "running", endsAt: 1_000, durationMs: 60_000 },
         serverNow: 500,
       }),
@@ -54,6 +59,34 @@ describe("useRoomState", () => {
     expect(result.current.phase).toEqual(buildPhaseStep(2));
     expect(result.current.timer.status).toBe("running");
     expect(result.current.decision).toEqual(decision);
+  });
+
+  it("snapshot で carryovers を復元し、phase:updated では維持する", () => {
+    const { result } = setup();
+    const carryover = buildCarryover();
+
+    act(() =>
+      result.current.applyMessage({
+        type: "snapshot",
+        notes: [],
+        members: buildMembers(1),
+        phase: buildPhaseStep(1, 2),
+        isHost: true,
+        decision: null,
+        carryovers: [carryover],
+        timer: { status: "idle" },
+        serverNow: 500,
+      }),
+    );
+    expect(result.current.carryovers).toEqual([carryover]);
+
+    act(() =>
+      result.current.applyMessage({
+        type: "phase:updated",
+        phase: buildPhaseStep(1, 2),
+      }),
+    );
+    expect(result.current.carryovers).toEqual([carryover]);
   });
 
   it("decision:updated を反映し、phase:updated で決定をクリアする", () => {

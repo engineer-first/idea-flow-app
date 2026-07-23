@@ -178,7 +178,7 @@ describe("NoteSchema", () => {
 });
 
 describe("ServerMessageSchema", () => {
-  it("snapshot は notes / members / phase / isHost / decision を必須にする", () => {
+  it("snapshot は notes / members / phase / isHost / decision / carryovers を必須にする", () => {
     const parsed = ServerMessageSchema.parse({
       type: "snapshot",
       notes: [],
@@ -186,6 +186,7 @@ describe("ServerMessageSchema", () => {
       phase: LOBBY,
       isHost: true,
       decision: null,
+      carryovers: [],
       timer: { status: "idle" },
       serverNow: 1_700_000_000_000,
     });
@@ -196,6 +197,7 @@ describe("ServerMessageSchema", () => {
       phase: LOBBY,
       isHost: true,
       decision: null,
+      carryovers: [],
       timer: { status: "idle" },
       serverNow: 1_700_000_000_000,
     });
@@ -206,6 +208,20 @@ describe("ServerMessageSchema", () => {
       type: "snapshot",
       notes: [],
       phase: LOBBY,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("snapshot に carryovers フィールドが無いと拒否する", () => {
+    const result = ServerMessageSchema.safeParse({
+      type: "snapshot",
+      notes: [],
+      members: [],
+      phase: LOBBY,
+      isHost: false,
+      decision: null,
+      timer: { status: "idle" },
+      serverNow: 1_700_000_000_000,
     });
     expect(result.success).toBe(false);
   });
@@ -521,6 +537,7 @@ describe("parseServerMessage", () => {
           phase: LOBBY,
           isHost: false,
           decision: null,
+          carryovers: [],
           timer: { status: "idle" },
           serverNow: 1_700_000_000_000,
         }),
@@ -532,6 +549,7 @@ describe("parseServerMessage", () => {
       phase: LOBBY,
       isHost: false,
       decision: null,
+      carryovers: [],
       timer: { status: "idle" },
       serverNow: 1_700_000_000_000,
     });

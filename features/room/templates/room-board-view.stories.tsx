@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { fn, userEvent, within } from "storybook/test";
 import { buildPhaseStep } from "@/contracts/phase.fixture";
 import {
+  buildCarryover,
   buildDecision,
   buildMembers,
   buildNotes,
@@ -12,6 +13,7 @@ const ME = "11111111-1111-4111-8111-111111111111";
 const STEP_1_1 = buildPhaseStep(1);
 const STEP_1_4 = buildPhaseStep(4);
 const STEP_1_5 = buildPhaseStep(5);
+const STEP_2_1 = buildPhaseStep(1, 2);
 
 const meta = {
   title: "Room/RoomBoardView",
@@ -35,7 +37,9 @@ const meta = {
     hostUserId: ME,
     isNextPhasePending: false,
     privateNotes: [],
+    hmwDecidedIssue: null,
     onAddPrivateNote: fn(),
+    onHmwTemplateSelect: fn(),
     onPrivateNoteContentChange: fn(),
     onPrivateNoteDelete: fn(),
     onPrivateNotePublish: fn(),
@@ -228,5 +232,20 @@ export const NextPhaseConfirmDialog: Story = {
         name: "次のステップへ",
       }),
     );
+  },
+};
+
+// Step 2-1（HMW 個人執筆）: 持ち越された決定課題バナー（上端）と HMW
+// テンプレートパネル（左端）がボード上に浮かび、ボード面は自分の付箋だけ
+// （共有付箋・グループは出さない）。
+export const HmwWritingStep: Story = {
+  args: {
+    phase: STEP_2_1,
+    notes: [],
+    hmwDecidedIssue: buildCarryover().content,
+    privateNotes: buildNotes(2).map((note) => ({
+      ...note,
+      visibility: "private" as const,
+    })),
   },
 };

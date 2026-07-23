@@ -29,6 +29,7 @@ const meta = {
     currentUserId: ME,
     hostUserId: ME,
     isNextPhasePending: false,
+    isNextPhaseBlocked: false,
     voteRemaining: { subjective: 5, objective: 10 },
     isLeaving: false,
     onShowVoteResult: fn(),

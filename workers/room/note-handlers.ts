@@ -30,7 +30,7 @@ import {
   unpublishNote,
   updateNoteContent,
 } from "./notes";
-import { getPhase } from "./phase";
+import { getPhase, isPersonalWritingStep } from "./phase";
 import {
   addUserNoteVote,
   countUserNoteVotes,
@@ -45,6 +45,18 @@ function autoReorganizeAtGroupingStep(ctx: HandlerCtx): void {
   }
 }
 
+// 個人執筆ステップでは自分の private 付箋だけが変更対象。前フェーズから
+// 残っている共有付箋は記録として凍結する（canEdit の「shared は全員編集可」
+// が個人執筆ステップへ漏れ込むのを塞ぐ）。
+function isFrozenSharedNoteAtPersonalStep(
+  ctx: HandlerCtx,
+  row: NoteRow,
+): boolean {
+  return (
+    row.visibility !== "private" && isPersonalWritingStep(getPhase(ctx.sql))
+  );
+}
+
 export const noteHandlers: MessageHandlers<
   | "note:create"
   | "note:publish"
@@ -56,14 +68,14 @@ export const noteHandlers: MessageHandlers<
   | "note:vote"
   | "note:vote-reset"
 > = {
-  "note:create": (ctx) => {
+  "note:create": (ctx, message) => {
     const now = new Date().toISOString();
     const color = getMemberColor(ctx.sql, ctx.userId) ?? "yellow";
 
     const note: NoteRow = {
       id: crypto.randomUUID(),
       author_id: ctx.userId,
-      content: "",
+      content: message.content ?? "",
       visibility: "private",
       color: color,
       x: NOTE_SPAWN_X_MIN + Math.random() * NOTE_SPAWN_JITTER,
@@ -120,7 +132,10 @@ export const noteHandlers: MessageHandlers<
   "note:update-content": (ctx, message) => {
     const row = requireNote(ctx, message.noteId);
     if (!row) return;
-    if (!canEdit(row, ctx.userId)) {
+    if (
+      !canEdit(row, ctx.userId) ||
+      isFrozenSharedNoteAtPersonalStep(ctx, row)
+    ) {
       replyForbidden(ctx);
       return;
     }
@@ -181,7 +196,10 @@ export const noteHandlers: MessageHandlers<
   "note:delete": (ctx, message) => {
     const row = requireNote(ctx, message.noteId);
     if (!row) return;
-    if (row.author_id !== ctx.userId) {
+    if (
+      row.author_id !== ctx.userId ||
+      isFrozenSharedNoteAtPersonalStep(ctx, row)
+    ) {
       replyForbidden(ctx);
       return;
     }

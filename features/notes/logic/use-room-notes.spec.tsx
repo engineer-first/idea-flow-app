@@ -24,6 +24,7 @@ function snapshotMessage(
     phase: buildPhaseStep(1),
     isHost: true,
     decision: null,
+    carryovers: [],
     timer: { status: "idle" },
     serverNow: Date.now(),
   };
@@ -233,6 +234,13 @@ describe("useRoomNotes", () => {
 
     act(() => result.current.addNote());
     expect(send).toHaveBeenCalledWith({ type: "note:create" });
+
+    // テンプレート・具体例を起点にしたプリフィル付き作成。
+    act(() => result.current.addNote("もっと簡単に"));
+    expect(send).toHaveBeenCalledWith({
+      type: "note:create",
+      content: "もっと簡単に",
+    });
 
     act(() => result.current.publishNote(NOTE_ID, 50, 60));
     expect(send).toHaveBeenCalledWith({

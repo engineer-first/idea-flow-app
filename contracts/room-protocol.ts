@@ -119,6 +119,19 @@ export const DecisionSchema = z.object({
 });
 export type Decision = z.infer<typeof DecisionSchema>;
 
+// フェーズをまたいで引き継ぐ確定情報（前フェーズで決定された付箋）。
+// content は決定時点のコピーで、元付箋の後からの編集・削除に影響されない。
+// フェーズ2の「決定した課題」表示が最初の利用者で、フェーズ3の決定 HMW
+// 表示でも同じ形を再利用する。
+export const CarryoverSchema = z.object({
+  phase: z.number().int().min(1).max(3),
+  noteId: z.string().uuid(),
+  // サーバーが note.content（入力時に上限検証済み）をコピーする値だが、
+  // コントラクト単体でも他スキーマと同じ上限で有界にしておく。
+  content: z.string().max(NOTE_CONTENT_MAX_LENGTH),
+});
+export type Carryover = z.infer<typeof CarryoverSchema>;
+
 const NotePositionSchema = {
   x: z.number().finite().min(0).max(BOARD_WIDTH),
   y: z.number().finite().min(0).max(BOARD_HEIGHT),
@@ -129,7 +142,16 @@ const NotePositionSchema = {
 // ---------------------------------------------------------------
 
 export const ClientMessageSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("note:create") }),
+  // content はテンプレート・具体例を起点にしたプリフィル付き作成用。
+  // プロトコルに作成応答の相関 ID がないため、「作成してから内容を送る」
+  // 2 段階ではなく作成時に内容を渡せる形にしている。
+  z.object({
+    type: z.literal("note:create"),
+    content: z
+      .string()
+      .max(NOTE_CONTENT_MAX_LENGTH, "本文は2000文字以内で入力してください。")
+      .optional(),
+  }),
   z.object({
     type: z.literal("note:publish"),
     noteId: z.string().uuid(),
@@ -223,6 +245,8 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
     phase: RoomPhaseSchema,
     isHost: z.boolean(),
     decision: DecisionSchema.nullable(),
+    // 現在フェーズより前のフェーズで確定した決定の一覧（フェーズ昇順）。
+    carryovers: z.array(CarryoverSchema),
     timer: TimerStateSchema,
     serverNow: TimerMillisecondsSchema,
   }),
