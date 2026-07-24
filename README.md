@@ -4,6 +4,8 @@
 
 ハッカソン・ビジコン・チーム制作の初期で起きる「何を作ればいいか分からない」「アイデアが出ない」「どれを選べばいいか分からない」といった課題を、発散・整理・選定の流れに沿ったブレスト体験で支援します。Miro や FigJam のような自由なホワイトボードではなく、初学者でも迷わず進められるフレームワーク型のアイデア創出支援を目指しています。
 
+本番アプリ: **<https://ideaboost.dev>**
+
 ## ドキュメント
 
 プロダクトの詳細（PRD、ペルソナ、競合分析、画面イメージなど）は [idea-flow-app Wiki](https://github.com/engineer-first/idea-flow-app/wiki) にまとめています。仕様や設計の確認は Wiki を参照してください。
@@ -71,6 +73,9 @@ Google ログインを確認する場合は、Google Cloud Console で OAuth ク
 | `npm run new:room-do-migration -- 短い説明` | RoomDO migration の `.sql` スタブをタイムスタンプ付きで作成（例: `-- add-note-kind`）。コミットするのは `.sql` だけ（集約 `index.ts` は gitignore 済みの生成物で、`npm ci` / `test:workers` / `dev:api` などが自動再生成する） |
 | `npm run build`                             | Next.js 本番ビルド                                                                                                                                                                                                             |
 | `npm run build:cf`                          | Cloudflare Workers 向けビルド（OpenNext）                                                                                                                                                                                      |
+| `npm run deploy:api`                        | api-worker をデプロイ                                                                                                                                                                                                          |
+| `npm run deploy:app`                        | app-worker をビルド + デプロイ（api → app の順が必要な場合は `npm run deploy`）                                                                                                                                                |
+| `npm run deploy`                            | api → app の順で両方デプロイ                                                                                                                                                                                                   |
 | `npm run preview:cf`                        | Workers 向けビルドを workerd 上でローカル実行（2構成同時）                                                                                                                                                                     |
 | `npm run lint`                              | Biome による静的解析 (lint + format チェック)                                                                                                                                                                                  |
 | `npm run fix`                               | Biome の自動修正 (lint + format)                                                                                                                                                                                               |
@@ -81,10 +86,18 @@ Google ログインを確認する場合は、Google Cloud Console で OAuth ク
 
 ### デプロイ（Cloudflare）
 
-1. `wrangler d1 create idea-flow-lobby` で D1 を作成し、`workers/wrangler.jsonc` の `database_id` を置き換える
-2. `wrangler secret put SESSION_SECRET --config workers/wrangler.jsonc` で本番秘密鍵を設定する
-3. `npm run deploy:api` で api-worker をデプロイする（RoomDO migration の集約を再生成してから deploy する）
-4. `npm run build:cf && wrangler deploy` で Next.js ワーカーをデプロイする
+本番アプリは **<https://ideaboost.dev>** で利用できます。
+
+2 Worker + D1 + RoomDO 構成です。デプロイ順は **api → app**（`npm run deploy`）。CI と同じ D1 migration → api → app をこの 1 行で実行します。
+
+| Worker          | 設定ファイル             | 役割                                                         |
+| --------------- | ------------------------ | ------------------------------------------------------------ |
+| `idea-flow-app` | `wrangler.jsonc`         | UI（Next.js / OpenNext）+ `/api/*` を service binding で転送 |
+| `idea-flow-api` | `workers/wrangler.jsonc` | REST + WebSocket（D1 / RoomDO への唯一の入口）               |
+
+**本番の更新方法:** `develop` の変更を `release` にマージ（または push）すると GitHub Actions（`deploy.yml`）が自動で D1 migrate → api → app → health を実行します。手動で出すときは `npm run deploy`（`wrangler login` 済みであること）。Actions には `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` / `vars.NEXT_PUBLIC_SITE_URL` の設定が必要です。
+
+秘密・初回手順・カスタムドメイン・CI・動作確認の詳細は **[デプロイ構成図](docs/site/deploy-map/index.html)**（公開後: [GitHub Pages](https://engineer-first.github.io/idea-flow-app/deploy-map/)）を参照してください。
 
 ### MSW (Mock Service Worker)
 
