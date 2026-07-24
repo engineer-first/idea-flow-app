@@ -231,7 +231,7 @@ export function RoomBoardCanvas({
             )}
           >
             {/* 長文でも左端のテンプレートパネルと同じ帯を侵食しないよう
-                幅を抑える（本文は truncate + title 属性で全文可読）。 */}
+                幅を抑える（本文は省略せず折り返して全文表示する）。 */}
             <HmwDecidedIssueBanner
               content={hmwDecidedIssue}
               className="pointer-events-auto max-w-xl"

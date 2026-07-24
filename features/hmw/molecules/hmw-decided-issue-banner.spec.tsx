@@ -12,12 +12,11 @@ describe("HmwDecidedIssueBanner", () => {
     expect(screen.getByText("宿題を後回しにしてしまう")).toBeInTheDocument();
   });
 
-  it("長文でも title 属性で全文が読める", () => {
+  it("長文でも省略せず全文を表示する", () => {
     render(<HmwDecidedIssueBanner content={LONG_DECIDED_ISSUE} />);
 
-    expect(screen.getByText(LONG_DECIDED_ISSUE)).toHaveAttribute(
-      "title",
-      LONG_DECIDED_ISSUE,
-    );
+    const contentEl = screen.getByText(LONG_DECIDED_ISSUE);
+    expect(contentEl).not.toHaveClass("truncate");
+    expect(contentEl).toHaveClass("whitespace-normal");
   });
 });

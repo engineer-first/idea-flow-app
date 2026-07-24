@@ -15,8 +15,8 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-// 長文が1行に truncate され、全文は title 属性で読めることを確認する。
-// 幅を絞らないと truncate が発動しないため className で制限する。
+// 長文でも省略せず折り返して全文表示されることを確認する。
+// 折り返しを見た目で確認できるよう className で幅を制限する。
 export const LongContent: Story = {
   args: {
     content: LONG_DECIDED_ISSUE,

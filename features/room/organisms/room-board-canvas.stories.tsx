@@ -152,7 +152,7 @@ export const HmwWritingStep: Story = {
   },
 };
 
-// 長文の決定課題は max-w-xl + truncate で収まり、左端パネルの帯を侵食しない。
+// 長文の決定課題は max-w-xl 内で折り返して全文表示し、左端パネルの帯を侵食しない。
 export const HmwWritingStepLongIssue: Story = {
   args: {
     phase: buildPhaseStep(1, 2),
