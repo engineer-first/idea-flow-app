@@ -20,6 +20,7 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardHeader>[0]> = {}) {
     currentUserId: ME,
     hostUserId: ME,
     isNextPhasePending: false,
+    isNextPhaseBlocked: false,
     voteRemaining: { subjective: 5, objective: 10 },
     isLeaving: false,
     onShowVoteResult: vi.fn(),
@@ -72,7 +73,8 @@ describe("RoomBoardHeader", () => {
     it.each([
       ["未接続", { isDisconnected: true }],
       ["ステップ移行 pending", { isNextPhasePending: true }],
-      ["Step 1-5", { phase: buildPhaseStep(5) }],
+      // 決定待ち・次ステップ未実装などのブロック判定は view 側の責務。
+      ["ブロック中", { isNextPhaseBlocked: true }],
     ])("%s では「次のステップへ」が無効になる", (_label, overrides) => {
       setup({ isHost: true, ...overrides });
       expect(

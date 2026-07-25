@@ -37,9 +37,16 @@ vi.mock("../logic/room-notify", () => ({
   },
 }));
 
+import type { PersistentGroup } from "@/contracts/grouping";
 import type { RoomPhase } from "@/contracts/phase";
 import { buildPhaseStep } from "@/contracts/phase.fixture";
-import type { ProtocolNote } from "@/contracts/room-protocol";
+import type { Carryover, ProtocolNote } from "@/contracts/room-protocol";
+import { buildCarryover, buildGroup } from "@/contracts/room-protocol.fixture";
+import {
+  DECIDED_ISSUE_LABEL,
+  HMW_HEADING,
+  HMW_TEMPLATES,
+} from "@/features/hmw";
 import { FORCE_NEXT_PHASE_COPY } from "../molecules/force-next-phase-dialog";
 import { RoomBoard } from "./room-board";
 
@@ -162,6 +169,8 @@ function connectWithSnapshot(
   options?: {
     phase?: RoomPhase;
     isHost?: boolean;
+    carryovers?: Carryover[];
+    groups?: PersistentGroup[];
   },
 ) {
   const { view, socket } = renderBoard({ isHost: options?.isHost ?? true });
@@ -174,6 +183,8 @@ function connectWithSnapshot(
       phase: options?.phase ?? buildPhaseStep(1),
       isHost: options?.isHost ?? true,
       decision: null,
+      carryovers: options?.carryovers ?? [],
+      groups: options?.groups,
       timer: { status: "idle" },
       serverNow: Date.now(),
     }),
@@ -217,6 +228,7 @@ describe("メンバー参加・退出の通知", () => {
         phase: buildPhaseStep(1),
         isHost: true,
         decision: null,
+        carryovers: [],
         timer: { status: "idle" },
         serverNow: Date.now(),
       }),
@@ -369,6 +381,7 @@ describe("サーバーメッセージ → 画面反映", () => {
         phase: buildPhaseStep(5),
         isHost: true,
         decision: null,
+        carryovers: [],
         timer: { status: "idle" },
         serverNow: Date.now(),
       }),
@@ -1048,5 +1061,87 @@ describe("ユーザー操作 → プロトコルメッセージ送信", () => {
     fireEvent.click(screen.getByRole("button", { name: "移行する" }));
 
     expect(socket.sent).toContain(JSON.stringify({ type: "phase:next" }));
+  });
+});
+
+describe("Step 2-1（HMW 個人執筆）", () => {
+  function connectAtHmwStep(notes: ProtocolNote[] = []) {
+    return connectWithSnapshot(notes, {
+      phase: buildPhaseStep(1, 2),
+      carryovers: [buildCarryover({ content: "宿題を後回しにしてしまう" })],
+      groups:
+        notes.length >= 2
+          ? [
+              buildGroup({
+                name: "フェーズ1のグループ",
+                noteIds: notes.map((note) => note.id),
+              }),
+            ]
+          : undefined,
+    });
+  }
+
+  it("持ち越された決定課題と HMW 見出しが表示される", () => {
+    connectAtHmwStep();
+
+    expect(screen.getByText(DECIDED_ISSUE_LABEL)).toBeInTheDocument();
+    expect(screen.getByText("宿題を後回しにしてしまう")).toBeInTheDocument();
+    expect(screen.getByText(HMW_HEADING)).toBeInTheDocument();
+  });
+
+  it("テンプレートを選ぶと content 付き note:create を送る", () => {
+    const { socket } = connectAtHmwStep();
+
+    fireEvent.click(screen.getByRole("button", { name: HMW_TEMPLATES[0] }));
+
+    expect(socket.sent.map((raw) => JSON.parse(raw))).toContainEqual({
+      type: "note:create",
+      content: HMW_TEMPLATES[0],
+    });
+  });
+
+  it("「付箋を追加」は content なしの note:create を送る（イベントを content に流さない）", () => {
+    const { socket } = connectAtHmwStep();
+
+    fireEvent.click(screen.getByRole("button", { name: "付箋を追加" }));
+
+    expect(socket.sent.map((raw) => JSON.parse(raw))).toContainEqual({
+      type: "note:create",
+    });
+  });
+
+  it("Step 2-1 ではフェーズ1の共有付箋・グループをボードに描画しない", () => {
+    connectAtHmwStep([
+      protocolNote({ content: "フェーズ1の共有付箋", visibility: "shared" }),
+      protocolNote({
+        id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        content: "フェーズ1の共有付箋2",
+        visibility: "shared",
+      }),
+    ]);
+
+    expect(
+      screen.queryByDisplayValue("フェーズ1の共有付箋"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("フェーズ1のグループ")).not.toBeInTheDocument();
+  });
+
+  it("Step 1-1 では HMW テンプレートパネルを表示しない", () => {
+    connectWithSnapshot([], { phase: buildPhaseStep(1) });
+
+    expect(screen.queryByTestId("hmw-template-panel")).not.toBeInTheDocument();
+  });
+
+  it("フェーズ1では持ち越しが届いていても決定課題バナーを掲示しない", () => {
+    // 現サーバーはフェーズ1の snapshot に carryovers を入れないが、
+    // 「掲示はフェーズ2の間だけ」というクライアント側ポリシーを固定する。
+    connectWithSnapshot([], {
+      phase: buildPhaseStep(1),
+      carryovers: [buildCarryover()],
+    });
+
+    expect(
+      screen.queryByTestId("hmw-decided-issue-banner"),
+    ).not.toBeInTheDocument();
   });
 });

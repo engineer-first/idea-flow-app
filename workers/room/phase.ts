@@ -9,6 +9,7 @@ import {
   RoomPhaseSchema,
 } from "../../contracts/phase";
 import type { ClientMessage } from "../../contracts/room-protocol";
+import { getDecision } from "./decisions";
 import type { MessageHandlers } from "./handler-context";
 import { isHostUser } from "./members";
 import { haveAllMembersCompletedVoting } from "./votes";
@@ -48,8 +49,21 @@ function nextRoomPhase(current: RoomPhase): RoomPhase {
   if (current.phase === 1 && current.step < 5) {
     return { ...current, step: current.step + 1 };
   }
-  // Step 1-5 の次はフェーズ2だが、その実装はこの Issue のスコープ外。
+  if (current.phase === 1 && current.step === 5) {
+    return { kind: "step", phase: 2, step: 1 };
+  }
+  // Step 2-1 の次（2-2 以降）は issue #165 のスコープ。
   return current;
+}
+
+// 個人執筆ステップ（各フェーズの Step 1: 課題 / HMW / アイデアを個人で書く）
+// かどうか。これらのステップでは変更してよいのは自分の private 付箋だけで、
+// 前フェーズから残る共有付箋は記録として凍結する。共有ステップの
+// 「共有付箋は全員で修正できる」認可（note-handlers の canEdit）が
+// 個人執筆ステップへ漏れ込まないよう、ハンドラ側がこの述語で visibility を
+// 追加検証する。
+export function isPersonalWritingStep(phase: RoomPhase): boolean {
+  return !isLobby(phase) && phase.step === 1;
 }
 
 // WebSocket を直接送られても状態が変わらないよう、変更系メッセージを
@@ -100,7 +114,9 @@ const allowedBoardMutationsByPhase: {
     5: ["note:decide"],
   },
   2: {
-    1: [],
+    // Step 2-1（HMW 個人執筆）は Step 1-1 と同じ「自分専用付箋の作成・
+    // 編集・削除」だけを許可する。共有（publish）は 2-2 のスコープ。
+    1: ["note:create", "note:update-content", "note:delete"],
     2: [],
     3: [],
     4: [],
@@ -191,18 +207,35 @@ export const phaseHandlers: MessageHandlers<"start_phase" | "phase:next"> = {
       return;
     }
     const next = nextRoomPhase(current);
-    // Step 1-5 など「次のフェーズがまだ実装されていない」状態では
+    // Step 2-1 など「次のステップがまだ実装されていない」状態では
     // nextRoomPhase が current をそのまま返す。ここで no-op を配信すると
     // クライアントの decision 表示がフェーズ単位で無条件クリアされてしまう
     // （DB上の decision は残るため、再接続時の snapshot で復活し不整合になる）。
     if (next === current) {
       return;
     }
+    const crossesPhaseBoundary = !isLobby(next) && current.phase !== next.phase;
+    // フェーズ境界を越えるときは、現在フェーズの決定が確定していることを
+    // 要求する（fail-closed）。決定なしで次フェーズへ進むと、持ち越し表示の
+    // 前提が崩れたまま進行が続いてしまう。force は未投票メンバー向けの
+    // 脱出ハッチであり、このゲートは迂回できない。
+    if (crossesPhaseBoundary && !getDecision(ctx.sql, current.phase)) {
+      ctx.reply({
+        type: "error",
+        code: "forbidden",
+        message: "決定が確定するまで次のフェーズへ進めません。",
+      });
+      return;
+    }
     savePhase(ctx.sql, next);
-    // 投票ステップでは note:updated の count を秘匿している。結果ステップへ
-    // 遷移した接続中の参加者も、再接続を待たず完全な投票集計を受け取れるよう
-    // 受信者別 snapshot を先に再送する。
-    if (!isResultStep(current) && isResultStep(next)) {
+    // 投票ステップでは note:updated の count を秘匿しているため、結果ステップ
+    // へ遷移した接続中の参加者にも完全な投票集計を届け直す。フェーズ境界を
+    // 越えるときも、持ち越し（carryovers）を含む最新 snapshot を再送してから
+    // phase:updated を配る。
+    if (
+      (!isResultStep(current) && isResultStep(next)) ||
+      crossesPhaseBoundary
+    ) {
       ctx.refreshSnapshots();
     }
     ctx.broadcaster.broadcastToAll({ type: "phase:updated", phase: next });

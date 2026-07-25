@@ -16,6 +16,11 @@ import {
 } from "@/contracts/phase";
 import type { DotVoteKind } from "@/contracts/room-protocol";
 import type { DotVoteRemaining } from "@/features/dot-vote";
+import {
+  HmwDecidedIssueBanner,
+  HmwTemplatePanel,
+  isHmwWritingStep,
+} from "@/features/hmw";
 import { IdeaSupportSidebar } from "@/features/idea-support";
 import {
   type Note,
@@ -24,6 +29,7 @@ import {
   PrivateNotesToolbar,
   StickyNote,
 } from "@/features/notes";
+import { cn } from "@/lib/utils";
 import type { Decision } from "../logic/room-reducer";
 import {
   DECIDE_NOTE_ACTION_INSET,
@@ -45,9 +51,12 @@ export type RoomBoardCanvasProps = {
   // ツールバー発ドラッグ中に、まだ notes に現れていない付箋を描くゴースト。
   dragGhost: { note: Note; x: number; y: number } | null;
   isReturnDropTarget: boolean;
+  // 前フェーズから持ち越した決定課題。null なら非表示。
+  hmwDecidedIssue: string | null;
   boardScrollerRef: RefObject<HTMLDivElement | null>;
   privateToolbarRef: RefObject<HTMLDivElement | null>;
   onSelect: (noteId: string | null) => void;
+  onHmwTemplateSelect: (content: string) => void;
   onNoteDragStart: (
     noteId: string,
     event: ReactPointerEvent<HTMLButtonElement>,
@@ -81,9 +90,11 @@ export function RoomBoardCanvas({
   voteRemaining,
   dragGhost,
   isReturnDropTarget,
+  hmwDecidedIssue,
   boardScrollerRef,
   privateToolbarRef,
   onSelect,
+  onHmwTemplateSelect,
   onNoteDragStart,
   onNoteContentChange,
   onNoteDelete,
@@ -208,6 +219,36 @@ export function RoomBoardCanvas({
             ) : null}
           </div>
         </div>
+        {/* バナー（top）とパネル（left）は別条件で出す: Step 2-2 以降は
+            テンプレートを出さないが、決定課題の掲示は続ける（#165 で再利用）。 */}
+        {hmwDecidedIssue !== null ? (
+          <div
+            className={cn(
+              "pointer-events-none absolute inset-x-3 top-3 z-30 flex justify-center",
+              // テンプレートパネル（left-3 + w-64）と重なる帯を、
+              // パネル表示中はバナー側の左余白として予約する。
+              isHmwWritingStep(phase) && "left-72",
+            )}
+          >
+            {/* 長文でも左端のテンプレートパネルと同じ帯を侵食しないよう
+                幅を抑える（本文は省略せず折り返して全文表示する）。 */}
+            <HmwDecidedIssueBanner
+              content={hmwDecidedIssue}
+              className="pointer-events-auto max-w-xl"
+            />
+          </div>
+        ) : null}
+        {isHmwWritingStep(phase) ? (
+          // 下端はマイ付箋ドック（h-48 + 余白）を避ける。ボードが縦に狭い
+          // 画面ではパネル内スクロールに逃がす（#198 の全画面化で緩和される）。
+          <div className="pointer-events-none absolute top-3 bottom-56 left-3 z-30 flex items-start">
+            <HmwTemplatePanel
+              className="pointer-events-auto max-h-full overflow-y-auto"
+              onTemplateSelect={onHmwTemplateSelect}
+              disabled={isDisconnected}
+            />
+          </div>
+        ) : null}
         <div
           className="pointer-events-none absolute inset-x-3 bottom-3 z-30 flex justify-center"
           data-testid="private-notes-dock"

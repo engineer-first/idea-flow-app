@@ -26,7 +26,7 @@ export const decisionHandlers: MessageHandlers<"note:decide"> = {
       return;
     }
 
-    setDecision(ctx.sql, phase.phase, message.noteId, ctx.userId);
+    setDecision(ctx.sql, phase.phase, message.noteId, ctx.userId, note.content);
     ctx.broadcaster.broadcastToAll({
       type: "decision:updated",
       phase: phase.phase,

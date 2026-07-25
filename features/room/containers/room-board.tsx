@@ -13,6 +13,7 @@
 import { useCallback, useState } from "react";
 import type { RoomPhase } from "@/contracts/phase";
 import type { ServerMessage } from "@/contracts/room-protocol";
+import { isHmwWritingStep } from "@/features/hmw";
 import { useNoteGroups, useRoomNotes } from "@/features/notes";
 import { notify } from "@/lib/notify";
 import type { RoomSocketFactory } from "@/lib/room-client/room-client";
@@ -140,6 +141,32 @@ export function RoomBoard({
     [send],
   );
 
+  // PrivateNotesToolbar は onClick={onAdd} でイベントをそのまま渡すため、
+  // addNote(content?) を直接配線するとイベントオブジェクトが content に
+  // 流れ込む。引数なし版とテンプレート版を別コールバックに分けて形で塞ぐ。
+  const { addNote } = notes;
+  const handleAddPrivateNote = useCallback(() => addNote(), [addNote]);
+  const handleHmwTemplateSelect = useCallback(
+    (content: string) => addNote(content),
+    [addNote],
+  );
+
+  // Step 2-1（HMW 個人執筆）はボード面に自分の付箋だけを出す個人ステップ。
+  // フェーズ1の共有付箋・グループは描画しない。共有済み付箋は全員に公開済みの
+  // 情報なのでこれは表示上の判断であり、可視性の境界は引き続きサーバー
+  // （visibleTo）が持つ。付箋のフェーズ分離の本実装は #165 のスコープ。
+  const atHmwWritingStep = isHmwWritingStep(roomState.phase);
+  // 決定課題の掲示は Step 2-1 だけでなくフェーズ2の任意ステップで続ける。
+  // Step 2-2 以降（#165）もフェーズ1の決定を参照しながら発想するため、
+  // ステップが進んでも掲示を消さない。
+  // 持ち越しはフェーズ昇順の配列。掲示するのはフェーズ1の決定。
+  const atPhase2 =
+    roomState.phase.kind === "step" && roomState.phase.phase === 2;
+  const hmwDecidedIssue = atPhase2
+    ? (roomState.carryovers.find((carryover) => carryover.phase === 1)
+        ?.content ?? null)
+    : null;
+
   return (
     <>
       <ForceNextPhaseDialog
@@ -148,11 +175,16 @@ export function RoomBoard({
         onConfirm={handleForceNextPhase}
       />
       <RoomBoardView
-        notes={notes.notes.filter((note) => note.visibility === "shared")}
+        notes={
+          atHmwWritingStep
+            ? []
+            : notes.notes.filter((note) => note.visibility === "shared")
+        }
         privateNotes={notes.notes.filter(
           (note) => note.visibility === "private",
         )}
-        groups={noteGroups.groups}
+        groups={atHmwWritingStep ? [] : noteGroups.groups}
+        hmwDecidedIssue={hmwDecidedIssue}
         inviteCode={inviteCode}
         inviteUrl={inviteUrl}
         phase={roomState.phase}
@@ -166,7 +198,8 @@ export function RoomBoard({
         currentUserId={currentUserId}
         hostUserId={hostUserId}
         isNextPhasePending={isNextPhasePending}
-        onAddPrivateNote={notes.addNote}
+        onAddPrivateNote={handleAddPrivateNote}
+        onHmwTemplateSelect={handleHmwTemplateSelect}
         onPrivateNoteContentChange={notes.changeNoteContent}
         onPrivateNoteDelete={notes.deleteNote}
         onPrivateNotePublish={notes.publishNote}

@@ -8,6 +8,7 @@ import {
   buildNote,
   buildNotes,
 } from "@/contracts/room-protocol.fixture";
+import { HMW_TEMPLATES } from "@/features/hmw";
 import { RoomBoardView } from "./room-board-view";
 
 const ME = "11111111-1111-4111-8111-111111111111";
@@ -24,6 +25,8 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardView>[0]> = {}) {
     isHost: false,
     isNextPhasePending: false,
     privateNotes: [],
+    hmwDecidedIssue: null,
+    onHmwTemplateSelect: vi.fn(),
     draggingNoteId: null,
     members: buildMembers(2, ME),
     currentUserId: ME,
@@ -334,6 +337,31 @@ describe("RoomBoardView", () => {
       ).not.toBeDisabled();
     });
 
+    it.each([
+      "connecting",
+      "closed",
+    ] as const)("%sの間は Step 2-1 の HMW テンプレートボタンが無効化される", (connectionStatus) => {
+      setup({ phase: buildPhaseStep(1, 2), notes: [], connectionStatus });
+
+      expect(
+        screen.getByRole("button", { name: HMW_TEMPLATES[0] }),
+      ).toBeDisabled();
+    });
+
+    it("openの間は Step 2-1 の HMW テンプレートを選ぶと onHmwTemplateSelect が呼ばれる", () => {
+      const onHmwTemplateSelect = vi.fn();
+      setup({
+        phase: buildPhaseStep(1, 2),
+        notes: [],
+        connectionStatus: "open",
+        onHmwTemplateSelect,
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: HMW_TEMPLATES[0] }));
+
+      expect(onHmwTemplateSelect).toHaveBeenCalledWith(HMW_TEMPLATES[0]);
+    });
+
     it("closedの間は付箋をクリックしても選択されない", () => {
       setup({ connectionStatus: "closed" });
 
@@ -510,6 +538,39 @@ describe("RoomBoardView", () => {
       fireEvent.click(screen.getByRole("button", { name: "移行する" }));
 
       expect(onNextPhase).toHaveBeenCalledTimes(1);
+    });
+
+    it("Step 1-5 は課題が決定されるまで「次のステップへ」を無効にする", () => {
+      setup({ isHost: true, phase: buildPhaseStep(5), decision: null });
+
+      // 結果ステップで自動表示される投票結果ダイアログを閉じてから検証する。
+      fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
+
+      expect(
+        screen.getByRole("button", { name: "次のステップへ" }),
+      ).toBeDisabled();
+    });
+
+    it("Step 1-5 で課題が決定されると「次のステップへ」が有効になる", () => {
+      setup({
+        isHost: true,
+        phase: buildPhaseStep(5),
+        decision: buildDecision({ noteId: "note-1" }),
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
+
+      expect(
+        screen.getByRole("button", { name: "次のステップへ" }),
+      ).not.toBeDisabled();
+    });
+
+    it("Step 2-1 では次のステップ(2-2)が未実装のため「次のステップへ」を無効にする", () => {
+      setup({ isHost: true, phase: buildPhaseStep(1, 2), notes: [] });
+
+      expect(
+        screen.getByRole("button", { name: "次のステップへ" }),
+      ).toBeDisabled();
     });
   });
 });

@@ -2,8 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { RoomPhase } from "@/contracts/phase";
 import { buildLobbyPhase, buildPhaseStep } from "@/contracts/phase.fixture";
 import type { ProtocolMember, ServerMessage } from "@/contracts/room-protocol";
-import { buildDecision } from "@/contracts/room-protocol.fixture";
 import {
+  buildCarryover,
+  buildDecision,
+} from "@/contracts/room-protocol.fixture";
+import {
+  applyCarryoverServerMessage,
   applyDecisionServerMessage,
   applyMemberServerMessage,
   applyPhaseServerMessage,
@@ -31,6 +35,7 @@ describe("applyMemberServerMessage", () => {
       phase: LOBBY,
       isHost: true,
       decision: null,
+      carryovers: [],
       timer: { status: "idle" },
       serverNow: 1_000,
     };
@@ -193,6 +198,7 @@ describe("applyPhaseServerMessage", () => {
       phase: buildPhaseStep(1),
       isHost: true,
       decision: null,
+      carryovers: [],
       timer: { status: "running", endsAt: 10_000, durationMs: 10_000 },
       serverNow: 1_000,
     };
@@ -222,6 +228,7 @@ describe("applyTimerServerMessage", () => {
       phase: buildPhaseStep(1),
       isHost: true,
       decision: null,
+      carryovers: [],
       timer: { status: "running", endsAt: 10_000, durationMs: 10_000 },
       serverNow: 1_000,
     };
@@ -272,6 +279,7 @@ describe("applyDecisionServerMessage", () => {
         phase: buildPhaseStep(5),
         isHost: true,
         decision,
+        carryovers: [],
         timer: { status: "idle" },
         serverNow: 1_000,
       }),
@@ -294,5 +302,43 @@ describe("applyDecisionServerMessage", () => {
         member: B,
       }),
     ).toEqual(decision);
+  });
+});
+
+describe("applyCarryoverServerMessage", () => {
+  const carryover = buildCarryover();
+
+  it("snapshot の carryovers で持ち越しを復元する", () => {
+    expect(
+      applyCarryoverServerMessage([], {
+        type: "snapshot",
+        notes: [],
+        members: [A],
+        phase: buildPhaseStep(1, 2),
+        isHost: true,
+        decision: null,
+        carryovers: [carryover],
+        timer: { status: "idle" },
+        serverNow: 1_000,
+      }),
+    ).toEqual([carryover]);
+  });
+
+  it("phase:updated では持ち越しを維持する（フェーズ境界の真実は snapshot 再送が運ぶ）", () => {
+    expect(
+      applyCarryoverServerMessage([carryover], {
+        type: "phase:updated",
+        phase: buildPhaseStep(1, 2),
+      }),
+    ).toEqual([carryover]);
+  });
+
+  it("持ち越しに関係しないメッセージでは現在の持ち越しを維持する", () => {
+    expect(
+      applyCarryoverServerMessage([carryover], {
+        type: "member_joined",
+        member: B,
+      }),
+    ).toEqual([carryover]);
   });
 });

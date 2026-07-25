@@ -745,8 +745,8 @@ describe("RoomDO phase:next", () => {
     ws.close();
   });
 
-  it("Step 1-5 で phase:next を送っても no-op で phase:updated を配信しない", async () => {
-    const roomName = "room-phase-step5-noop";
+  it("課題が未決定の Step 1-5 では phase:next を拒否し、フェーズを進めない", async () => {
+    const roomName = "room-phase-step5-no-decision";
     const stub = roomStub(roomName);
     await stub.initializeNewRoom(USER_A, "Host");
     await stub.setPhase(buildPhaseStep(5), USER_A);
@@ -754,7 +754,10 @@ describe("RoomDO phase:next", () => {
     const ws = await connectDirectly(roomName, USER_A, USER_A);
     ws.send(JSON.stringify({ type: "phase:next" }));
 
-    expect(await nextJsonWithin(ws)).toBeUndefined();
+    expect(await nextJsonWithin(ws)).toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
     expect(await stub.getPhase()).toEqual(buildPhaseStep(5));
     ws.close();
   });
@@ -1250,11 +1253,11 @@ describe("RoomDO timer:* の認可", () => {
 });
 
 describe("RoomDO 課題整理ステップの境界ゲート", () => {
-  it("フェーズ2では変更系メッセージをdeny-allで拒否する", async () => {
+  it("Step 2-2 以降のフェーズ2ステップでは変更系メッセージをdeny-allで拒否する", async () => {
     const roomName = "room-phase-2-deny-all";
     const stub = roomStub(roomName);
     await stub.initializeNewRoom(USER_A, "Host");
-    await stub.setPhase(buildPhaseStep(1, 2), USER_A);
+    await stub.setPhase(buildPhaseStep(2, 2), USER_A);
 
     const ws = await connectDirectly(roomName, USER_A, USER_A);
     ws.send(JSON.stringify({ type: "note:create" }));
@@ -1262,7 +1265,7 @@ describe("RoomDO 課題整理ステップの境界ゲート", () => {
     expect(await nextJson(ws)).toMatchObject({
       type: "error",
       code: "forbidden",
-      message: expect.stringContaining("2-1 HMWを個人で書く"),
+      message: expect.stringContaining("2-2 共有する"),
     });
     ws.close();
   });
@@ -1864,6 +1867,377 @@ describe("RoomDO lobby のボード凍結", () => {
     ws.send(JSON.stringify({ type: "note:create" }));
     expect(await nextJson(ws)).toMatchObject({ type: "note:inserted" });
 
+    ws.close();
+  });
+});
+
+describe("RoomDO フェーズ1→2 の遷移と決定課題の持ち越し", () => {
+  const DECIDED_NOTE_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+
+  async function insertSharedNote(
+    roomName: string,
+    noteId: string,
+    content: string,
+  ): Promise<void> {
+    await runInRoomDO(roomName, (_instance, state) => {
+      const now = new Date().toISOString();
+      state.storage.sql.exec(
+        `INSERT INTO notes
+           (id, author_id, content, visibility, color, x, y, created_at, updated_at)
+         VALUES (?1, ?2, ?3, 'shared', 'yellow', 0, 0, ?4, ?4)`,
+        noteId,
+        USER_A,
+        content,
+        now,
+      );
+    });
+  }
+
+  // Step 1-5 で決定済みの状態から phase:next で Step 2-1 へ遷移させる。
+  async function decideAndAdvance(roomName: string): Promise<void> {
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "note:decide", noteId: DECIDED_NOTE_ID }));
+    await nextJson(ws); // decision:updated
+    ws.send(JSON.stringify({ type: "phase:next" }));
+    await nextJson(ws); // snapshot
+    await nextJson(ws); // phase:updated
+    ws.close();
+  }
+
+  it("課題決定済みの Step 1-5 から phase:next で Step 2-1 へ進み、snapshot で持ち越しを配信する", async () => {
+    const roomName = "room-carryover-transition";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(5), USER_A);
+    await insertSharedNote(
+      roomName,
+      DECIDED_NOTE_ID,
+      "宿題を後回しにしてしまう",
+    );
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "note:decide", noteId: DECIDED_NOTE_ID }));
+    await nextJson(ws); // decision:updated
+
+    ws.send(JSON.stringify({ type: "phase:next" }));
+
+    // 遷移時は接続中の全員に snapshot を再送してから phase:updated を配る
+    // （投票→結果ステップ遷移と同じ順序）。
+    expect(await nextJson(ws)).toMatchObject({
+      type: "snapshot",
+      phase: buildPhaseStep(1, 2),
+      carryovers: [
+        {
+          phase: 1,
+          noteId: DECIDED_NOTE_ID,
+          content: "宿題を後回しにしてしまう",
+        },
+      ],
+    });
+    expect(await nextJson(ws)).toMatchObject({
+      type: "phase:updated",
+      phase: buildPhaseStep(1, 2),
+    });
+    expect(await stub.getPhase()).toEqual(buildPhaseStep(1, 2));
+    ws.close();
+  });
+
+  it("Step 2-1 の再接続 snapshot は前フェーズの決定を持ち越し、現在フェーズの decision は null になる", async () => {
+    const roomName = "room-carryover-reconnect";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(5), USER_A);
+    await insertSharedNote(roomName, DECIDED_NOTE_ID, "決定した課題");
+    await decideAndAdvance(roomName);
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    // connectDirectly が受信済みの snapshot を検証し直すため再接続する。
+    const reconnect = await roomStub(roomName).fetch("https://do/ws", {
+      headers: {
+        Upgrade: "websocket",
+        [USER_ID_HEADER]: USER_A,
+        [HOST_ID_HEADER]: USER_A,
+      },
+    });
+    const reconnectWs = reconnect.webSocket;
+    if (!reconnectWs) throw new Error("WebSocket 接続を確立できませんでした。");
+    reconnectWs.accept();
+
+    const snapshot = await nextJson(reconnectWs);
+    expect(snapshot).toMatchObject({
+      type: "snapshot",
+      phase: buildPhaseStep(1, 2),
+      carryovers: [
+        { phase: 1, noteId: DECIDED_NOTE_ID, content: "決定した課題" },
+      ],
+    });
+    expect(snapshot.decision).toBeNull();
+    ws.close();
+    reconnectWs.close();
+  });
+
+  it("決定後に元の付箋が削除されても、持ち越しは決定時点の内容を保持する", async () => {
+    const roomName = "room-carryover-note-deleted";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(5), USER_A);
+    await insertSharedNote(roomName, DECIDED_NOTE_ID, "決定時点の内容");
+    await decideAndAdvance(roomName);
+
+    await runInRoomDO(roomName, (_instance, state) => {
+      state.storage.sql.exec(
+        "DELETE FROM notes WHERE id = ?1",
+        DECIDED_NOTE_ID,
+      );
+    });
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    const reconnect = await roomStub(roomName).fetch("https://do/ws", {
+      headers: {
+        Upgrade: "websocket",
+        [USER_ID_HEADER]: USER_A,
+        [HOST_ID_HEADER]: USER_A,
+      },
+    });
+    const reconnectWs = reconnect.webSocket;
+    if (!reconnectWs) throw new Error("WebSocket 接続を確立できませんでした。");
+    reconnectWs.accept();
+
+    expect(await nextJson(reconnectWs)).toMatchObject({
+      type: "snapshot",
+      carryovers: [
+        { phase: 1, noteId: DECIDED_NOTE_ID, content: "決定時点の内容" },
+      ],
+    });
+    ws.close();
+    reconnectWs.close();
+  });
+});
+
+describe("RoomDO Step 2-1 の境界ゲート", () => {
+  it("Step 2-1 では content 付き note:create で自分専用付箋を作成できる", async () => {
+    const roomName = "room-step2-1-create";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(1, 2), USER_A);
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "note:create", content: "もっと簡単に" }));
+
+    expect(await nextJson(ws)).toMatchObject({
+      type: "note:inserted",
+      note: {
+        authorId: USER_A,
+        content: "もっと簡単に",
+        visibility: "private",
+      },
+    });
+    ws.close();
+  });
+
+  it("Step 2-1 では他者の HMW 付箋が snapshot に含まれず、note:vote も forbidden になる", async () => {
+    const roomName = "room-step2-1-others-hidden";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.upsertMember(USER_B, "Member");
+    await stub.setPhase(buildPhaseStep(1, 2), USER_A);
+
+    const memberWs = await connectDirectly(roomName, USER_B, USER_A);
+    memberWs.send(
+      JSON.stringify({ type: "note:create", content: "他人のHMW" }),
+    );
+    const inserted = (await nextJson(memberWs)) as {
+      note: { id: string };
+    };
+
+    const hostWs = await connectDirectly(roomName, USER_A, USER_A);
+    const reconnect = await stub.fetch("https://do/ws", {
+      headers: {
+        Upgrade: "websocket",
+        [USER_ID_HEADER]: USER_A,
+        [HOST_ID_HEADER]: USER_A,
+      },
+    });
+    const reconnectWs = reconnect.webSocket;
+    if (!reconnectWs) throw new Error("WebSocket 接続を確立できませんでした。");
+    reconnectWs.accept();
+    const snapshot = (await nextJson(reconnectWs)) as {
+      notes: { id: string }[];
+    };
+    expect(snapshot.notes).toEqual([]);
+
+    hostWs.send(
+      JSON.stringify({
+        type: "note:vote",
+        noteId: inserted.note.id,
+        kind: "subjective",
+      }),
+    );
+    expect(await nextJson(hostWs)).toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+    memberWs.close();
+    hostWs.close();
+    reconnectWs.close();
+  });
+
+  it("Step 2-1 では note:publish が forbidden になる（共有は Step 2-2 のスコープ）", async () => {
+    const roomName = "room-step2-1-publish-forbidden";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(1, 2), USER_A);
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "note:create", content: "自分のHMW" }));
+    const inserted = (await nextJson(ws)) as { note: { id: string } };
+
+    ws.send(
+      JSON.stringify({
+        type: "note:publish",
+        noteId: inserted.note.id,
+        x: 100,
+        y: 100,
+      }),
+    );
+    expect(await nextJson(ws)).toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+    ws.close();
+  });
+
+  it("note:create の content が上限超過なら invalid-message で拒否される", async () => {
+    const roomName = "room-step2-1-content-too-long";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(1, 2), USER_A);
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(
+      JSON.stringify({ type: "note:create", content: "あ".repeat(2001) }),
+    );
+
+    expect(await nextJson(ws)).toMatchObject({
+      type: "error",
+      code: "invalid-message",
+    });
+    ws.close();
+  });
+
+  // フェーズ1から残っている共有付箋は、個人執筆ステップでは記録として凍結する。
+  // 1-2 の「共有付箋は全員で修正できる」認可（canEdit）が 2-1 に漏れ込まないこと。
+  const SHARED_NOTE_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+
+  async function insertSharedNoteByA(
+    roomName: string,
+    content: string,
+  ): Promise<void> {
+    await runInRoomDO(roomName, (_instance, state) => {
+      const now = new Date().toISOString();
+      state.storage.sql.exec(
+        `INSERT INTO notes
+           (id, author_id, content, visibility, color, x, y, created_at, updated_at)
+         VALUES (?1, ?2, ?3, 'shared', 'yellow', 0, 0, ?4, ?4)`,
+        SHARED_NOTE_ID,
+        USER_A,
+        content,
+        now,
+      );
+    });
+  }
+
+  it("Step 2-1 では非 author による共有付箋への note:update-content が forbidden になる", async () => {
+    const roomName = "room-step2-1-shared-update-non-author";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.upsertMember(USER_B, "Member");
+    await stub.setPhase(buildPhaseStep(1, 2), USER_A);
+    await insertSharedNoteByA(roomName, "フェーズ1の記録");
+
+    const ws = await connectDirectly(roomName, USER_B, USER_A);
+    ws.send(
+      JSON.stringify({
+        type: "note:update-content",
+        noteId: SHARED_NOTE_ID,
+        content: "改ざん",
+      }),
+    );
+
+    expect(await nextJson(ws)).toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+    const row = await runInRoomDO(roomName, (_instance, state) => {
+      return state.storage.sql
+        .exec("SELECT content FROM notes WHERE id = ?1", SHARED_NOTE_ID)
+        .one() as { content: string };
+    });
+    expect(row.content).toBe("フェーズ1の記録");
+    ws.close();
+  });
+
+  it("Step 2-1 では author 自身も共有付箋の note:update-content / note:delete ができない", async () => {
+    const roomName = "room-step2-1-shared-author-frozen";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(1, 2), USER_A);
+    await insertSharedNoteByA(roomName, "フェーズ1の記録");
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(
+      JSON.stringify({
+        type: "note:update-content",
+        noteId: SHARED_NOTE_ID,
+        content: "書き換え",
+      }),
+    );
+    expect(await nextJson(ws)).toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+
+    ws.send(JSON.stringify({ type: "note:delete", noteId: SHARED_NOTE_ID }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+    const count = await runInRoomDO(roomName, (_instance, state) => {
+      return state.storage.sql
+        .exec("SELECT COUNT(*) AS c FROM notes WHERE id = ?1", SHARED_NOTE_ID)
+        .one().c as number;
+    });
+    expect(count).toBe(1);
+    ws.close();
+  });
+
+  it("Step 2-1 では自分の private 付箋の編集・削除はできる", async () => {
+    const roomName = "room-step2-1-private-editable";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(1, 2), USER_A);
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "note:create", content: "下書き" }));
+    const inserted = (await nextJson(ws)) as { note: { id: string } };
+
+    ws.send(
+      JSON.stringify({
+        type: "note:update-content",
+        noteId: inserted.note.id,
+        content: "もっと簡単に宿題を進められるだろう？",
+      }),
+    );
+    expect(await nextJson(ws)).toMatchObject({
+      type: "note:updated",
+      note: { content: "もっと簡単に宿題を進められるだろう？" },
+    });
+
+    ws.send(JSON.stringify({ type: "note:delete", noteId: inserted.note.id }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "note:deleted",
+      noteId: inserted.note.id,
+    });
     ws.close();
   });
 });

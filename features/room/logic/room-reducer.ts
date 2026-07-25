@@ -9,6 +9,7 @@
 
 import type { RoomPhase } from "@/contracts/phase";
 import type {
+  Carryover as ProtocolCarryover,
   Decision as ProtocolDecision,
   ProtocolMember,
   ServerMessage,
@@ -17,6 +18,7 @@ import type {
 
 export type Member = ProtocolMember;
 export type Decision = ProtocolDecision;
+export type Carryover = ProtocolCarryover;
 
 // snapshot / member_joined / member_left を受けて members state を更新する純粋関数。
 // 進行状態メッセージは早期 return。
@@ -118,6 +120,17 @@ export function applyDecisionServerMessage(
       return _exhaustive;
     }
   }
+}
+
+// 持ち越し（前フェーズで確定した決定）はサーバー権威で、snapshot だけが
+// 真実を運ぶ。decision と違い phase:updated ではクリアしない: フェーズ境界を
+// 越える遷移ではサーバーが snapshot を再送するため、そこで置き換わる。
+export function applyCarryoverServerMessage(
+  carryovers: Carryover[],
+  message: ServerMessage,
+): Carryover[] {
+  if (message.type === "snapshot") return message.carryovers;
+  return carryovers;
 }
 
 // phase state を更新する純粋関数。phase 以外のメッセージは何もしない。

@@ -35,7 +35,8 @@ export type UseRoomNotesResult = {
   // エコーはローカル優先で無視される。
   applyMessage: (message: ServerMessage) => void;
   // 新規付箋は個人ツールバーへだけ挿入される。ID生成と永続化はRoomDOに一本化する。
-  addNote: () => void;
+  // content はテンプレート・具体例を起点にしたプリフィル付き作成用。
+  addNote: (content?: string) => void;
   publishNote: (noteId: string, x: number, y: number) => void;
   unpublishNote: (noteId: string) => void;
   startNoteDrag: (noteId: string) => void;
@@ -109,9 +110,16 @@ export function useRoomNotes({
     [updateNotes],
   );
 
-  const addNote = useCallback(() => {
-    send({ type: "note:create" });
-  }, [send]);
+  const addNote = useCallback(
+    (content?: string) => {
+      send(
+        content === undefined
+          ? { type: "note:create" }
+          : { type: "note:create", content },
+      );
+    },
+    [send],
+  );
 
   const publishNote = useCallback(
     (noteId: string, x: number, y: number) => {

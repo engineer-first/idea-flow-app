@@ -33,6 +33,9 @@ export type RoomBoardHeaderProps = {
   currentUserId: string;
   hostUserId: string;
   isNextPhasePending: boolean;
+  // 「次のステップへ」を進められない状態（決定待ち・次ステップ未実装など）。
+  // 判定は view の責務で、ここでは受け取った状態で無効化するだけ。
+  isNextPhaseBlocked: boolean;
   voteRemaining: DotVoteRemaining;
   isLeaving: boolean;
   onShowVoteResult: () => void;
@@ -58,6 +61,7 @@ export function RoomBoardHeader({
   currentUserId,
   hostUserId,
   isNextPhasePending,
+  isNextPhaseBlocked,
   voteRemaining,
   isLeaving,
   onShowVoteResult,
@@ -108,7 +112,7 @@ export function RoomBoardHeader({
           <NextPhaseConfirmDialog
             phase={phase}
             disabled={
-              isDisconnected || isNextPhasePending || isResultStep(phase)
+              isDisconnected || isNextPhasePending || isNextPhaseBlocked
             }
             onConfirm={onNextPhase}
           />
