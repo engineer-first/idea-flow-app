@@ -56,6 +56,16 @@ function nextRoomPhase(current: RoomPhase): RoomPhase {
   return current;
 }
 
+// フェーズ1の個人付箋は課題の発散途中の下書きであり、HMW 個人執筆へは
+// 持ち越さない。削除済み付箋の票を残さないよう、先に note_votes も掃除する。
+function discardPrivateNotesBeforePhase2(sql: SqlStorage): void {
+  sql.exec(
+    `DELETE FROM note_votes
+     WHERE note_id IN (SELECT id FROM notes WHERE visibility = 'private')`,
+  );
+  sql.exec("DELETE FROM notes WHERE visibility = 'private'");
+}
+
 // 個人執筆ステップ（各フェーズの Step 1: 課題 / HMW / アイデアを個人で書く）
 // かどうか。これらのステップでは変更してよいのは自分の private 付箋だけで、
 // 前フェーズから残る共有付箋は記録として凍結する。共有ステップの
@@ -227,7 +237,18 @@ export const phaseHandlers: MessageHandlers<"start_phase" | "phase:next"> = {
       });
       return;
     }
-    savePhase(ctx.sql, next);
+    const entersPhase2 =
+      !isLobby(next) && current.phase === 1 && next.phase === 2;
+    if (entersPhase2) {
+      // 付箋の掃除と遷移を同じストレージトランザクションで確定する。途中失敗時に
+      // 「個人付箋だけ消えてフェーズ1のまま」という状態を残さない。
+      ctx.storage.transactionSync(() => {
+        discardPrivateNotesBeforePhase2(ctx.sql);
+        savePhase(ctx.sql, next);
+      });
+    } else {
+      savePhase(ctx.sql, next);
+    }
     // 投票ステップでは note:updated の count を秘匿しているため、結果ステップ
     // へ遷移した接続中の参加者にも完全な投票集計を届け直す。フェーズ境界を
     // 越えるときも、持ち越し（carryovers）を含む最新 snapshot を再送してから

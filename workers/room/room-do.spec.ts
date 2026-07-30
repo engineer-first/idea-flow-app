@@ -1873,6 +1873,7 @@ describe("RoomDO lobby のボード凍結", () => {
 
 describe("RoomDO フェーズ1→2 の遷移と決定課題の持ち越し", () => {
   const DECIDED_NOTE_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  const PRIVATE_NOTE_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 
   async function insertSharedNote(
     roomName: string,
@@ -1885,6 +1886,25 @@ describe("RoomDO フェーズ1→2 の遷移と決定課題の持ち越し", () 
         `INSERT INTO notes
            (id, author_id, content, visibility, color, x, y, created_at, updated_at)
          VALUES (?1, ?2, ?3, 'shared', 'yellow', 0, 0, ?4, ?4)`,
+        noteId,
+        USER_A,
+        content,
+        now,
+      );
+    });
+  }
+
+  async function insertPrivateNote(
+    roomName: string,
+    noteId: string,
+    content: string,
+  ): Promise<void> {
+    await runInRoomDO(roomName, (_instance, state) => {
+      const now = new Date().toISOString();
+      state.storage.sql.exec(
+        `INSERT INTO notes
+           (id, author_id, content, visibility, color, x, y, created_at, updated_at)
+         VALUES (?1, ?2, ?3, 'private', 'yellow', 0, 0, ?4, ?4)`,
         noteId,
         USER_A,
         content,
@@ -1939,6 +1959,42 @@ describe("RoomDO フェーズ1→2 の遷移と決定課題の持ち越し", () 
       phase: buildPhaseStep(1, 2),
     });
     expect(await stub.getPhase()).toEqual(buildPhaseStep(1, 2));
+    ws.close();
+  });
+
+  it("フェーズ2へ進むとフェーズ1の個人付箋を削除し、snapshot に持ち越さない", async () => {
+    const roomName = "room-carryover-discards-private-notes";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(5), USER_A);
+    await insertSharedNote(roomName, DECIDED_NOTE_ID, "決定する課題");
+    await insertPrivateNote(
+      roomName,
+      PRIVATE_NOTE_ID,
+      "フェーズ1で共有しなかった個人付箋",
+    );
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "note:decide", noteId: DECIDED_NOTE_ID }));
+    await nextJson(ws); // decision:updated
+    ws.send(JSON.stringify({ type: "phase:next" }));
+
+    const snapshot = (await nextJson(ws)) as {
+      notes: { id: string }[];
+    };
+    expect(snapshot.notes.map((note) => note.id)).toEqual([DECIDED_NOTE_ID]);
+    expect(await nextJson(ws)).toMatchObject({
+      type: "phase:updated",
+      phase: buildPhaseStep(1, 2),
+    });
+    const privateNoteCount = await runInRoomDO(roomName, (_instance, state) => {
+      return state.storage.sql
+        .exec(
+          "SELECT COUNT(*) AS count FROM notes WHERE visibility = 'private'",
+        )
+        .one().count as number;
+    });
+    expect(privateNoteCount).toBe(0);
     ws.close();
   });
 
