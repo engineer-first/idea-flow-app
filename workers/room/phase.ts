@@ -56,6 +56,29 @@ function nextRoomPhase(current: RoomPhase): RoomPhase {
   return current;
 }
 
+// 共有されなかったマイ付箋は発散途中の下書きにすぎない。以降のステップへ
+// 持ち越さず破棄する。削除済み付箋の票を残さないよう、先に note_votes も
+// 掃除する。
+function discardPrivateNotes(sql: SqlStorage): void {
+  sql.exec(
+    `DELETE FROM note_votes
+     WHERE note_id IN (SELECT id FROM notes WHERE visibility = 'private')`,
+  );
+  sql.exec("DELETE FROM notes WHERE visibility = 'private'");
+}
+
+// 「共有する」はどのフェーズでも Step 2（contracts/phase.ts の
+// ROOM_PHASE_STEP_LABELS が真実）。投票・結果ステップと違いフェーズごとに
+// ずれないため、フェーズ別の対応表は持たない。
+const SHARING_STEP = 2;
+
+// 共有ステップ（各フェーズの Step 2: 共有する）かどうか。マイ付箋を共有
+// ボードへ上げられる（note:publish が許可される）最後のステップであり、
+// ここを抜けると未共有の付箋は誰の目にも触れられなくなる。
+function isSharingStep(phase: RoomPhase): boolean {
+  return !isLobby(phase) && phase.step === SHARING_STEP;
+}
+
 // 個人執筆ステップ（各フェーズの Step 1: 課題 / HMW / アイデアを個人で書く）
 // かどうか。これらのステップでは変更してよいのは自分の private 付箋だけで、
 // 前フェーズから残る共有付箋は記録として凍結する。共有ステップの
@@ -227,14 +250,31 @@ export const phaseHandlers: MessageHandlers<"start_phase" | "phase:next"> = {
       });
       return;
     }
-    savePhase(ctx.sql, next);
+    // 共有ステップを抜けた時点で、共有されなかったマイ付箋はもう共有ボードへ
+    // 上げる経路がない（Step 3 以降は note:publish が許可されない）。残すと
+    // 誰の目にも触れないまま次のステップ・フェーズへ溜まり続けるため、ここで
+    // 破棄する。掃除のタイミングはこの1箇所に一本化し、フェーズ境界では
+    // 掃除しない（同じ判断が2箇所にあると、どちらが真実か分からなくなる）。
+    const leavesSharingStep = isSharingStep(current) && !isSharingStep(next);
+    if (leavesSharingStep) {
+      // 付箋の掃除と遷移を同じストレージトランザクションで確定する。途中失敗時に
+      // 「個人付箋だけ消えてステップは進んでいない」という状態を残さない。
+      ctx.storage.transactionSync(() => {
+        discardPrivateNotes(ctx.sql);
+        savePhase(ctx.sql, next);
+      });
+    } else {
+      savePhase(ctx.sql, next);
+    }
     // 投票ステップでは note:updated の count を秘匿しているため、結果ステップ
     // へ遷移した接続中の参加者にも完全な投票集計を届け直す。フェーズ境界を
     // 越えるときも、持ち越し（carryovers）を含む最新 snapshot を再送してから
-    // phase:updated を配る。
+    // phase:updated を配る。マイ付箋を破棄したときも、破棄をクライアントへ
+    // 伝える経路は snapshot の再送しかない（note:deleted は配信しない）。
     if (
       (!isResultStep(current) && isResultStep(next)) ||
-      crossesPhaseBoundary
+      crossesPhaseBoundary ||
+      leavesSharingStep
     ) {
       ctx.refreshSnapshots();
     }

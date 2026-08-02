@@ -37,6 +37,10 @@ npm ci
 cp .env.example .env.local                       # Next.js 側
 cp workers/.dev.vars.example workers/.dev.vars   # api-worker 側の秘密（gitignore 済み）
 
+# セッション署名用の秘密を生成
+openssl rand -base64 32
+# 出力された同じ値を .env.local と workers/.dev.vars の SESSION_SECRET に設定
+
 # D1（ローカル）に migration を適用（初回のみ）
 npm run db:migrate
 
@@ -48,6 +52,10 @@ npm run dev
 ```
 
 ブラウザで <http://localhost:3000> を開いて動作を確認できます。
+
+`.env.example` と `workers/.dev.vars.example` の `SESSION_SECRET` は、コピーした
+まま誤って利用されることを防ぐため、意図的に認証処理で拒否されます。生成した
+値は Git にコミットせず、必ず両方のファイルで同じ値を使用してください。
 
 ### 認証のローカル開発
 

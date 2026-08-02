@@ -2014,6 +2014,130 @@ describe("RoomDO フェーズ1→2 の遷移と決定課題の持ち越し", () 
   });
 });
 
+describe("RoomDO 共有ステップ終了時のマイ付箋の破棄", () => {
+  const SHARED_NOTE_ID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+  const PRIVATE_NOTE_ID = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+
+  async function insertNote(
+    roomName: string,
+    noteId: string,
+    visibility: "private" | "shared",
+    content: string,
+  ): Promise<void> {
+    await runInRoomDO(roomName, (_instance, state) => {
+      const now = new Date().toISOString();
+      state.storage.sql.exec(
+        `INSERT INTO notes
+           (id, author_id, content, visibility, color, x, y, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, 'yellow', 0, 0, ?5, ?5)`,
+        noteId,
+        USER_A,
+        content,
+        visibility,
+        now,
+      );
+    });
+  }
+
+  async function insertVote(roomName: string, noteId: string): Promise<void> {
+    await runInRoomDO(roomName, (_instance, state) => {
+      const now = new Date().toISOString();
+      state.storage.sql.exec(
+        `INSERT INTO note_votes (note_id, user_id, kind, created_at, vote_count)
+         VALUES (?1, ?2, 'subjective', ?3, 1)`,
+        noteId,
+        USER_A,
+        now,
+      );
+    });
+  }
+
+  async function countPrivateNotes(roomName: string): Promise<number> {
+    return await runInRoomDO(roomName, (_instance, state) => {
+      return state.storage.sql
+        .exec(
+          "SELECT COUNT(*) AS count FROM notes WHERE visibility = 'private'",
+        )
+        .one().count as number;
+    });
+  }
+
+  async function countVotes(roomName: string, noteId: string): Promise<number> {
+    return await runInRoomDO(roomName, (_instance, state) => {
+      return state.storage.sql
+        .exec(
+          "SELECT COUNT(*) AS count FROM note_votes WHERE note_id = ?1",
+          noteId,
+        )
+        .one().count as number;
+    });
+  }
+
+  it("Step 1-2 から 1-3 へ進むと、共有しなかったマイ付箋とその票を破棄する", async () => {
+    const roomName = "room-discard-private-notes-leaving-sharing-step";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(2), USER_A);
+    await insertNote(roomName, SHARED_NOTE_ID, "shared", "共有した課題");
+    await insertNote(
+      roomName,
+      PRIVATE_NOTE_ID,
+      "private",
+      "共有しなかった下書き",
+    );
+    // 削除した付箋の票が孤児として残らないこと、かつ掃除が private に
+    // 限定され共有付箋の票を巻き込まないことの両方を検証する。
+    await insertVote(roomName, PRIVATE_NOTE_ID);
+    await insertVote(roomName, SHARED_NOTE_ID);
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "phase:next" }));
+
+    // 破棄をクライアントへ伝える経路は snapshot の再送だけ。phase:updated の
+    // 前に届かないと、消えたはずのマイ付箋が画面に残り続ける。
+    const snapshot = (await nextJson(ws)) as {
+      type: string;
+      notes: { id: string }[];
+    };
+    expect(snapshot.type).toBe("snapshot");
+    expect(snapshot.notes.map((note) => note.id)).toEqual([SHARED_NOTE_ID]);
+    expect(await nextJson(ws)).toMatchObject({
+      type: "phase:updated",
+      phase: buildPhaseStep(3),
+    });
+
+    expect(await countPrivateNotes(roomName)).toBe(0);
+    expect(await countVotes(roomName, PRIVATE_NOTE_ID)).toBe(0);
+    expect(await countVotes(roomName, SHARED_NOTE_ID)).toBe(1);
+    ws.close();
+  });
+
+  it("Step 1-1 から 1-2 へ進む時点ではマイ付箋を破棄しない", async () => {
+    const roomName = "room-keep-private-notes-entering-sharing-step";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(1), USER_A);
+    await insertNote(
+      roomName,
+      PRIVATE_NOTE_ID,
+      "private",
+      "これから共有する下書き",
+    );
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "phase:next" }));
+
+    // 共有ステップに入る側では掃除も snapshot 再送も起こさない。ここで
+    // 消すと、共有する前に下書きを失う。
+    expect(await nextJson(ws)).toMatchObject({
+      type: "phase:updated",
+      phase: buildPhaseStep(2),
+    });
+    expect(await countPrivateNotes(roomName)).toBe(1);
+    ws.close();
+  });
+});
+
 describe("RoomDO Step 2-1 の境界ゲート", () => {
   it("Step 2-1 では content 付き note:create で自分専用付箋を作成できる", async () => {
     const roomName = "room-step2-1-create";
