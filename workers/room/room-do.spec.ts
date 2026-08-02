@@ -1913,6 +1913,30 @@ describe("RoomDO フェーズ1→2 の遷移と決定課題の持ち越し", () 
     });
   }
 
+  async function insertVote(roomName: string, noteId: string): Promise<void> {
+    await runInRoomDO(roomName, (_instance, state) => {
+      const now = new Date().toISOString();
+      state.storage.sql.exec(
+        `INSERT INTO note_votes (note_id, user_id, kind, created_at, vote_count)
+         VALUES (?1, ?2, 'subjective', ?3, 1)`,
+        noteId,
+        USER_A,
+        now,
+      );
+    });
+  }
+
+  async function countVotes(roomName: string, noteId: string): Promise<number> {
+    return await runInRoomDO(roomName, (_instance, state) => {
+      return state.storage.sql
+        .exec(
+          "SELECT COUNT(*) AS count FROM note_votes WHERE note_id = ?1",
+          noteId,
+        )
+        .one().count as number;
+    });
+  }
+
   // Step 1-5 で決定済みの状態から phase:next で Step 2-1 へ遷移させる。
   async function decideAndAdvance(roomName: string): Promise<void> {
     const ws = await connectDirectly(roomName, USER_A, USER_A);
@@ -1973,6 +1997,10 @@ describe("RoomDO フェーズ1→2 の遷移と決定課題の持ち越し", () 
       PRIVATE_NOTE_ID,
       "フェーズ1で共有しなかった個人付箋",
     );
+    // 削除した付箋の票が孤児として残らないこと、かつ掃除が private に
+    // 限定され共有付箋の票を巻き込まないことの両方を検証する。
+    await insertVote(roomName, PRIVATE_NOTE_ID);
+    await insertVote(roomName, DECIDED_NOTE_ID);
 
     const ws = await connectDirectly(roomName, USER_A, USER_A);
     ws.send(JSON.stringify({ type: "note:decide", noteId: DECIDED_NOTE_ID }));
@@ -1995,6 +2023,8 @@ describe("RoomDO フェーズ1→2 の遷移と決定課題の持ち越し", () 
         .one().count as number;
     });
     expect(privateNoteCount).toBe(0);
+    expect(await countVotes(roomName, PRIVATE_NOTE_ID)).toBe(0);
+    expect(await countVotes(roomName, DECIDED_NOTE_ID)).toBe(1);
     ws.close();
   });
 
