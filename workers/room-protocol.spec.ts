@@ -1410,6 +1410,10 @@ describe("グループ指向のグループ同期", () => {
     await expectType(member, "note:updated");
 
     send(owner, { type: "phase:next" });
+    // 共有ステップ（Step 1-2）を抜けるときは未共有のマイ付箋を破棄するため、
+    // phase:updated の前に snapshot が再送される。
+    await expectType(owner, "snapshot");
+    await expectType(member, "snapshot");
     await expectType(owner, "phase:updated");
     await expectType(member, "phase:updated");
 
