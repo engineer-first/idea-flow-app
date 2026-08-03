@@ -812,6 +812,78 @@ describe("RoomDO phase:next", () => {
     ws.close();
   });
 
+  it("フェーズ2を phase:next で Step 2-2 から Step 3-1 まで進められる", async () => {
+    const roomName = "room-phase2-main-transition";
+    const noteId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(2, 2), USER_A);
+    await runInRoomDO(roomName, (_instance, state) => {
+      const now = new Date().toISOString();
+      state.storage.sql.exec(
+        `INSERT INTO notes
+           (id, author_id, content, visibility, color, x, y, created_at, updated_at, phase)
+         VALUES (?1, ?2, 'HMW', 'shared', 'yellow', 0, 0, ?3, ?3, 2)`,
+        noteId,
+        USER_A,
+        now,
+      );
+    });
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+
+    ws.send(JSON.stringify({ type: "phase:next" }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "snapshot",
+      phase: buildPhaseStep(3, 2),
+    });
+    expect(await nextJson(ws)).toMatchObject({
+      type: "phase:updated",
+      phase: buildPhaseStep(3, 2),
+    });
+
+    await runInRoomDO(roomName, (_instance, state) => {
+      const now = new Date().toISOString();
+      state.storage.sql.exec(
+        `INSERT INTO note_votes (note_id, user_id, kind, created_at, vote_count)
+         VALUES (?1, ?2, 'subjective', ?3, 1),
+                (?1, ?2, 'objective', ?3, 3)`,
+        noteId,
+        USER_A,
+        now,
+      );
+    });
+
+    ws.send(JSON.stringify({ type: "phase:next" }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "snapshot",
+      phase: buildPhaseStep(4, 2),
+    });
+    expect(await nextJson(ws)).toMatchObject({
+      type: "phase:updated",
+      phase: buildPhaseStep(4, 2),
+    });
+
+    ws.send(JSON.stringify({ type: "note:decide", noteId }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "decision:updated",
+      phase: 2,
+      noteId,
+    });
+
+    ws.send(JSON.stringify({ type: "phase:next" }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "snapshot",
+      phase: buildPhaseStep(1, 3),
+    });
+    expect(await nextJson(ws)).toMatchObject({
+      type: "phase:updated",
+      phase: buildPhaseStep(1, 3),
+    });
+    expect(await stub.getPhase()).toEqual(buildPhaseStep(1, 3));
+    ws.close();
+  });
+
   it("host は phase を進められる", async () => {
     const stub = roomStub("room-phase-host");
 
