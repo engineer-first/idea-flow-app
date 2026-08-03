@@ -1871,6 +1871,83 @@ describe("RoomDO lobby のボード凍結", () => {
   });
 });
 
+describe("RoomDO フェーズ2の投票・決定ゲート", () => {
+  const HMW_NOTE_ID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+
+  it("Step 2-3 では投票が許可される", async () => {
+    const roomName = "room-phase2-vote-gate";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(3, 2), USER_A);
+    await runInRoomDO(roomName, (_instance, state) => {
+      const now = new Date().toISOString();
+      state.storage.sql.exec(
+        `INSERT INTO notes
+           (id, author_id, content, visibility, color, x, y, created_at, updated_at)
+         VALUES (?1, ?2, 'HMW', 'shared', 'yellow', 0, 0, ?3, ?3)`,
+        HMW_NOTE_ID,
+        USER_A,
+        now,
+      );
+    });
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(
+      JSON.stringify({
+        type: "note:vote",
+        noteId: HMW_NOTE_ID,
+        kind: "subjective",
+      }),
+    );
+    expect(await nextJson(ws)).toMatchObject({ type: "note:updated" });
+    ws.close();
+  });
+
+  it("Step 2-4 ではホストのHMW決定が許可される", async () => {
+    const roomName = "room-phase2-decide-gate";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(4, 2), USER_A);
+    await runInRoomDO(roomName, (_instance, state) => {
+      const now = new Date().toISOString();
+      state.storage.sql.exec(
+        `INSERT INTO notes
+           (id, author_id, content, visibility, color, x, y, created_at, updated_at)
+         VALUES (?1, ?2, 'HMW', 'shared', 'yellow', 0, 0, ?3, ?3)`,
+        HMW_NOTE_ID,
+        USER_A,
+        now,
+      );
+    });
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "note:decide", noteId: HMW_NOTE_ID }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "decision:updated",
+      phase: 2,
+      noteId: HMW_NOTE_ID,
+    });
+    ws.close();
+  });
+
+  it("フェーズ2の投票未完了時は force でも結果ステップへ進めない", async () => {
+    const roomName = "room-phase2-voting-incomplete-force";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.upsertMember(USER_B, "Member");
+    await stub.setPhase(buildPhaseStep(3, 2), USER_A);
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "phase:next", force: true }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "error",
+      code: "voting-incomplete",
+    });
+    expect(await stub.getPhase()).toEqual(buildPhaseStep(3, 2));
+    ws.close();
+  });
+});
+
 describe("RoomDO フェーズ1→2 の遷移と決定課題の持ち越し", () => {
   const DECIDED_NOTE_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 
