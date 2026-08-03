@@ -2,33 +2,58 @@
 set -euo pipefail
 
 PAYLOAD=$(cat)
-FILE=$(jq -r '.tool_input.file_path // empty' <<<"$PAYLOAD")
+
+read_tool_input() {
+  node -e '
+    let payload = "";
+    process.stdin.on("data", (chunk) => (payload += chunk));
+    process.stdin.on("end", () => {
+      try {
+        const toolInput = JSON.parse(payload).tool_input ?? {};
+        const edits = Array.isArray(toolInput.edits) ? toolInput.edits : [];
+        const joinStrings = (values) =>
+          values.filter((value) => typeof value === "string").join("\n");
+
+        switch (process.argv[1]) {
+          case "file":
+            if (typeof toolInput.file_path === "string") {
+              process.stdout.write(toolInput.file_path);
+            }
+            break;
+          case "new-text":
+            process.stdout.write(
+              joinStrings([
+                toolInput.content,
+                toolInput.new_string,
+                ...edits.map((edit) => edit?.new_string),
+              ]),
+            );
+            break;
+          case "old-text":
+            process.stdout.write(
+              joinStrings([
+                toolInput.old_string,
+                ...edits.map((edit) => edit?.old_string),
+              ]),
+            );
+            break;
+          case "has-full-content":
+            process.stdout.write(String(typeof toolInput.content === "string"));
+            break;
+        }
+      } catch {}
+    });
+  ' "$1" <<<"$PAYLOAD"
+}
+
+FILE=$(read_tool_input file)
 
 [[ -z "$FILE" ]] && exit 0
 
 BASENAME=$(basename "$FILE")
-NEW_TEXT=$(
-  jq -r '
-    [
-      .tool_input.content?,
-      .tool_input.new_string?,
-      (.tool_input.edits[]?.new_string?)
-    ]
-    | map(select(type == "string"))
-    | join("\n")
-  ' <<<"$PAYLOAD"
-)
-OLD_TEXT=$(
-  jq -r '
-    [
-      .tool_input.old_string?,
-      (.tool_input.edits[]?.old_string?)
-    ]
-    | map(select(type == "string"))
-    | join("\n")
-  ' <<<"$PAYLOAD"
-)
-HAS_FULL_CONTENT=$(jq -r '(.tool_input.content? | type) == "string"' <<<"$PAYLOAD")
+NEW_TEXT=$(read_tool_input new-text)
+OLD_TEXT=$(read_tool_input old-text)
+HAS_FULL_CONTENT=$(read_tool_input has-full-content)
 
 deny() {
   cat >&2 <<EOF

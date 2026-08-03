@@ -192,7 +192,7 @@ describe("RoomBoardView", () => {
             ownCount: 0,
           },
           objective: {
-            count: [1, 5, 0, 0][index],
+            count: [1, 5, 1, 0][index],
             votedByMe: false,
             ownCount: 0,
           },
@@ -206,7 +206,7 @@ describe("RoomBoardView", () => {
     expect(screen.getByText("総合ポイントが高い順")).toBeInTheDocument();
     expect(screen.getByText("1位")).toBeInTheDocument();
     expect(screen.getByText("2位")).toBeInTheDocument();
-    expect(screen.getAllByText("3位")).toHaveLength(2);
+    expect(screen.getByText("3位")).toBeInTheDocument();
     expect(screen.queryByText("TOP 3")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
@@ -225,6 +225,13 @@ describe("RoomBoardView", () => {
       phase: buildPhaseStep(5),
       isHost: true,
       onNoteDecide,
+      notes: buildNotes(1).map((note) => ({
+        ...note,
+        dotVotes: {
+          subjective: { count: 1, votedByMe: false, ownCount: 0 },
+          objective: { count: 0, votedByMe: false, ownCount: 0 },
+        },
+      })),
     });
 
     fireEvent.click(
@@ -241,6 +248,13 @@ describe("RoomBoardView", () => {
     setup({
       phase: buildPhaseStep(5),
       decision: buildDecision({ noteId: "note-1", decidedBy: ME }),
+      notes: buildNotes(1).map((note) => ({
+        ...note,
+        dotVotes: {
+          subjective: { count: 1, votedByMe: false, ownCount: 0 },
+          objective: { count: 0, votedByMe: false, ownCount: 0 },
+        },
+      })),
     });
 
     expect(
@@ -255,6 +269,13 @@ describe("RoomBoardView", () => {
       phase: buildPhaseStep(5),
       isHost: true,
       connectionStatus: "closed",
+      notes: buildNotes(1).map((note) => ({
+        ...note,
+        dotVotes: {
+          subjective: { count: 1, votedByMe: false, ownCount: 0 },
+          objective: { count: 0, votedByMe: false, ownCount: 0 },
+        },
+      })),
     });
 
     expect(

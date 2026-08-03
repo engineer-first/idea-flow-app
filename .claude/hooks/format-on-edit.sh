@@ -3,7 +3,16 @@ set -uo pipefail
 
 PAYLOAD=$(cat)
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-FILE=$(jq -r '.tool_input.file_path // empty' <<<"$PAYLOAD")
+FILE=$(node -e '
+  let payload = "";
+  process.stdin.on("data", (chunk) => (payload += chunk));
+  process.stdin.on("end", () => {
+    try {
+      const file = JSON.parse(payload).tool_input?.file_path;
+      if (typeof file === "string") process.stdout.write(file);
+    } catch {}
+  });
+' <<<"$PAYLOAD")
 
 [[ -z "$FILE" ]] && exit 0
 
