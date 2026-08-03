@@ -1,15 +1,27 @@
 "use client";
 
-// ボード画面上部のヘッダー。招待情報（host 限定）・メンバー一覧・残り投票数・
-// フェーズ表示と移行操作・接続状態・退出/解散・タイマーを 1 列に束ねる。
-// データ層には依存せず、表示状態とコールバックを props で受け取る。
+// ボード画面の進行レールとフローティング HUD。
+// 常設するのは現在地だけに絞り、参加者・招待・退出はポップオーバーへ退避する。
+import { LogOut, MoreHorizontal } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { isResultStep, type RoomPhase } from "@/contracts/phase";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import {
+  isResultStep,
+  isVotingStep,
+  PHASE_STEP_COUNTS,
+  type RoomPhase,
+} from "@/contracts/phase";
 import type { TimerState } from "@/contracts/room-protocol";
 import type { DotVoteRemaining } from "@/features/dot-vote";
 import { DotVoteSummary } from "@/features/dot-vote";
 import { CopyInviteButton } from "@/features/invite";
-import { RoomMembers } from "@/features/room-members";
+import { MemberAvatar } from "@/features/room-members";
 import {
   CONNECTION_STATUS_LABELS,
   type RoomScreenConnectionStatus,
@@ -18,6 +30,14 @@ import { getPhaseLabel } from "../logic/phase-labels";
 import type { Member } from "../logic/room-reducer";
 import { NextPhaseConfirmDialog } from "../molecules/next-phase-confirm-dialog";
 import { RoomTimer } from "./room-timer";
+
+const PHASE_TITLES = {
+  1: "課題整理",
+  2: "問いの作成",
+  3: "アイデア",
+} as const;
+
+const PROGRESS_STEPS = [1, 2, 3, 4, 5] as const;
 
 export type RoomBoardHeaderProps = {
   inviteCode: string;
@@ -38,6 +58,7 @@ export type RoomBoardHeaderProps = {
   isNextPhaseBlocked: boolean;
   voteRemaining: DotVoteRemaining;
   isLeaving: boolean;
+  signOutAction?: () => Promise<void>;
   onShowVoteResult: () => void;
   onLeaveClick: () => void;
   onNextPhase: () => void;
@@ -47,6 +68,24 @@ export type RoomBoardHeaderProps = {
   onTimerExtend: () => void;
   onTimerStop: () => void;
 };
+
+function getPhaseContext(phase: RoomPhase): {
+  title: string;
+  step: number;
+  stepCount: number;
+  stepLabel: string;
+} {
+  if (phase.kind === "lobby") {
+    return { title: "開始待ち", step: 0, stepCount: 1, stepLabel: "準備中" };
+  }
+
+  return {
+    title: PHASE_TITLES[phase.phase],
+    step: phase.step,
+    stepCount: PHASE_STEP_COUNTS[phase.phase],
+    stepLabel: getPhaseLabel(phase).replace(/^\d+-\d+\s*/, ""),
+  };
+}
 
 export function RoomBoardHeader({
   inviteCode,
@@ -64,6 +103,7 @@ export function RoomBoardHeader({
   isNextPhaseBlocked,
   voteRemaining,
   isLeaving,
+  signOutAction,
   onShowVoteResult,
   onLeaveClick,
   onNextPhase,
@@ -73,96 +113,271 @@ export function RoomBoardHeader({
   onTimerExtend,
   onTimerStop,
 }: RoomBoardHeaderProps) {
+  const [roomMenuOpen, setRoomMenuOpen] = useState(false);
+  const context = getPhaseContext(phase);
+  const currentMember = members.find(
+    (member) => member.userId === currentUserId,
+  );
+  const connectionLabel = CONNECTION_STATUS_LABELS[connectionStatus];
+  const leaveLabel = isHost
+    ? isLeaving
+      ? "解散中…"
+      : "ルームを解散"
+    : isLeaving
+      ? "退出中…"
+      : "退出する";
+
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-3">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-        {isHost ? (
-          // 招待URL / 招待コードはホストだけが共有できる情報。
-          // 値自体を表示し、クリックでコピー。中央揃え。
-          <div
-            className="flex max-w-full flex-col items-center gap-3"
-            data-testid="board-view-invite"
-          >
-            <div className="flex max-w-full flex-col items-center gap-0.5">
-              <span className="text-xs text-muted-foreground">招待URL</span>
-              <CopyInviteButton value={inviteUrl} itemLabel="招待URL" />
-            </div>
-            <div className="flex max-w-full flex-col items-center gap-0.5">
-              <span className="text-xs text-muted-foreground">招待コード</span>
-              <CopyInviteButton value={inviteCode} itemLabel="招待コード" />
-            </div>
-          </div>
-        ) : null}
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <RoomMembers
-          members={members}
-          currentUserId={currentUserId}
-          hostUserId={hostUserId}
-        />
-        <DotVoteSummary voteRemaining={voteRemaining} />
-        <span className="text-sm text-muted-foreground">
-          現在のステップ:
-          <span className="ml-1 font-semibold text-foreground">
-            {getPhaseLabel(phase)}
+    <TooltipProvider delayDuration={300}>
+      <header
+        className="pointer-events-auto absolute top-3 left-3 z-40 flex h-12 max-w-[calc(100%-34rem)] items-center gap-3 overflow-hidden rounded-xl border border-border bg-background/85 px-3 shadow-lg shadow-black/5 backdrop-blur-xl"
+        data-testid="board-context-hud"
+      >
+        <p className="shrink-0 text-sm font-semibold tracking-tight">
+          IdeaFlow
+        </p>
+        <span aria-hidden="true" className="h-4 w-px bg-border" />
+        <p className="shrink-0 text-xs font-semibold">{context.title}</p>
+        <p className="flex min-w-0 shrink items-center gap-1 whitespace-nowrap text-xs text-muted-foreground">
+          <span className="shrink-0 font-medium text-foreground">
+            Step {context.step}/{context.stepCount}
           </span>
-        </span>
+          <span className="min-w-0 truncate">{context.stepLabel}</span>
+        </p>
+        <div
+          role="progressbar"
+          aria-label={`${context.title}の進行状況`}
+          aria-valuemin={0}
+          aria-valuemax={context.stepCount}
+          aria-valuenow={context.step}
+          className="flex h-1 w-56 min-w-28 shrink gap-1"
+          data-testid="board-progress-rail"
+        >
+          {PROGRESS_STEPS.slice(0, context.stepCount).map((stepNumber) => (
+            <span
+              key={stepNumber}
+              className={`h-full flex-1 rounded-full ${
+                stepNumber <= context.step ? "bg-foreground" : "bg-muted"
+              }`}
+            />
+          ))}
+        </div>
+      </header>
 
-        {isHost && (
-          <NextPhaseConfirmDialog
-            phase={phase}
-            disabled={
-              isDisconnected || isNextPhasePending || isNextPhaseBlocked
-            }
-            onConfirm={onNextPhase}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 z-40 flex items-start justify-end gap-2 p-3"
+        data-testid="board-control-hud"
+      >
+        <div className="pointer-events-auto shrink-0">
+          <RoomTimer
+            timer={timer}
+            serverOffsetMs={timerServerOffsetMs}
+            isHost={isHost}
+            disabled={isDisconnected}
+            onStart={onTimerStart}
+            onPause={onTimerPause}
+            onResume={onTimerResume}
+            onExtend={onTimerExtend}
+            onStop={onTimerStop}
           />
-        )}
+        </div>
+        <div className="pointer-events-auto flex h-12 max-w-[calc(100%-7rem)] items-center gap-1 rounded-xl border border-border bg-background/85 p-1 shadow-lg shadow-black/5 backdrop-blur-xl">
+          {isVotingStep(phase) ? (
+            <DotVoteSummary voteRemaining={voteRemaining} />
+          ) : null}
 
-        {CONNECTION_STATUS_LABELS[connectionStatus] !== null && (
-          // role="status"（aria-live: polite）で、再接続をスクリーンリーダーにも通知する。
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-10 gap-2 px-2"
+                aria-label={`参加者 ${members.length}人`}
+              >
+                <span className="flex items-center pl-2" aria-hidden="true">
+                  {members.slice(0, 10).map((member, index) => (
+                    <span
+                      key={member.userId}
+                      className={`relative ${
+                        index >= 6 ? "hidden xl:inline-flex" : "inline-flex"
+                      } ${index > 0 ? "-ml-2" : ""}`}
+                      style={{ zIndex: 10 - index }}
+                    >
+                      <MemberAvatar
+                        name={member.name}
+                        color={member.color}
+                        size={28}
+                        isMe={member.userId === currentUserId}
+                      />
+                    </span>
+                  ))}
+                </span>
+                <span className="text-xs tabular-nums">{members.length}</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72" aria-label="参加者一覧">
+              <p className="mb-3 text-sm font-semibold">
+                参加者 {members.length}人
+              </p>
+              <ul className="flex max-h-72 flex-col gap-2 overflow-y-auto p-1">
+                {members.map((member) => (
+                  <li
+                    key={member.userId}
+                    data-testid={`member-row-${member.userId}`}
+                    data-self={
+                      member.userId === currentUserId ? "true" : undefined
+                    }
+                    className="flex min-w-0 items-center gap-2"
+                  >
+                    <MemberAvatar
+                      name={member.name}
+                      color={member.color}
+                      size={32}
+                      isMe={member.userId === currentUserId}
+                    />
+                    <span className="min-w-0 flex-1 truncate text-sm">
+                      {member.name}
+                    </span>
+                    {member.userId === hostUserId ? (
+                      <span
+                        className="text-xs text-muted-foreground"
+                        data-testid={`member-host-label-${member.userId}`}
+                      >
+                        ホスト
+                      </span>
+                    ) : null}
+                    {member.userId === currentUserId ? (
+                      <span className="text-xs text-muted-foreground">
+                        あなた
+                      </span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </PopoverContent>
+          </Popover>
+
+          {isResultStep(phase) ? (
+            <Button
+              type="button"
+              className="h-10 px-4"
+              onClick={onShowVoteResult}
+            >
+              投票結果を表示
+            </Button>
+          ) : isHost ? (
+            <NextPhaseConfirmDialog
+              phase={phase}
+              disabled={
+                isDisconnected || isNextPhasePending || isNextPhaseBlocked
+              }
+              onConfirm={onNextPhase}
+            />
+          ) : null}
+
+          <Popover open={roomMenuOpen} onOpenChange={setRoomMenuOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                className="size-10 p-0"
+                aria-label="ルームメニューを開く"
+              >
+                <MoreHorizontal aria-hidden="true" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80" aria-label="ルームメニュー">
+              {currentMember ? (
+                <div className="mb-3 flex min-w-0 items-center gap-2 border-b border-border pb-3">
+                  <MemberAvatar
+                    name={currentMember.name}
+                    color={currentMember.color}
+                    size={32}
+                    isMe
+                  />
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                    {currentMember.name}
+                  </span>
+                  {isHost ? (
+                    <span className="text-xs text-muted-foreground">
+                      ホスト
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {isHost ? (
+                <div
+                  className="mb-3 flex flex-col gap-3 border-b border-border pb-3"
+                  data-testid="board-view-invite"
+                >
+                  <div className="min-w-0">
+                    <span className="block text-xs text-muted-foreground">
+                      招待URL
+                    </span>
+                    <CopyInviteButton
+                      value={inviteUrl}
+                      itemLabel="招待URL"
+                      className="mt-1 block max-w-full text-left"
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="block text-xs text-muted-foreground">
+                      招待コード
+                    </span>
+                    <CopyInviteButton
+                      value={inviteCode}
+                      itemLabel="招待コード"
+                      className="mt-1 block max-w-full text-left"
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="flex flex-col gap-1">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  className="h-10 justify-start"
+                  disabled={isLeaving}
+                  data-testid="leave-button"
+                  onClick={() => {
+                    setRoomMenuOpen(false);
+                    onLeaveClick();
+                  }}
+                >
+                  {leaveLabel}
+                </Button>
+                {signOutAction ? (
+                  <form action={signOutAction}>
+                    <Button
+                      type="submit"
+                      variant="ghost"
+                      className="h-10 w-full justify-start"
+                    >
+                      <LogOut aria-hidden="true" />
+                      ログアウト
+                    </Button>
+                  </form>
+                ) : null}
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        {connectionLabel !== null ? (
           <span
             role="status"
-            className={`text-sm ${
+            className={`pointer-events-auto absolute top-16 right-16 rounded-full border border-border bg-background/85 px-3 py-2 text-xs font-medium tracking-wide shadow-lg shadow-black/5 backdrop-blur-xl ${
               connectionStatus === "closed"
                 ? "text-destructive"
                 : "text-muted-foreground"
             }`}
           >
-            {CONNECTION_STATUS_LABELS[connectionStatus]}
+            {connectionLabel}
           </span>
-        )}
-        {isResultStep(phase) ? (
-          <Button type="button" onClick={onShowVoteResult}>
-            投票結果を表示
-          </Button>
         ) : null}
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onLeaveClick}
-          disabled={isLeaving}
-          data-testid="leave-button"
-        >
-          {isHost
-            ? isLeaving
-              ? "解散中…"
-              : "ルームを解散"
-            : isLeaving
-              ? "退出中…"
-              : "退出する"}
-        </Button>
-        <RoomTimer
-          timer={timer}
-          serverOffsetMs={timerServerOffsetMs}
-          isHost={isHost}
-          disabled={isDisconnected}
-          onStart={onTimerStart}
-          onPause={onTimerPause}
-          onResume={onTimerResume}
-          onExtend={onTimerExtend}
-          onStop={onTimerStop}
-        />
       </div>
-    </div>
+    </TooltipProvider>
   );
 }

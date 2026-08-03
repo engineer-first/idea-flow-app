@@ -44,6 +44,7 @@ export type RoomBoardViewProps = {
   // ホストの userId（メンバー一覧の「ホスト」ラベル表示用）。
   hostUserId: string;
   isNextPhasePending: boolean;
+  signOutAction?: () => Promise<void>;
   privateNotes: Note[];
   // ボード上に掲示する、フェーズ1から持ち越された決定課題の本文。
   // 解決（carryovers からの取り出し）はコンテナの責務。null なら非表示。
@@ -94,6 +95,7 @@ export function RoomBoardView({
   currentUserId,
   hostUserId,
   isNextPhasePending,
+  signOutAction,
   privateNotes,
   hmwDecidedIssue,
   onAddPrivateNote,
@@ -206,7 +208,7 @@ export function RoomBoardView({
     <div
       ref={boardRootRef}
       data-testid="room-board-view-root"
-      className="flex h-full flex-col gap-3"
+      className="relative flex h-full flex-col"
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerEnd}
       onPointerCancel={handlePointerEnd}
@@ -225,6 +227,7 @@ export function RoomBoardView({
         hostUserId={hostUserId}
         isNextPhasePending={isNextPhasePending}
         isNextPhaseBlocked={isNextPhaseBlocked}
+        signOutAction={signOutAction}
         voteRemaining={voteRemaining}
         isLeaving={isLeaving}
         onShowVoteResult={() => setVoteTotalingDialogOpen(true)}

@@ -131,12 +131,13 @@ describe("RoomBoardCanvas", () => {
     expect(screen.getByRole("button", { name: "付箋を追加" })).toBeDisabled();
   });
 
-  it("発想支援サイドバーを閉じた状態で表示する", () => {
+  it("発想支援サイドバーを閉じた状態でHUDと重ならない位置に表示する", () => {
     setup();
 
     expect(
       screen.getByRole("button", { name: "発想支援を開く" }),
     ).toBeInTheDocument();
+    expect(screen.getByTestId("idea-support-dock")).toHaveClass("top-16");
   });
 
   describe("HMW オーバーレイ", () => {

@@ -31,7 +31,7 @@ export function NextPhaseConfirmDialog({
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button type="button" disabled={disabled}>
+        <Button type="button" className="h-10 px-4" disabled={disabled}>
           次のステップへ
         </Button>
       </AlertDialogTrigger>

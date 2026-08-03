@@ -952,7 +952,9 @@ describe("ユーザー操作 → プロトコルメッセージ送信", () => {
   });
 
   it("客観ドットはサーバー応答前でも残数までしか送信しない", () => {
-    const { socket } = connectWithSnapshot([protocolNote()]);
+    const { socket } = connectWithSnapshot([protocolNote()], {
+      phase: buildPhaseStep(4),
+    });
     const button = screen.getByRole("button", { name: "客観ドットを追加" });
 
     fireEvent.click(button);

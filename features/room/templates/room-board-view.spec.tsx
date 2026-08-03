@@ -64,6 +64,14 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardView>[0]> = {}) {
   return props;
 }
 
+function openRoomMenu() {
+  fireEvent.click(screen.getByRole("button", { name: "ルームメニューを開く" }));
+}
+
+function openMembers() {
+  fireEvent.click(screen.getByRole("button", { name: /参加者 \d+人/ }));
+}
+
 // カード内の選択・ドラッグ・キー操作を受けるサーフェス（透明なbutton）。
 function getNoteSurface(card: HTMLElement) {
   return within(card).getByRole("button", { name: "付箋" });
@@ -101,12 +109,15 @@ describe("RoomBoardView", () => {
     expect(onTimerStart).toHaveBeenCalledWith(90_000);
   });
 
-  it("host のとき招待URLと招待コードのラベルと値を表示する", () => {
+  it("host の招待URLと招待コードはルームメニューから表示する", () => {
     setup({
       isHost: true,
       inviteCode: "ZZ99XX",
       inviteUrl: "https://idea-flow.example/invite/ZZ99XX",
     });
+
+    expect(screen.queryByText("招待URL")).not.toBeInTheDocument();
+    openRoomMenu();
 
     expect(screen.getByText("招待URL")).toBeInTheDocument();
     expect(screen.getByText("招待コード")).toBeInTheDocument();
@@ -153,6 +164,7 @@ describe("RoomBoardView", () => {
 
   it("残り投票可能数を表示する", () => {
     setup({
+      phase: buildPhaseStep(4),
       notes: buildNotes(2).map((note, index) => ({
         ...note,
         dotVotes: {
@@ -168,6 +180,18 @@ describe("RoomBoardView", () => {
 
     expect(screen.getByText("主観 残り0")).toBeInTheDocument();
     expect(screen.getByText("客観 残り1")).toBeInTheDocument();
+  });
+
+  it("現在地と操作HUDをキャンバス上に重ねる", () => {
+    setup({ isHost: true });
+
+    expect(screen.getByTestId("board-context-hud")).toHaveClass("absolute");
+    expect(screen.getByTestId("board-progress-rail")).toBeInTheDocument();
+    expect(screen.getByTestId("board-control-hud")).toHaveClass(
+      "absolute",
+      "top-0",
+    );
+    expect(screen.getByTestId("room-board-view-root")).toHaveClass("relative");
   });
 
   it("Step 1-4 のホストは Step 1-5 へ進める", () => {
@@ -540,18 +564,18 @@ describe("RoomBoardView", () => {
       expect(onNextPhase).toHaveBeenCalledTimes(1);
     });
 
-    it("Step 1-5 は課題が決定されるまで「次のステップへ」を無効にする", () => {
+    it("Step 1-5 は投票結果の確認後も「次のステップへ」を表示しない", () => {
       setup({ isHost: true, phase: buildPhaseStep(5), decision: null });
 
       // 結果ステップで自動表示される投票結果ダイアログを閉じてから検証する。
       fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
 
       expect(
-        screen.getByRole("button", { name: "次のステップへ" }),
-      ).toBeDisabled();
+        screen.queryByRole("button", { name: "次のステップへ" }),
+      ).not.toBeInTheDocument();
     });
 
-    it("Step 1-5 で課題が決定されると「次のステップへ」が有効になる", () => {
+    it("Step 1-5 で課題が決定されても「次のステップへ」を表示しない", () => {
       setup({
         isHost: true,
         phase: buildPhaseStep(5),
@@ -561,8 +585,8 @@ describe("RoomBoardView", () => {
       fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
 
       expect(
-        screen.getByRole("button", { name: "次のステップへ" }),
-      ).not.toBeDisabled();
+        screen.queryByRole("button", { name: "次のステップへ" }),
+      ).not.toBeInTheDocument();
     });
 
     it("Step 2-1 では次のステップ(2-2)が未実装のため「次のステップへ」を無効にする", () => {
@@ -578,6 +602,7 @@ describe("RoomBoardView", () => {
 describe("退出・解散ボタン", () => {
   it("ホストは「ルームを解散」ボタンが描画される", () => {
     setup({ isHost: true });
+    openRoomMenu();
     expect(
       screen.getByRole("button", { name: "ルームを解散" }),
     ).toBeInTheDocument();
@@ -585,6 +610,7 @@ describe("退出・解散ボタン", () => {
 
   it("非ホストは「退出する」ボタンが描画される", () => {
     setup({ isHost: false });
+    openRoomMenu();
     expect(
       screen.getByRole("button", { name: "退出する" }),
     ).toBeInTheDocument();
@@ -595,6 +621,9 @@ describe("退出・解散ボタン", () => {
     const user = userEvent.setup();
     setup({ onLeave, isHost: true });
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: "ルームメニューを開く" }),
+    );
     await user.click(screen.getByRole("button", { name: "ルームを解散" }));
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();
     expect(screen.getByText("ルームを解散しますか？")).toBeInTheDocument();
@@ -606,6 +635,9 @@ describe("退出・解散ボタン", () => {
     const onLeave = vi.fn();
     const user = userEvent.setup();
     setup({ onLeave, isHost: true });
+    await user.click(
+      screen.getByRole("button", { name: "ルームメニューを開く" }),
+    );
     await user.click(screen.getByRole("button", { name: "ルームを解散" }));
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "キャンセル" }));
@@ -615,6 +647,7 @@ describe("退出・解散ボタン", () => {
 
   it("isLeaving=true のときホストボタンは disabled で文言が「解散中…」になる", () => {
     setup({ isLeaving: true, isHost: true });
+    openRoomMenu();
     const button = screen.getByRole("button", { name: /解散/ });
     expect(button).toBeDisabled();
     expect(button).toHaveTextContent("解散中…");
@@ -638,40 +671,46 @@ describe("招待URL/コード（host 限定表示）", () => {
   });
 });
 
-describe("メンバー一覧（名前常時表示）", () => {
-  it("メンバー名が Avatar の隣に常時表示される（ホバー不要）", () => {
+describe("参加者 HUD", () => {
+  it("メンバー名は参加者ポップオーバーに表示する", () => {
     setup();
-    // 自分
+    expect(screen.queryByText("Yuki Tanaka")).not.toBeInTheDocument();
+    openMembers();
     expect(screen.getByText("Yuki Tanaka")).toBeInTheDocument();
-    // 自分以外（fixture の NAMES[0] と NAMES[1]）
     expect(screen.getByText("Taro Yamada")).toBeInTheDocument();
   });
 
-  it("自分メンバーは data-self と ring で識別し、（あなた）文言は出さない", () => {
+  it("自分メンバーは data-self と ring で識別する", () => {
     setup();
+    openMembers();
     const meRow = screen.getByTestId(`member-row-${ME}`);
     expect(meRow).toHaveAttribute("data-self", "true");
     expect(meRow.textContent).toContain("Yuki Tanaka");
-    expect(meRow.textContent).not.toContain("（あなた）");
+    expect(meRow.textContent).toContain("あなた");
   });
 
-  it("ホストの名前下に「ホスト」ラベルが出る", () => {
+  it("ホストの名前に「ホスト」ラベルが出る", () => {
     setup({ hostUserId: ME });
+    openMembers();
     expect(screen.getByTestId(`member-host-label-${ME}`)).toHaveTextContent(
       "ホスト",
     );
   });
 
-  it("ボード画面は最大 12 人（4×3）まで表示し、超過は +N になる", () => {
-    // 13 人 → 表示 11 + +2
+  it("10人を超えても HUD は最大10アバターと合計人数で折り返さない", () => {
     setup({ members: buildMembers(13) });
-    expect(screen.getAllByTestId("avatar")).toHaveLength(11);
-    expect(screen.getByLabelText("他 2 名")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "参加者 13人" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByTestId("avatar")).toHaveLength(10);
   });
 
-  it("12 人以下なら全員表示され +N は出ない", () => {
-    setup({ members: buildMembers(5) });
-    expect(screen.getAllByTestId("avatar")).toHaveLength(5);
-    expect(screen.queryByLabelText(/他 \d+ 名/)).not.toBeInTheDocument();
+  it("1024px向けに7人目以降のアバターを縮約表示する", () => {
+    setup({ members: buildMembers(10) });
+    const seventhAvatarWrapper =
+      screen.getAllByTestId("avatar")[6]?.parentElement;
+
+    expect(seventhAvatarWrapper).toHaveClass("hidden", "xl:inline-flex");
+    expect(seventhAvatarWrapper?.classList.contains("inline-flex")).toBe(false);
   });
 });

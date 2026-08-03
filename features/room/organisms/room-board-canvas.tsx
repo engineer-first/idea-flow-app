@@ -140,7 +140,7 @@ export function RoomBoardCanvas({
       <div className="relative h-full min-h-80" data-testid="board-frame">
         <div
           ref={boardScrollerRef}
-          className="h-full overflow-auto rounded-md border border-border bg-muted/30"
+          className="h-full overflow-auto bg-muted/20"
         >
           <div
             data-testid="board-canvas"
@@ -257,7 +257,7 @@ export function RoomBoardCanvas({
             notes={privateNotes}
             disabled={isDisconnected}
             editingDisabled={isResultStep(phase)}
-            className="pointer-events-auto max-w-5xl"
+            className="pointer-events-auto w-[min(42rem,calc(100vw-2rem))] max-w-none"
             toolbarRef={privateToolbarRef}
             isReturnDropTarget={isReturnDropTarget}
             selectedNoteId={selectedNoteId}
@@ -268,7 +268,10 @@ export function RoomBoardCanvas({
             onDragStart={onPrivateNoteDragStart}
           />
         </div>
-        <div className="pointer-events-none absolute inset-y-3 right-3 z-30">
+        <div
+          className="pointer-events-none absolute top-16 right-3 bottom-3 z-30"
+          data-testid="idea-support-dock"
+        >
           <IdeaSupportSidebar />
         </div>
       </div>
