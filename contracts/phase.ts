@@ -96,6 +96,10 @@ export function isAtOrAfterGroupingStep(phase: RoomPhase): boolean {
   return phase.kind === "step" && phase.phase === 1 && phase.step >= 3;
 }
 
+export function isSharingStep(phase: RoomPhase): boolean {
+  return phase.kind === "step" && phase.step === 2;
+}
+
 export function isResultStep(phase: RoomPhase): boolean {
   return (
     phase.kind === "step" && phase.step === RESULT_STEP_BY_PHASE[phase.phase]

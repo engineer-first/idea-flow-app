@@ -170,6 +170,33 @@ describe("useBoardDrag", () => {
     expect(result.current.drag).toBeNull();
   });
 
+  it("canPublish が false の場合、マイ付箋をボードへ運ぶと onPublishBlocked を1回だけ呼び通信を遮断する", () => {
+    const onPublishBlocked = vi.fn();
+    const { args, result } = setup({ canPublish: false, onPublishBlocked });
+
+    act(() => {
+      result.current.handlePrivateDragStart(
+        "private-1",
+        pointerEvent(1, 400, 560),
+      );
+    });
+
+    act(() => {
+      result.current.handlePointerMove(pointerEvent(1, 300, 200));
+    });
+
+    expect(onPublishBlocked).toHaveBeenCalledTimes(1);
+    expect(args.onPrivateNotePublish).not.toHaveBeenCalled();
+
+    // 2回目 pointerMove
+    act(() => {
+      result.current.handlePointerMove(pointerEvent(1, 310, 210));
+    });
+
+    expect(onPublishBlocked).toHaveBeenCalledTimes(1);
+    expect(args.onNoteDragMove).not.toHaveBeenCalled();
+  });
+
   it("異なる pointerId のイベントは無視する（マルチタッチの混線防止）", () => {
     const { args, result } = setup();
 

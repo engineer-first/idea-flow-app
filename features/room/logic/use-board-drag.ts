@@ -31,6 +31,8 @@ export type UseBoardDragArgs = {
   boardRootRef: RefObject<HTMLDivElement | null>;
   boardScrollerRef: RefObject<HTMLDivElement | null>;
   privateToolbarRef: RefObject<HTMLDivElement | null>;
+  canPublish?: boolean;
+  onPublishBlocked?: () => void;
   onNoteDragStart: (noteId: string) => void;
   onNoteDragMove: (noteId: string, x: number, y: number) => void;
   onNoteDragEnd: (noteId: string, x: number, y: number) => void;
@@ -45,6 +47,8 @@ export function useBoardDrag({
   boardRootRef,
   boardScrollerRef,
   privateToolbarRef,
+  canPublish = true,
+  onPublishBlocked,
   onNoteDragStart,
   onNoteDragMove,
   onNoteDragEnd,
@@ -55,6 +59,7 @@ export function useBoardDrag({
   // pointermove は React の再レンダーより速く連続発火するため、最新状態は
   // ref で参照する（state はレンダー反映用）。
   const dragRef = useRef<BoardDrag | null>(null);
+  const hasNotifiedBlockedRef = useRef(false);
 
   const updateDrag = useCallback((next: BoardDrag | null) => {
     dragRef.current = next;
@@ -118,6 +123,7 @@ export function useBoardDrag({
     (noteId: string, event: ReactPointerEvent<HTMLButtonElement>) => {
       const note = notes.find((n) => n.id === noteId);
       if (!note) return;
+      hasNotifiedBlockedRef.current = false;
       boardRootRef.current?.setPointerCapture?.(event.pointerId);
       updateDrag({
         note,
@@ -135,6 +141,7 @@ export function useBoardDrag({
     (noteId: string, event: ReactPointerEvent<HTMLButtonElement>) => {
       const note = privateNotes.find((n) => n.id === noteId);
       if (!note) return;
+      hasNotifiedBlockedRef.current = false;
       boardRootRef.current?.setPointerCapture?.(event.pointerId);
       updateDrag({
         note,
@@ -157,7 +164,9 @@ export function useBoardDrag({
           current.status === "shared" &&
           current.note.authorId === currentUserId
         ) {
-          onPrivateNoteUnpublish(current.note.id);
+          if (canPublish) {
+            onPrivateNoteUnpublish(current.note.id);
+          }
           updateDrag({ ...current, status: "returning" });
         }
         return;
@@ -166,23 +175,34 @@ export function useBoardDrag({
       const position = boardPositionFromPointer(event.clientX, event.clientY);
       if (!position) return;
       if (current.status === "private" || current.status === "returning") {
-        // ボードに入った瞬間に共有化する。以後の座標は既存のdrag配信を使う。
-        onPrivateNotePublish(current.note.id, position.x, position.y);
-        onNoteDragStart(current.note.id);
+        if (!canPublish) {
+          if (!hasNotifiedBlockedRef.current) {
+            onPublishBlocked?.();
+            hasNotifiedBlockedRef.current = true;
+          }
+        } else {
+          // ボードに入った瞬間に共有化する。以後の座標は既存のdrag配信を使う。
+          onPrivateNotePublish(current.note.id, position.x, position.y);
+          onNoteDragStart(current.note.id);
+        }
       }
-      // publish と同じ WebSocket 接続で送るため、publish のあとに届く drag は
-      // RoomDO 側でも公開後の付箋として処理される。
-      onNoteDragMove(current.note.id, position.x, position.y);
+      if (canPublish) {
+        // publish と同じ WebSocket 接続で送るため、publish のあとに届く drag は
+        // RoomDO 側でも公開後の付箋として処理される。
+        onNoteDragMove(current.note.id, position.x, position.y);
+      }
       updateDrag({ ...current, status: "shared", ...position });
     },
     [
       boardPositionFromPointer,
+      canPublish,
       currentUserId,
       isPointerOverPrivateToolbar,
       onNoteDragMove,
       onNoteDragStart,
       onPrivateNotePublish,
       onPrivateNoteUnpublish,
+      onPublishBlocked,
       updateDrag,
     ],
   );
@@ -190,8 +210,9 @@ export function useBoardDrag({
   const handlePointerEnd = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       const current = dragRef.current;
+      hasNotifiedBlockedRef.current = false;
       if (!current || current.pointerId !== event.pointerId) return;
-      if (current.status === "shared") {
+      if (current.status === "shared" && canPublish) {
         const position = boardPositionFromPointer(
           event.clientX,
           event.clientY,
@@ -201,7 +222,13 @@ export function useBoardDrag({
       boardRootRef.current?.releasePointerCapture?.(event.pointerId);
       updateDrag(null);
     },
-    [boardPositionFromPointer, boardRootRef, onNoteDragEnd, updateDrag],
+    [
+      boardPositionFromPointer,
+      boardRootRef,
+      canPublish,
+      onNoteDragEnd,
+      updateDrag,
+    ],
   );
 
   return {

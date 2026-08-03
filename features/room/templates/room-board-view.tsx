@@ -9,7 +9,7 @@
 // 持ち、この view は UI 状態とドラッグ機械（use-board-drag）の配線に徹する。
 import { useEffect, useRef, useState } from "react";
 import type { PersistentGroup } from "@/contracts/grouping";
-import { isResultStep, type RoomPhase } from "@/contracts/phase";
+import { isResultStep, isSharingStep, type RoomPhase } from "@/contracts/phase";
 import {
   DOT_VOTE_LIMITS,
   type DotVoteKind,
@@ -18,6 +18,7 @@ import {
 import { isHmwWritingStep } from "@/features/hmw";
 import type { Note } from "@/features/notes";
 import type { RoomScreenConnectionStatus } from "../logic/connection-status";
+import { roomNotify } from "../logic/room-notify";
 import type { Decision, Member } from "../logic/room-reducer";
 import { useBoardDrag } from "../logic/use-board-drag";
 import { LeaveConfirmDialog } from "../molecules/leave-confirm-dialog";
@@ -156,6 +157,8 @@ export function RoomBoardView({
     boardRootRef,
     boardScrollerRef,
     privateToolbarRef,
+    canPublish: isSharingStep(phase),
+    onPublishBlocked: roomNotify.cannotPublishNote,
     onNoteDragStart,
     onNoteDragMove,
     onNoteDragEnd,

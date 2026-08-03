@@ -24,4 +24,7 @@ export const roomNotify = {
   roomDisbandedBySelf(): void {
     toast("ルームを解散しました");
   },
+  cannotPublishNote() {
+    toast.error("移動できません");
+  },
 };
