@@ -210,8 +210,8 @@ export function useBoardDrag({
   const handlePointerEnd = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       const current = dragRef.current;
-      hasNotifiedBlockedRef.current = false;
       if (!current || current.pointerId !== event.pointerId) return;
+      hasNotifiedBlockedRef.current = false;
       if (current.status === "shared" && canPublish) {
         const position = boardPositionFromPointer(
           event.clientX,
