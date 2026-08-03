@@ -164,9 +164,7 @@ export function useBoardDrag({
           current.status === "shared" &&
           current.note.authorId === currentUserId
         ) {
-          if (canPublish) {
-            onPrivateNoteUnpublish(current.note.id);
-          }
+          onPrivateNoteUnpublish(current.note.id);
           updateDrag({ ...current, status: "returning" });
         }
         return;
@@ -180,17 +178,19 @@ export function useBoardDrag({
             onPublishBlocked?.();
             hasNotifiedBlockedRef.current = true;
           }
-        } else {
-          // ボードに入った瞬間に共有化する。以後の座標は既存のdrag配信を使う。
-          onPrivateNotePublish(current.note.id, position.x, position.y);
-          onNoteDragStart(current.note.id);
+          updateDrag({ ...current, status: "shared", ...position });
+          return;
         }
+        // ボードに入った瞬間に共有化する。以後の座標は既存のdrag配信を使う。
+        onPrivateNotePublish(current.note.id, position.x, position.y);
+        onNoteDragStart(current.note.id);
+      } else if (!canPublish) {
+        updateDrag({ ...current, status: "shared", ...position });
+        return;
       }
-      if (canPublish) {
-        // publish と同じ WebSocket 接続で送るため、publish のあとに届く drag は
-        // RoomDO 側でも公開後の付箋として処理される。
-        onNoteDragMove(current.note.id, position.x, position.y);
-      }
+      // publish と同じ WebSocket 接続で送るため、publish のあとに届く drag は
+      // RoomDO 側でも公開後の付箋として処理される。
+      onNoteDragMove(current.note.id, position.x, position.y);
       updateDrag({ ...current, status: "shared", ...position });
     },
     [
@@ -212,7 +212,7 @@ export function useBoardDrag({
       const current = dragRef.current;
       if (!current || current.pointerId !== event.pointerId) return;
       hasNotifiedBlockedRef.current = false;
-      if (current.status === "shared" && canPublish) {
+      if (current.status === "shared") {
         const position = boardPositionFromPointer(
           event.clientX,
           event.clientY,
@@ -222,13 +222,7 @@ export function useBoardDrag({
       boardRootRef.current?.releasePointerCapture?.(event.pointerId);
       updateDrag(null);
     },
-    [
-      boardPositionFromPointer,
-      boardRootRef,
-      canPublish,
-      onNoteDragEnd,
-      updateDrag,
-    ],
+    [boardPositionFromPointer, boardRootRef, onNoteDragEnd, updateDrag],
   );
 
   return {

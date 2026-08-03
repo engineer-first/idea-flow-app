@@ -9,7 +9,11 @@
 // 持ち、この view は UI 状態とドラッグ機械（use-board-drag）の配線に徹する。
 import { useEffect, useRef, useState } from "react";
 import type { PersistentGroup } from "@/contracts/grouping";
-import { isResultStep, isSharingStep, type RoomPhase } from "@/contracts/phase";
+import {
+  isPublishAllowedStep,
+  isResultStep,
+  type RoomPhase,
+} from "@/contracts/phase";
 import {
   DOT_VOTE_LIMITS,
   type DotVoteKind,
@@ -157,7 +161,7 @@ export function RoomBoardView({
     boardRootRef,
     boardScrollerRef,
     privateToolbarRef,
-    canPublish: isSharingStep(phase),
+    canPublish: isPublishAllowedStep(phase),
     onPublishBlocked: roomNotify.cannotPublishNote,
     onNoteDragStart,
     onNoteDragMove,
