@@ -20,6 +20,7 @@ import type { Note } from "@/features/notes";
 import type { RoomScreenConnectionStatus } from "../logic/connection-status";
 import type { Decision, Member } from "../logic/room-reducer";
 import { useBoardDrag } from "../logic/use-board-drag";
+import { useCanvasCamera } from "../logic/use-canvas-camera";
 import { LeaveConfirmDialog } from "../molecules/leave-confirm-dialog";
 import { VoteTotalingDialog } from "../molecules/vote-totaling-dialog";
 import { RoomBoardCanvas } from "../organisms/room-board-canvas";
@@ -144,6 +145,24 @@ export function RoomBoardView({
   const isDisconnected = isMounted ? connectionStatus !== "open" : true;
 
   const {
+    camera,
+    gridStyle,
+    isPanning,
+    worldPointFromClient,
+    fitToNotes,
+    zoomIn,
+    zoomOut,
+    resetZoom,
+    handlePointerDown: handleCanvasPointerDown,
+    handlePointerMove: handleCanvasPointerMove,
+    handlePointerEnd: handleCanvasPointerEnd,
+    handleWheel: handleCanvasWheel,
+  } = useCanvasCamera({
+    viewportRef: boardScrollerRef,
+    notes,
+  });
+
+  const {
     drag,
     renderedNotes,
     renderedPrivateNotes,
@@ -157,6 +176,7 @@ export function RoomBoardView({
     currentUserId,
     boardRootRef,
     boardScrollerRef,
+    worldPointFromClient,
     privateToolbarRef,
     onNoteDragStart,
     onNoteDragMove,
@@ -258,6 +278,17 @@ export function RoomBoardView({
         hmwDecidedIssue={hmwDecidedIssue}
         boardScrollerRef={boardScrollerRef}
         privateToolbarRef={privateToolbarRef}
+        camera={camera}
+        gridStyle={gridStyle}
+        isPanning={isPanning}
+        onCanvasPointerDown={handleCanvasPointerDown}
+        onCanvasPointerMove={handleCanvasPointerMove}
+        onCanvasPointerEnd={handleCanvasPointerEnd}
+        onCanvasWheel={handleCanvasWheel}
+        onZoomIn={zoomIn}
+        onZoomOut={zoomOut}
+        onResetZoom={resetZoom}
+        onFitToNotes={fitToNotes}
         onSelect={setSelectedNoteId}
         onHmwTemplateSelect={onHmwTemplateSelect}
         onNoteDragStart={handleSharedNoteDragStart}

@@ -135,6 +135,21 @@ describe("RoomBoardView", () => {
     expect(screen.getAllByTestId("note-card")).toHaveLength(3);
   });
 
+  it("無限キャンバスの格子・世界レイヤー・ズームHUDを描画する", () => {
+    setup({ notes: buildNotes(3) });
+
+    const canvas = screen.getByTestId("board-canvas");
+    const viewport = canvas.parentElement;
+    expect(viewport).toHaveClass("overflow-hidden");
+    expect(viewport).toHaveStyle({ backgroundSize: expect.any(String) });
+    expect(canvas).toHaveStyle({ transformOrigin: "0 0" });
+    expect(canvas.getAttribute("style")).toContain("scale(");
+    expect(screen.getByTestId("canvas-zoom-hud")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "付箋全体を表示" }),
+    ).toBeInTheDocument();
+  });
+
   it("付箋が0件のときは空状態メッセージを表示する", () => {
     setup({ notes: [] });
 

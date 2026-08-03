@@ -430,15 +430,33 @@ describe("ClientMessageSchema", () => {
     ).toMatchObject({ type: "note:publish", x: 400, y: 300 });
   });
 
-  it("note:publish はボード外の座標を拒否する", () => {
+  it("note:publish は旧ボード範囲外を含む負の座標を受け入れる", () => {
     expect(
-      ClientMessageSchema.safeParse({
+      ClientMessageSchema.parse({
         type: "note:publish",
         noteId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        x: -1,
-        y: 0,
-      }).success,
-    ).toBe(false);
+        x: -4_000,
+        y: 3_000,
+      }),
+    ).toMatchObject({ type: "note:publish", x: -4_000, y: 3_000 });
+  });
+
+  it("note:publish は安全上限を超える座標と有限でない座標を拒否する", () => {
+    for (const [x, y] of [
+      [-1_000_001, 0],
+      [0, 1_000_001],
+      [Number.POSITIVE_INFINITY, 0],
+      [0, Number.NaN],
+    ]) {
+      expect(
+        ClientMessageSchema.safeParse({
+          type: "note:publish",
+          noteId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          x,
+          y,
+        }).success,
+      ).toBe(false);
+    }
   });
 
   it("note:unpublish は付箋IDを受け入れる", () => {

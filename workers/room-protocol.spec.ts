@@ -927,6 +927,32 @@ describe("note:update-content / note:move（pgTAP: メンバーの共同編集�
     member.close();
   });
 
+  it("note:move は旧ボード範囲外の負座標も保存・配信する", async () => {
+    const { roomId, owner, member } = await setupStartedRoom();
+    const noteId = await createNote({ owner, member });
+
+    await arrangeStep(owner, 2);
+
+    send(member, { type: "note:move", noteId, x: -4_000, y: 3_000 });
+    const toOwner = await expectType(owner, "note:updated");
+    const toMember = await expectType(member, "note:updated");
+
+    expect(toOwner.note).toMatchObject({ id: noteId, x: -4_000, y: 3_000 });
+    expect(toMember.note).toMatchObject({ id: noteId, x: -4_000, y: 3_000 });
+
+    const reconnected = await connectRoomAs(MEMBER, roomId);
+    const snapshot = await expectType(reconnected, "snapshot");
+    expect(snapshot.notes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: noteId, x: -4_000, y: 3_000 }),
+      ]),
+    );
+
+    owner.close();
+    member.close();
+    reconnected.close();
+  });
+
   it("存在しない付箋の更新は not-found エラーになる", async () => {
     const { owner, member } = await setupStartedRoom();
 
@@ -1321,11 +1347,11 @@ describe("入力検証（コントラクト境界）", () => {
     member.close();
   });
 
-  it("ボード範囲外への move は invalid-message で拒否される", async () => {
+  it("安全上限を超える move は invalid-message で拒否される", async () => {
     const { owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
 
-    send(owner, { type: "note:move", noteId, x: -10, y: 99999 });
+    send(owner, { type: "note:move", noteId, x: -1_000_001, y: 1_000_001 });
     const error = await expectType(owner, "error");
     expect(error.code).toBe("invalid-message");
 

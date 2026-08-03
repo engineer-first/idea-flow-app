@@ -798,12 +798,12 @@ describe("サーバーメッセージ → 画面反映", () => {
 
     // 2回目の publish が送られたこと
     expect(socket.sent).toContain(
-      JSON.stringify({ type: "note:publish", noteId: NOTE_ID, x: 150, y: 150 }),
+      JSON.stringify({ type: "note:publish", noteId: NOTE_ID, x: 140, y: 140 }),
     );
 
     // 最終的に note:move で確定すること
     expect(socket.sent).toContain(
-      JSON.stringify({ type: "note:move", noteId: NOTE_ID, x: 160, y: 160 }),
+      JSON.stringify({ type: "note:move", noteId: NOTE_ID, x: 150, y: 150 }),
     );
   });
 
