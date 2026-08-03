@@ -19,6 +19,7 @@ export type NoteRow = {
   y: number;
   created_at: string;
   updated_at: string;
+  phase: number;
 };
 
 // 「誰の視点でもない」射影に使う viewerId。listSharedNotes や自動再編成の
@@ -35,6 +36,24 @@ export function requireNote(ctx: HandlerCtx, noteId: string): NoteRow | null {
   const row = findNote(ctx.sql, noteId);
   if (!row) {
     replyNotFound(ctx);
+    return null;
+  }
+  return row;
+}
+
+export function requireNoteInCurrentPhase(
+  ctx: HandlerCtx,
+  noteId: string,
+): NoteRow | null {
+  const row = requireNote(ctx, noteId);
+  if (!row) return null;
+  const phase = getPhase(ctx.sql);
+  if (phase.kind !== "step" || row.phase !== phase.phase) {
+    ctx.reply({
+      type: "error",
+      code: "forbidden",
+      message: "別のフェーズの付箋は操作できません。",
+    });
     return null;
   }
   return row;
@@ -61,15 +80,27 @@ function canAccessNote(
   );
 }
 
-export function listNotes(sql: SqlStorage, viewerId: string): ProtocolNote[] {
-  return sql
-    .exec("SELECT * FROM notes ORDER BY created_at")
-    .toArray()
-    .map((row) => toProtocolNote(sql, row as unknown as NoteRow, viewerId));
+export function listNotes(
+  sql: SqlStorage,
+  viewerId: string,
+  phase?: number,
+): ProtocolNote[] {
+  const rows =
+    phase === undefined
+      ? sql.exec("SELECT * FROM notes ORDER BY created_at").toArray()
+      : sql
+          .exec(
+            "SELECT * FROM notes WHERE phase = ?1 ORDER BY created_at",
+            phase,
+          )
+          .toArray();
+  return rows.map((row) =>
+    toProtocolNote(sql, row as unknown as NoteRow, viewerId),
+  );
 }
 
-export function listSharedNotes(sql: SqlStorage): ProtocolNote[] {
-  return listNotes(sql, NULL_VIEWER_ID).filter(
+export function listSharedNotes(sql: SqlStorage, phase = 1): ProtocolNote[] {
+  return listNotes(sql, NULL_VIEWER_ID, phase).filter(
     (note) => note.visibility === "shared",
   );
 }
@@ -85,8 +116,9 @@ export function hasOnlySharedNotes(
 
 export function insertNote(sql: SqlStorage, note: NoteRow): void {
   sql.exec(
-    `INSERT INTO notes (id, author_id, content, visibility, color, x, y, created_at, updated_at)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`,
+    `INSERT INTO notes
+       (id, author_id, content, visibility, color, x, y, created_at, updated_at, phase)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)`,
     note.id,
     note.author_id,
     note.content,
@@ -96,6 +128,7 @@ export function insertNote(sql: SqlStorage, note: NoteRow): void {
     note.y,
     note.created_at,
     note.updated_at,
+    note.phase,
   );
 }
 

@@ -317,13 +317,21 @@ export class RoomDO extends DurableObject {
     const phase = getPhase(this.sql);
     const notes = filterVisible(
       { viewerId: userId },
-      listNotes(this.sql, userId),
+      listNotes(
+        this.sql,
+        userId,
+        phase.kind === "step" ? phase.phase : undefined,
+      ),
     ).map((note) => projectNoteForViewer({ viewerId: userId, phase }, note));
 
     this.broadcaster.sendTo(ws, {
       type: "snapshot",
       notes,
-      groups: listVisibleGroups(this.sql, userId),
+      // フェーズ2では既存のフェーズ1グループも表示しない。
+      groups:
+        phase.kind === "step" && phase.phase === 2
+          ? []
+          : listVisibleGroups(this.sql, userId),
       members: listMembers(this.sql),
       phase,
       isHost: isHostUser(this.sql, userId),

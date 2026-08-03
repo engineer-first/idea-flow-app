@@ -52,7 +52,9 @@ function nextRoomPhase(current: RoomPhase): RoomPhase {
   if (current.phase === 1 && current.step === 5) {
     return { kind: "step", phase: 2, step: 1 };
   }
-  // Step 2-1 の次（2-2 以降）は issue #165 のスコープ。
+  if (current.phase === 2 && current.step === 1) {
+    return { kind: "step", phase: 2, step: 2 };
+  }
   return current;
 }
 
@@ -137,10 +139,17 @@ const allowedBoardMutationsByPhase: {
     5: ["note:decide"],
   },
   2: {
-    // Step 2-1（HMW 個人執筆）は Step 1-1 と同じ「自分専用付箋の作成・
-    // 編集・削除」だけを許可する。共有（publish）は 2-2 のスコープ。
+    // Step 2-1（HMW 個人執筆）は自分専用付箋の作成・編集・削除だけ。
     1: ["note:create", "note:update-content", "note:delete"],
-    2: [],
+    // Step 2-2（共有）は個人執筆済み付箋の publish と、共有後の共同編集。
+    // 作成・削除・投票・グループ操作は次のステップ以降も許可しない。
+    2: [
+      "note:publish",
+      "note:unpublish",
+      "note:update-content",
+      "note:move",
+      "note:drag",
+    ],
     3: [],
     4: [],
   },
@@ -230,8 +239,8 @@ export const phaseHandlers: MessageHandlers<"start_phase" | "phase:next"> = {
       return;
     }
     const next = nextRoomPhase(current);
-    // Step 2-1 など「次のステップがまだ実装されていない」状態では
-    // nextRoomPhase が current をそのまま返す。ここで no-op を配信すると
+    // 次のステップがまだ実装されていない状態では nextRoomPhase が current を
+    // そのまま返す。ここで no-op を配信すると
     // クライアントの decision 表示がフェーズ単位で無条件クリアされてしまう
     // （DB上の decision は残るため、再接続時の snapshot で復活し不整合になる）。
     if (next === current) {
