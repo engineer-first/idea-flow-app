@@ -89,7 +89,7 @@ describe("calculateVoteTotaling", () => {
     expect(result).not.toHaveProperty("selectedChallenges");
   });
 
-  it("無投票の付箋も総合ポイント0としてランキングに含める", () => {
+  it("合計1票以上の付箋だけをランキングに含める", () => {
     const votes = [
       [2, 0],
       [0, 3],
@@ -104,17 +104,16 @@ describe("calculateVoteTotaling", () => {
     const result = calculateVoteTotaling({ notes, memberCount: 2 });
 
     expect(result.isComplete).toBe(true);
-    expect(result.rows.map((row) => row.score)).toEqual([10, 3, 2, 1, 0]);
+    expect(result.rows.map((row) => row.score)).toEqual([10, 3, 2, 1]);
     expect(result.rows.map((row) => row.noteId)).toEqual([
       "note-1",
       "note-2",
       "note-3",
       "note-4",
-      "note-5",
     ]);
   });
 
-  it("count が未公開でも投票結果の入力として扱える", () => {
+  it("count が未公開の付箋は投票結果に含めない", () => {
     const [note] = buildNotes(1);
     const result = calculateVoteTotaling({
       notes: [
@@ -130,15 +129,7 @@ describe("calculateVoteTotaling", () => {
       isVotingComplete: true,
     });
 
-    expect(result.rows).toEqual([
-      {
-        noteId: note.id,
-        content: note.content,
-        subjectiveCount: 0,
-        objectiveCount: 0,
-        score: 0,
-      },
-    ]);
+    expect(result.rows).toEqual([]);
   });
 });
 
@@ -161,7 +152,7 @@ describe("VoteTotalingPanel", () => {
     expect(screen.getByTestId("vote-result-ranking")).toBeInTheDocument();
   });
 
-  it("すべての付箋を総合ポイント順に表示し、無投票の付箋も含める", () => {
+  it("1票以上の付箋だけを総合ポイント順に表示する", () => {
     const notes = buildNotes(5).map((note, index) =>
       withVotes(note, [2, 0, 0, 0, 0][index], [0, 3, 2, 1, 0][index]),
     );
@@ -189,16 +180,16 @@ describe("VoteTotalingPanel", () => {
       "vote-totaling-row-note-2",
       "vote-totaling-row-note-3",
       "vote-totaling-row-note-4",
-      "vote-totaling-row-note-5",
     ]);
-    expect(screen.getByText("5位")).toBeInTheDocument();
+    expect(screen.queryByTestId("vote-totaling-row-note-5")).toBeNull();
+    expect(screen.getByText("4位")).toBeInTheDocument();
     expect(
       within(screen.getByTestId("vote-totaling-row-note-1")).getByText("10点"),
     ).toBeInTheDocument();
   });
 
   it("ホストが接続中なら未決定のランキング行から決定を通知する", () => {
-    const notes = buildNotes(2);
+    const notes = buildNotes(2).map((note) => withVotes(note, 1, 0));
     const onNoteDecide = vi.fn();
 
     render(
@@ -228,7 +219,7 @@ describe("VoteTotalingPanel", () => {
       <VoteTotalingPanel
         isVotingComplete
         members={buildMembers(1, ME)}
-        notes={[buildNote({ id: "note-1", content: "" })]}
+        notes={[withVotes(buildNote({ id: "note-1", content: "" }), 1, 0)]}
         decision={null}
         isHost
         isDisconnected={false}
@@ -255,7 +246,7 @@ describe("VoteTotalingPanel", () => {
       <VoteTotalingPanel
         isVotingComplete
         members={buildMembers(2, ME)}
-        notes={buildNotes(2)}
+        notes={buildNotes(2).map((note) => withVotes(note, 1, 0))}
         decision={null}
         isHost={isHost}
         isDisconnected={isDisconnected}
@@ -271,7 +262,7 @@ describe("VoteTotalingPanel", () => {
   });
 
   it("決定済み行はstatusを表示し、別の行から決定し直せる", () => {
-    const notes = buildNotes(2);
+    const notes = buildNotes(2).map((note) => withVotes(note, 1, 0));
     const onNoteDecide = vi.fn();
 
     render(
