@@ -1955,8 +1955,8 @@ describe("RoomDO フェーズ2の投票・決定ゲート", () => {
       const now = new Date().toISOString();
       state.storage.sql.exec(
         `INSERT INTO notes
-           (id, author_id, content, visibility, color, x, y, created_at, updated_at)
-         VALUES (?1, ?2, 'HMW', 'shared', 'yellow', 0, 0, ?3, ?3)`,
+           (id, author_id, content, visibility, color, x, y, created_at, updated_at, phase)
+         VALUES (?1, ?2, 'HMW', 'shared', 'yellow', 0, 0, ?3, ?3, 2)`,
         HMW_NOTE_ID,
         USER_A,
         now,
@@ -1984,8 +1984,8 @@ describe("RoomDO フェーズ2の投票・決定ゲート", () => {
       const now = new Date().toISOString();
       state.storage.sql.exec(
         `INSERT INTO notes
-           (id, author_id, content, visibility, color, x, y, created_at, updated_at)
-         VALUES (?1, ?2, 'HMW', 'shared', 'yellow', 0, 0, ?3, ?3)`,
+           (id, author_id, content, visibility, color, x, y, created_at, updated_at, phase)
+         VALUES (?1, ?2, 'HMW', 'shared', 'yellow', 0, 0, ?3, ?3, 2)`,
         HMW_NOTE_ID,
         USER_A,
         now,
