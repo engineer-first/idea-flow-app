@@ -16,6 +16,7 @@ import { getMemberColor } from "./members";
 import {
   broadcastNoteInserted,
   broadcastNoteUpdated,
+  broadcastVoteUpdated,
   canEdit,
   deleteNote,
   findNote,
@@ -245,10 +246,12 @@ export const noteHandlers: MessageHandlers<
 
     const updatedAt = new Date().toISOString();
     touchNote(ctx.sql, message.noteId, updatedAt);
-    broadcastNoteUpdated(ctx.sql, ctx.broadcaster, {
-      ...row,
-      updated_at: updatedAt,
-    });
+    broadcastVoteUpdated(
+      ctx.sql,
+      ctx.broadcaster,
+      { ...row, updated_at: updatedAt },
+      ctx.userId,
+    );
   },
 
   "note:vote-reset": (ctx, message) => {
@@ -263,9 +266,11 @@ export const noteHandlers: MessageHandlers<
 
     const updatedAt = new Date().toISOString();
     touchNote(ctx.sql, message.noteId, updatedAt);
-    broadcastNoteUpdated(ctx.sql, ctx.broadcaster, {
-      ...row,
-      updated_at: updatedAt,
-    });
+    broadcastVoteUpdated(
+      ctx.sql,
+      ctx.broadcaster,
+      { ...row, updated_at: updatedAt },
+      ctx.userId,
+    );
   },
 };

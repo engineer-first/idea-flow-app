@@ -1,5 +1,7 @@
 // 付箋（notes）の真実。ストレージアクセス・可視性判定・プロトコル射影と、
 // 受信者ごとの可視性を踏まえたノート配信ヘルパをここに集約する。
+
+import { isVotingStep } from "../../contracts/phase";
 import type { NoteColor, ProtocolNote } from "../../contracts/room-protocol";
 import { projectNoteForViewer, visibleTo } from "../visibility";
 import type { RoomBroadcaster } from "./broadcast";
@@ -224,6 +226,36 @@ export function broadcastNoteUpdated(
 ): void {
   const phase = getPhase(sql);
   broadcaster.broadcastNote((viewerId) => ({
+    type: "note:updated",
+    note: projectNoteForViewer(
+      { viewerId, phase },
+      toProtocolNote(sql, row, viewerId),
+    ),
+  }));
+}
+
+// 投票ステップでは、投票者本人（同一アカウントの全接続）に限定する。
+// 他メンバーへイベント自体を配信しないことで、票数だけでなく投票タイミングも
+// WebSocket から推測できないようにする。投票工程外は既存どおり全員へ同期する。
+export function broadcastVoteUpdated(
+  sql: SqlStorage,
+  broadcaster: RoomBroadcaster,
+  row: NoteRow,
+  userId: string,
+): void {
+  const phase = getPhase(sql);
+  if (!isVotingStep(phase)) {
+    broadcaster.broadcastNote((viewerId) => ({
+      type: "note:updated",
+      note: projectNoteForViewer(
+        { viewerId, phase },
+        toProtocolNote(sql, row, viewerId),
+      ),
+    }));
+    return;
+  }
+
+  broadcaster.broadcastNoteToUser(userId, (viewerId) => ({
     type: "note:updated",
     note: projectNoteForViewer(
       { viewerId, phase },
