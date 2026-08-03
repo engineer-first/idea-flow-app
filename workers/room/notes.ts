@@ -245,13 +245,7 @@ export function broadcastVoteUpdated(
 ): void {
   const phase = getPhase(sql);
   if (!isVotingStep(phase)) {
-    broadcaster.broadcastNote((viewerId) => ({
-      type: "note:updated",
-      note: projectNoteForViewer(
-        { viewerId, phase },
-        toProtocolNote(sql, row, viewerId),
-      ),
-    }));
+    broadcastNoteUpdated(sql, broadcaster, row);
     return;
   }
 

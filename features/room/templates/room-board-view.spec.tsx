@@ -64,6 +64,16 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardView>[0]> = {}) {
   return props;
 }
 
+function noteWithSingleVote() {
+  return buildNotes(1).map((note) => ({
+    ...note,
+    dotVotes: {
+      subjective: { count: 1, votedByMe: false, ownCount: 0 },
+      objective: { count: 0, votedByMe: false, ownCount: 0 },
+    },
+  }));
+}
+
 // カード内の選択・ドラッグ・キー操作を受けるサーフェス（透明なbutton）。
 function getNoteSurface(card: HTMLElement) {
   return within(card).getByRole("button", { name: "付箋" });
@@ -225,13 +235,7 @@ describe("RoomBoardView", () => {
       phase: buildPhaseStep(5),
       isHost: true,
       onNoteDecide,
-      notes: buildNotes(1).map((note) => ({
-        ...note,
-        dotVotes: {
-          subjective: { count: 1, votedByMe: false, ownCount: 0 },
-          objective: { count: 0, votedByMe: false, ownCount: 0 },
-        },
-      })),
+      notes: noteWithSingleVote(),
     });
 
     fireEvent.click(
@@ -248,13 +252,7 @@ describe("RoomBoardView", () => {
     setup({
       phase: buildPhaseStep(5),
       decision: buildDecision({ noteId: "note-1", decidedBy: ME }),
-      notes: buildNotes(1).map((note) => ({
-        ...note,
-        dotVotes: {
-          subjective: { count: 1, votedByMe: false, ownCount: 0 },
-          objective: { count: 0, votedByMe: false, ownCount: 0 },
-        },
-      })),
+      notes: noteWithSingleVote(),
     });
 
     expect(
@@ -269,13 +267,7 @@ describe("RoomBoardView", () => {
       phase: buildPhaseStep(5),
       isHost: true,
       connectionStatus: "closed",
-      notes: buildNotes(1).map((note) => ({
-        ...note,
-        dotVotes: {
-          subjective: { count: 1, votedByMe: false, ownCount: 0 },
-          objective: { count: 0, votedByMe: false, ownCount: 0 },
-        },
-      })),
+      notes: noteWithSingleVote(),
     });
 
     expect(

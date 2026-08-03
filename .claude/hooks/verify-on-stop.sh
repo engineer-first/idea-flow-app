@@ -2,17 +2,7 @@
 set -uo pipefail
 
 PAYLOAD=$(cat)
-STOP_HOOK_ACTIVE=$(node -e '
-  let payload = "";
-  process.stdin.on("data", (chunk) => (payload += chunk));
-  process.stdin.on("end", () => {
-    try {
-      process.stdout.write(String(JSON.parse(payload).stop_hook_active === true));
-    } catch {
-      process.stdout.write("false");
-    }
-  });
-' <<<"$PAYLOAD")
+STOP_HOOK_ACTIVE=$(jq -r '.stop_hook_active // false' <<<"$PAYLOAD")
 
 # Stop フック起因の継続中に再実行すると無限ループになるためスキップする
 [[ "$STOP_HOOK_ACTIVE" == "true" ]] && exit 0
