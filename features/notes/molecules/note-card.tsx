@@ -32,6 +32,7 @@ export type NoteCardProps = {
   // サーバーへ届かず再接続後の snapshot で消える」体験になってしまう。
   disabled?: boolean;
   canEditNote: boolean;
+  canDeleteNote: boolean;
   canMoveNote: boolean;
   canShowVote: boolean;
   canVote: boolean;
@@ -68,6 +69,7 @@ export function NoteCard({
   isDecided = false,
   disabled = false,
   canEditNote,
+  canDeleteNote,
   canMoveNote,
   canShowVote,
   canVote,
@@ -201,10 +203,11 @@ export function NoteCard({
     if (disabled) {
       return;
     }
-    if (event.key === "Backspace" || event.key === "Delete") {
-      event.preventDefault();
+    if (
+      canDeleteNote &&
+      (event.key === "Backspace" || event.key === "Delete")
+    ) {
       onDelete(note.id);
-      return;
     }
     if (event.key === "Enter" && canEditNote && !editingDisabled) {
       event.preventDefault();

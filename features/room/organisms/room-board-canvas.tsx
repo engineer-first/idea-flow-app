@@ -226,6 +226,7 @@ export function RoomBoardCanvas({
                 isOwnDrag={draggingNoteId === note.id}
                 isSelected={selectedNoteId === note.id}
                 editingDisabled={isResultStep(phase)}
+                canDeleteNote={permissions.canDeleteNote}
                 canEditNote={permissions.canEditNote}
                 canMoveNote={permissions.canMoveNote}
                 canShowVote={permissions.canShowVote}
@@ -318,6 +319,7 @@ export function RoomBoardCanvas({
             <PrivateNotesToolbar
               notes={privateNotes}
               disabled={isDisconnected}
+              canDeleteNote={permissions.canDeleteNote}
               canCreateNote={permissions.canCreateNote}
               canEditNote={permissions.canEditNote}
               canMoveNote={permissions.canMoveNote}

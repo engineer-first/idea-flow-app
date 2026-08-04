@@ -17,6 +17,7 @@ export type PrivateNotesToolbarProps = {
   isReturnDropTarget?: boolean;
   selectedNoteId: string | null;
   canCreateNote: boolean;
+  canDeleteNote: boolean;
   canMoveNote: boolean;
   onSelect: (noteId: string | null) => void;
   onAdd: () => void;
@@ -37,6 +38,7 @@ export function PrivateNotesToolbar({
   isReturnDropTarget = false,
   selectedNoteId,
   canCreateNote,
+  canDeleteNote,
   canMoveNote,
   canEditNote,
   onSelect,
@@ -96,6 +98,7 @@ export function PrivateNotesToolbar({
                 isSelected={selectedNoteId === note.id}
                 disabled={disabled}
                 editingDisabled={editingDisabled}
+                canDeleteNote={canDeleteNote}
                 canEditNote={canEditNote}
                 canMoveNote={canMoveNote}
                 canShowVote={false}

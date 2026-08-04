@@ -10,6 +10,7 @@ function setup(disabled = false) {
     disabled,
     selectedNoteId: null,
     canCreateNote: true,
+    canDeleteNote: true,
     canMoveNote: true,
     canEditNote: true,
     onSelect: vi.fn(),
@@ -57,6 +58,7 @@ describe("PrivateNotesToolbar", () => {
       disabled: false,
       selectedNoteId: null,
       canCreateNote: true,
+      canDeleteNote: true,
       canMoveNote: true,
       canEditNote: true,
       onSelect: vi.fn(),
@@ -87,6 +89,7 @@ describe("PrivateNotesToolbar", () => {
       disabled: false,
       selectedNoteId: "note-1",
       canCreateNote: true,
+      canDeleteNote: true,
       canMoveNote: true,
       canEditNote: true,
       onSelect: vi.fn(),
@@ -116,6 +119,7 @@ describe("PrivateNotesToolbar", () => {
       disabled: true,
       selectedNoteId: null,
       canCreateNote: true,
+      canDeleteNote: true,
       canMoveNote: true,
       canEditNote: true,
       onSelect: vi.fn(),
@@ -140,6 +144,7 @@ describe("PrivateNotesToolbar", () => {
       editingDisabled: true,
       selectedNoteId: "note-1",
       canCreateNote: true,
+      canDeleteNote: true,
       canMoveNote: true,
       canEditNote: true,
       onSelect: vi.fn(),
@@ -165,6 +170,7 @@ describe("PrivateNotesToolbar", () => {
         canCreateNote={false}
         canMoveNote={true}
         canEditNote={true}
+        canDeleteNote={false}
         selectedNoteId={null}
         onSelect={vi.fn()}
         onAdd={vi.fn()}
@@ -185,6 +191,7 @@ describe("PrivateNotesToolbar", () => {
         canCreateNote={true}
         canMoveNote={true}
         canEditNote={false}
+        canDeleteNote={false}
         selectedNoteId={null}
         onSelect={vi.fn()}
         onAdd={vi.fn()}
@@ -195,5 +202,33 @@ describe("PrivateNotesToolbar", () => {
     );
 
     expect(screen.getByRole("textbox")).toHaveAttribute("readonly");
+  });
+
+  it("canDeleteNoteがfalseの場合はBackspace/Deleteで削除できない", () => {
+    const onDelete = vi.fn();
+
+    render(
+      <PrivateNotesToolbar
+        notes={[buildNote({ visibility: "private" })]}
+        disabled={false}
+        canCreateNote={true}
+        canMoveNote={true}
+        canEditNote={true}
+        canDeleteNote={false}
+        selectedNoteId={null}
+        onSelect={vi.fn()}
+        onAdd={vi.fn()}
+        onContentChange={vi.fn()}
+        onDelete={onDelete}
+        onDragStart={vi.fn()}
+      />,
+    );
+
+    const surface = screen.getByRole("button", { name: "付箋" });
+
+    fireEvent.keyDown(surface, { key: "Backspace" });
+    fireEvent.keyDown(surface, { key: "Delete" });
+
+    expect(onDelete).not.toHaveBeenCalled();
   });
 });
