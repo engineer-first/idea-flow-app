@@ -2120,6 +2120,33 @@ describe("RoomDO フェーズ2の投票・決定ゲート", () => {
     ws.close();
   });
 
+  it("Step 2-4 では非ホストのHMW決定を forbidden で拒否する", async () => {
+    const roomName = "room-phase2-decide-non-host";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.upsertMember(USER_B, "Member");
+    await stub.setPhase(buildPhaseStep(4, 2), USER_A);
+    await runInRoomDO(roomName, (_instance, state) => {
+      const now = new Date().toISOString();
+      state.storage.sql.exec(
+        `INSERT INTO notes
+           (id, author_id, content, visibility, color, x, y, created_at, updated_at, phase)
+         VALUES (?1, ?2, 'HMW', 'shared', 'yellow', 0, 0, ?3, ?3, 2)`,
+        HMW_NOTE_ID,
+        USER_A,
+        now,
+      );
+    });
+
+    const ws = await connectDirectly(roomName, USER_B, USER_A);
+    ws.send(JSON.stringify({ type: "note:decide", noteId: HMW_NOTE_ID }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+    ws.close();
+  });
+
   it("フェーズ2の投票未完了時は force でも結果ステップへ進めない", async () => {
     const roomName = "room-phase2-voting-incomplete-force";
     const stub = roomStub(roomName);
