@@ -135,13 +135,16 @@ describe("RoomBoardView", () => {
     expect(screen.getAllByTestId("note-card")).toHaveLength(3);
   });
 
-  it("無限キャンバスの格子・世界レイヤー・ズームHUDを描画する", () => {
+  it("無限キャンバスのドット・世界レイヤー・ズームHUDを描画する", () => {
     setup({ notes: buildNotes(3) });
 
     const canvas = screen.getByTestId("board-canvas");
     const viewport = canvas.parentElement;
     expect(viewport).toHaveClass("overflow-hidden");
     expect(viewport).toHaveStyle({ backgroundSize: expect.any(String) });
+    expect(viewport?.style.backgroundImage).toContain("radial-gradient");
+    expect(viewport?.style.backgroundImage).toContain("var(--foreground) 30%");
+    expect(viewport?.style.backgroundImage).not.toContain("linear-gradient");
     expect(canvas).toHaveStyle({ transformOrigin: "0 0" });
     expect(canvas.getAttribute("style")).toContain("scale(");
     expect(screen.getByTestId("canvas-zoom-hud")).toBeInTheDocument();

@@ -90,7 +90,7 @@ describe("canvas-camera", () => {
     });
   });
 
-  it("倍率に応じて格子間隔を読みやすい画面幅へ調整する", () => {
+  it("倍率に応じてドット間隔を読みやすい画面幅へ調整する", () => {
     expect(getCanvasGridStep(1)).toBe(40);
     expect(getCanvasGridStep(0.01)).toBeGreaterThan(40);
     expect(getCanvasGridStep(4)).toBeLessThan(40);

@@ -268,10 +268,11 @@ export function useCanvasCamera({ viewportRef, notes }: UseCanvasCameraArgs) {
     const screenStep = step * camera.zoom;
     const positionX = ((camera.x % screenStep) + screenStep) % screenStep;
     const positionY = ((camera.y % screenStep) + screenStep) % screenStep;
+    const dotOffset = 1;
     return {
       backgroundImage:
-        "linear-gradient(to right, color-mix(in srgb, var(--border) 35%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in srgb, var(--border) 35%, transparent) 1px, transparent 1px)",
-      backgroundPosition: `${positionX}px ${positionY}px`,
+        "radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--foreground) 30%, transparent) 1px, transparent 1.5px)",
+      backgroundPosition: `${positionX - dotOffset}px ${positionY - dotOffset}px`,
       backgroundSize: `${screenStep}px ${screenStep}px`,
     };
   }, [camera]);
