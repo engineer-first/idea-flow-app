@@ -142,7 +142,7 @@ const allowedBoardMutationsByPhase: {
     // Step 2-1（HMW 個人執筆）は自分専用付箋の作成・編集・削除だけ。
     1: ["note:create", "note:update-content", "note:delete"],
     // Step 2-2（共有）は個人執筆済み付箋の publish と、共有後の共同編集。
-    // 作成・削除・投票・グループ操作は次のステップ以降も許可しない。
+    // 作成・削除・グループ操作は、フェーズ2の以降のステップでも許可しない。
     2: [
       "note:publish",
       "note:unpublish",
