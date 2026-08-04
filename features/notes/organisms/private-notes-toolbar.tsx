@@ -53,9 +53,9 @@ export function PrivateNotesToolbar({
           付箋を追加
         </Button>
       </CardHeader>
-      <CardContent className="min-w-0 flex-1 p-3">
+      <CardContent className="min-w-0 flex-1 p-0">
         <section
-          className="h-full overflow-x-auto"
+          className="h-full overflow-x-auto p-3"
           aria-label="マイ付箋一覧"
           data-testid="private-notes-scroll"
           onClick={(e) => {
