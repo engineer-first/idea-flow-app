@@ -31,6 +31,10 @@ export type NoteCardProps = {
   // メッセージを黙って破棄するため、UI操作自体を止めないと「入力したのに
   // サーバーへ届かず再接続後の snapshot で消える」体験になってしまう。
   disabled?: boolean;
+  canEditNote: boolean;
+  canMoveNote: boolean;
+  canShowVote: boolean;
+  canVote: boolean;
   onSelect: (noteId: string) => void;
   onDragStart: (
     noteId: string,
@@ -63,6 +67,10 @@ export function NoteCard({
   editingDisabled = false,
   isDecided = false,
   disabled = false,
+  canEditNote,
+  canMoveNote,
+  canShowVote,
+  canVote,
   onSelect,
   onDragStart,
   onContentChange,
@@ -114,6 +122,13 @@ export function NoteCard({
     }
   }, [editingDisabled, isEditing, note.content]);
 
+  useEffect(() => {
+    if (!canEditNote && isEditing) {
+      setIsEditing(false);
+      setLocalContent(note.content);
+    }
+  }, [canEditNote, isEditing, note.content]);
+
   // 状態に応じてフォーカスを移す。サーフェスにフォーカスがないと
   // Backspace削除などのキー操作を受け取れない。
   useEffect(() => {
@@ -159,6 +174,9 @@ export function NoteCard({
       if (distance < DRAG_THRESHOLD_PX) {
         return;
       }
+      if (!canMoveNote) {
+        return;
+      }
       origin.didDrag = true;
       // キャプチャをリリースし、ドラッグ処理を親に移管する
       event.currentTarget.releasePointerCapture?.(event.pointerId);
@@ -174,7 +192,7 @@ export function NoteCard({
     if (!origin) {
       return;
     }
-    if (origin.wasSelected && !editingDisabled) {
+    if (origin.wasSelected && canEditNote && !editingDisabled) {
       setIsEditing(true);
     }
   }
@@ -188,7 +206,7 @@ export function NoteCard({
       onDelete(note.id);
       return;
     }
-    if (event.key === "Enter" && !editingDisabled) {
+    if (event.key === "Enter" && canEditNote && !editingDisabled) {
       event.preventDefault();
       setIsEditing(true);
     }
@@ -250,13 +268,13 @@ export function NoteCard({
         }`}
         placeholder="メモを入力..."
       />
-      {!hideVoteControls && (
+      {!hideVoteControls && canShowVote && (
         <div className="relative z-20">
           <DotVoteControls
             noteId={note.id}
             dotVotes={note.dotVotes}
             voteRemaining={voteRemaining}
-            disabled={disabled}
+            disabled={disabled || !canVote}
             onVote={onVote}
             onVoteReset={onVoteReset}
           />

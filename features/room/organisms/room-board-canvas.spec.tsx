@@ -7,6 +7,7 @@ import {
   buildNote,
   buildNotes,
 } from "@/contracts/room-protocol.fixture";
+import { getBoardPermissions } from "../logic/board-permissions";
 import { RoomBoardCanvas } from "./room-board-canvas";
 
 function setup(overrides: Partial<Parameters<typeof RoomBoardCanvas>[0]> = {}) {
@@ -16,6 +17,7 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardCanvas>[0]> = {}) {
     phase: buildPhaseStep(1),
     decision: null,
     isHost: false,
+    permissions: getBoardPermissions(buildPhaseStep(1)),
     privateNotes: [],
     selectedNoteId: null,
     draggingNoteId: null,
@@ -143,14 +145,24 @@ describe("RoomBoardCanvas", () => {
     expect(screen.getByRole("button", { name: "付箋を追加" })).toBeDisabled();
   });
 
-  it("発想支援サイドバーを閉じた状態でHUDと重ならない位置に表示する", () => {
-    setup();
-
-    expect(
-      screen.getByRole("button", { name: "発想支援を開く" }),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId("idea-support-dock")).toHaveClass("top-16");
+  it("発想支援が利用できないステップではサイドバーを表示しない", () => {
+  setup({
+    phase: buildPhaseStep(1),
   });
+
+  expect(
+    screen.queryByRole("button", { name: "発想支援を開く" }),
+  ).not.toBeInTheDocument();
+});
+
+it("発想支援サイドバーを閉じた状態でHUDと重ならない位置に表示する", () => {
+  setup();
+
+  expect(
+    screen.getByRole("button", { name: "発想支援を開く" }),
+  ).toBeInTheDocument();
+  expect(screen.getByTestId("idea-support-dock")).toHaveClass("top-16");
+});
 
   describe("HMW オーバーレイ", () => {
     it("hmwDecidedIssue があるとボード上に決定課題バナーを表示する", () => {
@@ -270,5 +282,32 @@ describe("RoomBoardCanvas", () => {
         }),
       ).not.toBeInTheDocument();
     });
+  });
+  it("Step1-1ではマイ付箋ツールバーを表示する", () => {
+    setup({
+      phase: buildPhaseStep(1),
+      permissions: getBoardPermissions(buildPhaseStep(1)),
+    });
+
+    expect(screen.getByTestId("private-notes-dock")).toBeInTheDocument();
+  });
+
+  it("Step1-3ではマイ付箋ツールバーを表示しない", () => {
+    setup({
+      phase: buildPhaseStep(3),
+      permissions: getBoardPermissions(buildPhaseStep(3)),
+    });
+
+    expect(screen.queryByTestId("private-notes-dock")).not.toBeInTheDocument();
+  });
+  it("Step1-4では投票可能状態になる", () => {
+    setup({
+      phase: buildPhaseStep(4),
+      permissions: getBoardPermissions(buildPhaseStep(4)),
+    });
+
+    expect(
+      screen.getAllByRole("button", { name: /投票/ }).length,
+    ).toBeGreaterThan(0);
   });
 });

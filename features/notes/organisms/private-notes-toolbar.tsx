@@ -11,10 +11,13 @@ export type PrivateNotesToolbarProps = {
   notes: Note[];
   disabled: boolean;
   editingDisabled?: boolean;
+  canEditNote: boolean;
   className?: string;
   toolbarRef?: React.RefObject<HTMLDivElement | null>;
   isReturnDropTarget?: boolean;
   selectedNoteId: string | null;
+  canCreateNote: boolean;
+  canMoveNote: boolean;
   onSelect: (noteId: string | null) => void;
   onAdd: () => void;
   onContentChange: (noteId: string, content: string) => void;
@@ -33,6 +36,9 @@ export function PrivateNotesToolbar({
   toolbarRef,
   isReturnDropTarget = false,
   selectedNoteId,
+  canCreateNote,
+  canMoveNote,
+  canEditNote,
   onSelect,
   onAdd,
   onContentChange,
@@ -48,7 +54,12 @@ export function PrivateNotesToolbar({
     >
       <CardHeader className="w-40 shrink-0 justify-center border-r border-border p-3">
         <CardTitle className="text-sm">マイ付箋</CardTitle>
-        <Button type="button" size="sm" disabled={disabled} onClick={onAdd}>
+        <Button
+          type="button"
+          size="sm"
+          disabled={disabled || !canCreateNote}
+          onClick={onAdd}
+        >
           <Plus aria-hidden="true" />
           付箋を追加
         </Button>
@@ -85,6 +96,10 @@ export function PrivateNotesToolbar({
                 isSelected={selectedNoteId === note.id}
                 disabled={disabled}
                 editingDisabled={editingDisabled}
+                canEditNote={canEditNote}
+                canMoveNote={canMoveNote}
+                canShowVote={false}
+                canVote={false}
                 onSelect={onSelect}
                 onDragStart={onDragStart}
                 onContentChange={onContentChange}

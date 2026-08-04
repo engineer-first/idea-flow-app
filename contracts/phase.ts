@@ -105,3 +105,7 @@ export function isResultStep(phase: RoomPhase): boolean {
     phase.kind === "step" && phase.step === RESULT_STEP_BY_PHASE[phase.phase]
   );
 }
+
+export function isIdeaSupportAvailableStep(phase: RoomPhase): boolean {
+  return isPhaseStep(phase, 3, 1) || isPhaseStep(phase, 3, 2);
+}

@@ -15,6 +15,7 @@ import {
 } from "@/contracts/grouping";
 import {
   isAtOrAfterGroupingStep,
+  isIdeaSupportAvailableStep,
   isResultStep,
   type RoomPhase,
 } from "@/contracts/phase";
@@ -34,6 +35,7 @@ import {
   StickyNote,
 } from "@/features/notes";
 import { cn } from "@/lib/utils";
+import type { BoardPermissions } from "../logic/board-permissions";
 import type { CanvasCamera } from "../logic/canvas-camera";
 import type { Decision } from "../logic/room-reducer";
 import { CanvasZoomControls } from "../molecules/canvas-zoom-controls";
@@ -61,6 +63,7 @@ export type RoomBoardCanvasProps = {
   hmwDecidedIssue: string | null;
   boardScrollerRef: RefObject<HTMLDivElement | null>;
   privateToolbarRef: RefObject<HTMLDivElement | null>;
+  permissions: BoardPermissions;
   camera: CanvasCamera;
   gridStyle: CSSProperties;
   isPanning: boolean;
@@ -109,6 +112,7 @@ export function RoomBoardCanvas({
   hmwDecidedIssue,
   boardScrollerRef,
   privateToolbarRef,
+  permissions,
   camera,
   gridStyle,
   isPanning,
@@ -209,6 +213,7 @@ export function RoomBoardCanvas({
                   key={rg.id}
                   group={rg}
                   name={rg.name}
+                  canGroupNote={permissions.canGroupNote}
                   onUpdateName={handleUpdateName}
                 />
               );
@@ -221,6 +226,10 @@ export function RoomBoardCanvas({
                 isOwnDrag={draggingNoteId === note.id}
                 isSelected={selectedNoteId === note.id}
                 editingDisabled={isResultStep(phase)}
+                canEditNote={permissions.canEditNote}
+                canMoveNote={permissions.canMoveNote}
+                canShowVote={permissions.canShowVote}
+                canVote={permissions.canVote}
                 isDecided={decision?.noteId === note.id}
                 disabled={isDisconnected}
                 onSelect={onSelect}
@@ -301,31 +310,35 @@ export function RoomBoardCanvas({
             />
           </div>
         ) : null}
-        <div
-          className="pointer-events-none absolute inset-x-3 bottom-3 z-30 flex justify-center"
-          data-testid="private-notes-dock"
-        >
-          <PrivateNotesToolbar
-            notes={privateNotes}
-            disabled={isDisconnected}
-            editingDisabled={isResultStep(phase)}
-            className="pointer-events-auto w-[min(42rem,calc(100vw-2rem))] max-w-none"
-            toolbarRef={privateToolbarRef}
-            isReturnDropTarget={isReturnDropTarget}
-            selectedNoteId={selectedNoteId}
-            onSelect={onSelect}
-            onAdd={onAddPrivateNote}
-            onContentChange={onPrivateNoteContentChange}
-            onDelete={onPrivateNoteDelete}
-            onDragStart={onPrivateNoteDragStart}
-          />
-        </div>
-        <div
-          className="pointer-events-none absolute top-16 right-3 bottom-3 z-30"
-          data-testid="idea-support-dock"
-        >
-          <IdeaSupportSidebar />
-        </div>
+        {permissions.showPrivateToolbar ? (
+          <div
+            className="pointer-events-none absolute inset-x-3 bottom-3 z-30 flex justify-center"
+            data-testid="private-notes-dock"
+          >
+            <PrivateNotesToolbar
+              notes={privateNotes}
+              disabled={isDisconnected}
+              canCreateNote={permissions.canCreateNote}
+              canEditNote={permissions.canEditNote}
+              canMoveNote={permissions.canMoveNote}
+              editingDisabled={isResultStep(phase)}
+              className="pointer-events-auto max-w-5xl"
+              toolbarRef={privateToolbarRef}
+              isReturnDropTarget={isReturnDropTarget}
+              selectedNoteId={selectedNoteId}
+              onSelect={onSelect}
+              onAdd={onAddPrivateNote}
+              onContentChange={onPrivateNoteContentChange}
+              onDelete={onPrivateNoteDelete}
+              onDragStart={onPrivateNoteDragStart}
+            />
+          </div>
+        ) : null}
+        {isIdeaSupportAvailableStep(phase) ? (
+          <div className="pointer-events-none absolute inset-y-3 right-3 z-30">
+            <IdeaSupportSidebar />
+          </div>
+        ) : null}
       </div>
     </div>
   );

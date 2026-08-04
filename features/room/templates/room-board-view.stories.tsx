@@ -11,6 +11,8 @@ import { RoomBoardView } from "./room-board-view";
 
 const ME = "11111111-1111-4111-8111-111111111111";
 const STEP_1_1 = buildPhaseStep(1);
+const STEP_1_2 = buildPhaseStep(2);
+const STEP_1_3 = buildPhaseStep(3);
 const STEP_1_4 = buildPhaseStep(4);
 const STEP_1_5 = buildPhaseStep(5);
 const STEP_2_1 = buildPhaseStep(1, 2);
@@ -254,6 +256,51 @@ export const HostCanMovePhase: Story = {
   args: {
     isHost: true,
     phase: STEP_1_1,
+  },
+};
+
+export const Step1_1_PersonalWriting: Story = {
+  args: {
+    phase: STEP_1_1,
+    notes: [],
+    privateNotes: buildNotes(2).map((note) => ({
+      ...note,
+      visibility: "private" as const,
+    })),
+  },
+};
+
+export const Step1_2_Sharing: Story = {
+  args: {
+    phase: STEP_1_2,
+    notes: buildNotes(3),
+    privateNotes: buildNotes(2).map((note) => ({
+      ...note,
+      visibility: "private" as const,
+    })),
+  },
+};
+
+export const Step1_3_Grouping: Story = {
+  args: {
+    phase: STEP_1_3,
+    notes: buildNotes(5),
+    groups: [],
+    privateNotes: [],
+  },
+};
+
+export const Step1_4_Voting: Story = {
+  args: {
+    phase: STEP_1_4,
+    notes: buildNotes(5),
+  },
+};
+
+export const Step1_5_Result: Story = {
+  args: {
+    phase: STEP_1_5,
+    decision: null,
   },
 };
 

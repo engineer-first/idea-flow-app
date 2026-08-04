@@ -9,6 +9,9 @@ function setup(disabled = false) {
     notes: [buildNote({ visibility: "private", content: "非公開の考え" })],
     disabled,
     selectedNoteId: null,
+    canCreateNote: true,
+    canMoveNote: true,
+    canEditNote: true,
     onSelect: vi.fn(),
     onAdd: vi.fn(),
     onContentChange: vi.fn(),
@@ -53,6 +56,9 @@ describe("PrivateNotesToolbar", () => {
       ],
       disabled: false,
       selectedNoteId: null,
+      canCreateNote: true,
+      canMoveNote: true,
+      canEditNote: true,
       onSelect: vi.fn(),
       onAdd: vi.fn(),
       onContentChange: vi.fn(),
@@ -80,6 +86,9 @@ describe("PrivateNotesToolbar", () => {
       notes: [buildNote({ visibility: "private", content: "非公開の考え" })],
       disabled: false,
       selectedNoteId: "note-1",
+      canCreateNote: true,
+      canMoveNote: true,
+      canEditNote: true,
       onSelect: vi.fn(),
       onAdd: vi.fn(),
       onContentChange: vi.fn(),
@@ -106,6 +115,9 @@ describe("PrivateNotesToolbar", () => {
       notes: [buildNote({ visibility: "private", content: "非公開 of考え" })],
       disabled: true,
       selectedNoteId: null,
+      canCreateNote: true,
+      canMoveNote: true,
+      canEditNote: true,
       onSelect: vi.fn(),
       onAdd: vi.fn(),
       onContentChange: vi.fn(),
@@ -127,6 +139,9 @@ describe("PrivateNotesToolbar", () => {
       disabled: false,
       editingDisabled: true,
       selectedNoteId: "note-1",
+      canCreateNote: true,
+      canMoveNote: true,
+      canEditNote: true,
       onSelect: vi.fn(),
       onAdd: vi.fn(),
       onContentChange: vi.fn(),
@@ -138,6 +153,46 @@ describe("PrivateNotesToolbar", () => {
     const surface = screen.getByRole("button", { name: "付箋" });
     fireEvent.pointerDown(surface, { pointerId: 1 });
     fireEvent.pointerUp(surface, { pointerId: 1 });
+
+    expect(screen.getByRole("textbox")).toHaveAttribute("readonly");
+  });
+
+  it("canCreateNoteがfalseの場合は追加ボタンを無効化する", () => {
+    render(
+      <PrivateNotesToolbar
+        notes={[]}
+        disabled={false}
+        canCreateNote={false}
+        canMoveNote={true}
+        canEditNote={true}
+        selectedNoteId={null}
+        onSelect={vi.fn()}
+        onAdd={vi.fn()}
+        onContentChange={vi.fn()}
+        onDelete={vi.fn()}
+        onDragStart={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "付箋を追加" })).toBeDisabled();
+  });
+
+  it("canEditNoteがfalseの場合は編集できない", () => {
+    render(
+      <PrivateNotesToolbar
+        notes={[buildNote({ visibility: "private" })]}
+        disabled={false}
+        canCreateNote={true}
+        canMoveNote={true}
+        canEditNote={false}
+        selectedNoteId={null}
+        onSelect={vi.fn()}
+        onAdd={vi.fn()}
+        onContentChange={vi.fn()}
+        onDelete={vi.fn()}
+        onDragStart={vi.fn()}
+      />,
+    );
 
     expect(screen.getByRole("textbox")).toHaveAttribute("readonly");
   });

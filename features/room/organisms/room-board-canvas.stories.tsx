@@ -8,11 +8,14 @@ import {
   buildNote,
   buildNotes,
 } from "@/contracts/room-protocol.fixture";
+import { getBoardPermissions } from "../logic/board-permissions";
 import { RoomBoardCanvas } from "./room-board-canvas";
 
 const STEP_1_1 = buildPhaseStep(1);
 const STEP_1_2 = buildPhaseStep(2);
 const STEP_1_3 = buildPhaseStep(3);
+const STEP_1_4 = buildPhaseStep(4);
+const STEP_1_5 = buildPhaseStep(5);
 
 const meta = {
   title: "Room/RoomBoardCanvas",
@@ -25,6 +28,7 @@ const meta = {
     groups: [],
     phase: STEP_1_1,
     decision: null,
+    permissions: getBoardPermissions(STEP_1_1),
     isHost: true,
     privateNotes: [],
     selectedNoteId: null,
@@ -137,14 +141,16 @@ export const Disconnected: Story = {
 
 export const ReadyToDecide: Story = {
   args: {
-    phase: buildPhaseStep(5),
+    phase: STEP_1_5,
+    permissions: getBoardPermissions(STEP_1_5),
     selectedNoteId: "note-1",
   },
 };
 
 export const Decided: Story = {
   args: {
-    phase: buildPhaseStep(5),
+    phase: STEP_1_5,
+    permissions: getBoardPermissions(STEP_1_5),
     decision: buildDecision({
       noteId: "note-1",
       decidedBy: "11111111-1111-4111-8111-111111111111",
@@ -157,6 +163,7 @@ export const Decided: Story = {
 export const HmwWritingStep: Story = {
   args: {
     phase: buildPhaseStep(1, 2),
+    permissions: getBoardPermissions(buildPhaseStep(1, 2)),
     notes: [],
     hmwDecidedIssue: buildCarryover().content,
   },
@@ -181,5 +188,53 @@ export const HmwCarryoverOnly: Story = {
   args: {
     phase: buildPhaseStep(2, 2),
     hmwDecidedIssue: buildCarryover().content,
+  },
+};
+
+// Step1-1: 個人で付箋を書く
+export const Step1Writing: Story = {
+  args: {
+    phase: STEP_1_1,
+    permissions: getBoardPermissions(STEP_1_1),
+  },
+};
+
+// Step1-2: 共有・移動
+export const Step1Sharing: Story = {
+  args: {
+    phase: STEP_1_2,
+    permissions: getBoardPermissions(STEP_1_2),
+  },
+};
+
+// Step1-3: グループ化
+export const Step1Grouping: Story = {
+  args: {
+    phase: STEP_1_3,
+    permissions: getBoardPermissions(STEP_1_3),
+    groups: [
+      {
+        id: "g1",
+        name: "課題グループ",
+        noteIds: ["note-1", "note-2"],
+      },
+    ],
+  },
+};
+
+// Step1-4: 投票
+export const Step1Voting: Story = {
+  args: {
+    phase: STEP_1_4,
+    permissions: getBoardPermissions(STEP_1_4),
+  },
+};
+
+// Step1-5: 結果確認
+export const Step1Result: Story = {
+  args: {
+    phase: STEP_1_5,
+    permissions: getBoardPermissions(STEP_1_5),
+    selectedNoteId: "note-1",
   },
 };
