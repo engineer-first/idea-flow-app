@@ -197,6 +197,35 @@ describe("useBoardDrag", () => {
     expect(args.onNoteDragMove).not.toHaveBeenCalled();
   });
 
+  it("ドラッグ開始時に付箋内の掴んだ位置（オフセット）を保持し、相対位置を考慮して移動座標を計算する", () => {
+    const { args, result } = setup();
+    const event = pointerEvent(1, 120, 130);
+    Object.defineProperty(event, "currentTarget", {
+      value: {
+        getBoundingClientRect: () => ({
+          left: 100,
+          top: 100,
+          right: 300,
+          bottom: 250,
+          width: 200,
+          height: 150,
+        }),
+      },
+    });
+
+    // x:120, y:130 で左上(100,100)の付箋を掴んだ場合、grabOffsetX = 20, grabOffsetY = 30
+    act(() => {
+      result.current.handleSharedNoteDragStart("shared-1", event);
+    });
+
+    // ポインターが (220, 230) へ動いた場合、付箋左上座標は (220 - 20 = 200, 230 - 30 = 200) になる
+    act(() => {
+      result.current.handlePointerMove(pointerEvent(1, 220, 230));
+    });
+
+    expect(args.onNoteDragMove).toHaveBeenCalledWith("shared-1", 200, 200);
+  });
+
   it("異なる pointerId のイベントは無視する（マルチタッチの混線防止）", () => {
     const { args, result } = setup();
 

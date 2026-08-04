@@ -22,6 +22,8 @@ export type BoardDrag = {
   status: "private" | "shared" | "returning";
   x: number;
   y: number;
+  grabOffsetX: number;
+  grabOffsetY: number;
 };
 
 export type UseBoardDragArgs = {
@@ -39,6 +41,23 @@ export type UseBoardDragArgs = {
   onPrivateNotePublish: (noteId: string, x: number, y: number) => void;
   onPrivateNoteUnpublish: (noteId: string) => void;
 };
+
+function getGrabOffset(event: ReactPointerEvent<HTMLButtonElement>) {
+  if (
+    !event.currentTarget ||
+    typeof event.currentTarget.getBoundingClientRect !== "function"
+  ) {
+    return { grabOffsetX: 0, grabOffsetY: 0 };
+  }
+  const rect = event.currentTarget.getBoundingClientRect();
+  if (!rect || (rect.width === 0 && rect.height === 0)) {
+    return { grabOffsetX: 0, grabOffsetY: 0 };
+  }
+  return {
+    grabOffsetX: Math.max(0, event.clientX - rect.left),
+    grabOffsetY: Math.max(0, event.clientY - rect.top),
+  };
+}
 
 export function useBoardDrag({
   notes,
@@ -93,7 +112,7 @@ export function useBoardDrag({
   );
 
   const boardPositionFromPointer = useCallback(
-    (clientX: number, clientY: number) => {
+    (clientX: number, clientY: number, grabOffsetX = 0, grabOffsetY = 0) => {
       const scroller = boardScrollerRef.current;
       if (!scroller) return null;
       const rect = scroller.getBoundingClientRect();
@@ -107,11 +126,11 @@ export function useBoardDrag({
       }
       return {
         x: Math.min(
-          Math.max(clientX - rect.left + scroller.scrollLeft, 0),
+          Math.max(clientX - grabOffsetX - rect.left + scroller.scrollLeft, 0),
           BOARD_WIDTH,
         ),
         y: Math.min(
-          Math.max(clientY - rect.top + scroller.scrollTop, 0),
+          Math.max(clientY - grabOffsetY - rect.top + scroller.scrollTop, 0),
           BOARD_HEIGHT,
         ),
       };
@@ -125,12 +144,15 @@ export function useBoardDrag({
       if (!note) return;
       hasNotifiedBlockedRef.current = false;
       boardRootRef.current?.setPointerCapture?.(event.pointerId);
+      const { grabOffsetX, grabOffsetY } = getGrabOffset(event);
       updateDrag({
         note,
         pointerId: event.pointerId,
         status: "shared",
         x: note.x,
         y: note.y,
+        grabOffsetX,
+        grabOffsetY,
       });
       onNoteDragStart(noteId);
     },
@@ -143,12 +165,15 @@ export function useBoardDrag({
       if (!note) return;
       hasNotifiedBlockedRef.current = false;
       boardRootRef.current?.setPointerCapture?.(event.pointerId);
+      const { grabOffsetX, grabOffsetY } = getGrabOffset(event);
       updateDrag({
         note,
         pointerId: event.pointerId,
         status: "private",
         x: note.x,
         y: note.y,
+        grabOffsetX,
+        grabOffsetY,
       });
     },
     [privateNotes, boardRootRef, updateDrag],
@@ -170,7 +195,12 @@ export function useBoardDrag({
         return;
       }
 
-      const position = boardPositionFromPointer(event.clientX, event.clientY);
+      const position = boardPositionFromPointer(
+        event.clientX,
+        event.clientY,
+        current.grabOffsetX,
+        current.grabOffsetY,
+      );
       if (!position) return;
       if (current.status === "private" || current.status === "returning") {
         if (!canPublish) {
@@ -216,6 +246,8 @@ export function useBoardDrag({
         const position = boardPositionFromPointer(
           event.clientX,
           event.clientY,
+          current.grabOffsetX,
+          current.grabOffsetY,
         ) ?? { x: current.x, y: current.y };
         onNoteDragEnd(current.note.id, position.x, position.y);
       }
