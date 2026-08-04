@@ -54,9 +54,16 @@ export function PrivateNotesToolbar({
         </Button>
       </CardHeader>
       <CardContent className="min-w-0 flex-1 p-3">
+        {/* biome-ignore lint/a11y/useKeyboardEvents: 空白クリックによる選択解除は補助操作 */}
         <div
           className="h-full overflow-x-auto"
           data-testid="private-notes-scroll"
+          onClick={(e) => {
+            const target = e.target as HTMLElement;
+            if (!target.closest("[data-testid='note-card']")) {
+              onSelect(null);
+            }
+          }}
         >
           <div
             className="flex h-full min-w-max flex-nowrap items-center gap-3"
