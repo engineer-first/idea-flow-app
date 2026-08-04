@@ -28,3 +28,13 @@ export const LimitReached: Story = {
     voteRemaining: { subjective: 0, objective: 0 },
   },
 };
+
+export const StealthVoting: Story = {
+  args: {
+    dotVotes: {
+      subjective: { votedByMe: true, ownCount: 1 },
+      objective: { votedByMe: true, ownCount: 3 },
+    },
+    voteRemaining: { subjective: 0, objective: 0 },
+  },
+};

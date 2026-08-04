@@ -4,7 +4,6 @@
 // 判定ロジックの分散を構造的に禁止する）。
 //
 // private の付箋は作者だけ、shared の付箋はルームメンバー全員に配信する。
-
 import { isVotingStep, type RoomPhase } from "../contracts/phase";
 import type { ProtocolNote } from "../contracts/room-protocol";
 
