@@ -16,6 +16,9 @@ import {
 import { BOARD_HEIGHT, BOARD_WIDTH } from "@/contracts/board";
 import type { Note } from "@/features/notes";
 
+/**
+ * ドラッグ中の付箋の状態と位置情報を保持する型。
+ */
 export type BoardDrag = {
   note: Note;
   pointerId: number;
@@ -26,6 +29,9 @@ export type BoardDrag = {
   grabOffsetY: number;
 };
 
+/**
+ * useBoardDrag フックに引き渡す引数オプションの型。
+ */
 export type UseBoardDragArgs = {
   notes: Note[];
   privateNotes: Note[];
@@ -42,6 +48,12 @@ export type UseBoardDragArgs = {
   onPrivateNoteUnpublish: (noteId: string) => void;
 };
 
+/**
+ * ポインターイベントから、掴んだ付箋要素内の相対位置（グラブオフセット）を算出します。
+ *
+ * @param event - ポインターダウン/移動イベント
+ * @returns 付箋左上からの相対X/Yオフセット
+ */
 function getGrabOffset(event: ReactPointerEvent<HTMLButtonElement>) {
   if (
     !event.currentTarget ||
@@ -58,6 +70,13 @@ function getGrabOffset(event: ReactPointerEvent<HTMLButtonElement>) {
     grabOffsetY: Math.max(0, event.clientY - rect.top),
   };
 }
+
+/**
+ * ホワイトボードとマイ付箋ツールバー間の付箋ドラッグ状態を管理するカスタムフックです。
+ *
+ * @param args - フック設定オプション
+ * @returns ドラッグ状態とポインターハンドラー
+ */
 
 export function useBoardDrag({
   notes,
