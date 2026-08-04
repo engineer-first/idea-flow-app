@@ -11,6 +11,14 @@ import {
 import { HMW_TEMPLATES } from "@/features/hmw";
 import { RoomBoardView } from "./room-board-view";
 
+const notifyMocks = vi.hoisted(() => ({
+  cannotPublishNote: vi.fn(),
+}));
+
+vi.mock("../logic/room-notify", () => ({
+  roomNotify: notifyMocks,
+}));
+
 const ME = "11111111-1111-4111-8111-111111111111";
 
 function setup(overrides: Partial<Parameters<typeof RoomBoardView>[0]> = {}) {
@@ -673,5 +681,59 @@ describe("メンバー一覧（名前常時表示）", () => {
     setup({ members: buildMembers(5) });
     expect(screen.getAllByTestId("avatar")).toHaveLength(5);
     expect(screen.queryByLabelText(/他 \d+ 名/)).not.toBeInTheDocument();
+  });
+});
+
+describe("ホワイトボード移動制御 (cannotPublishNote)", () => {
+  it("Step 1-1（共有非許可ステップ）でマイ付箋をボードへドラッグした際に cannotPublishNote が1回呼ばれる", () => {
+    notifyMocks.cannotPublishNote.mockReset();
+    setup({
+      phase: buildPhaseStep(1, 1),
+      privateNotes: [buildNote({ id: "private-1", authorId: ME })],
+    });
+
+    const canvas = screen.getByTestId("board-canvas");
+    const scroller = canvas.parentElement;
+    if (!scroller) throw new Error("ボードスクローラーがありません");
+    Object.defineProperty(scroller, "getBoundingClientRect", {
+      value: () => ({ left: 0, top: 0, right: 800, bottom: 500 }),
+    });
+    const toolbar = screen.getByTestId("private-notes-toolbar");
+    Object.defineProperty(toolbar, "getBoundingClientRect", {
+      value: () => ({ left: 0, top: 540, right: 800, bottom: 600 }),
+    });
+
+    const handle = within(toolbar).getByRole("button", { name: "付箋" });
+    fireEvent.pointerDown(handle, {
+      button: 0,
+      pointerId: 1,
+      clientX: 100,
+      clientY: 550,
+    });
+    fireEvent.pointerMove(handle, {
+      button: 0,
+      pointerId: 1,
+      clientX: 110,
+      clientY: 550,
+    });
+
+    const root = screen.getByTestId("room-board-view-root");
+    fireEvent.pointerMove(root, {
+      button: 0,
+      pointerId: 1,
+      clientX: 300,
+      clientY: 200,
+    });
+
+    expect(notifyMocks.cannotPublishNote).toHaveBeenCalledTimes(1);
+
+    // 連続ドラッグで追加発報されないことを確認
+    fireEvent.pointerMove(root, {
+      button: 0,
+      pointerId: 1,
+      clientX: 310,
+      clientY: 210,
+    });
+    expect(notifyMocks.cannotPublishNote).toHaveBeenCalledTimes(1);
   });
 });
