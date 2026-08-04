@@ -234,7 +234,7 @@ export const phaseHandlers: MessageHandlers<"start_phase" | "phase:next"> = {
     // 必須にし、結果ステップへ未完了のまま進めない。
     if (
       isVotingStep(current) &&
-      !haveAllMembersCompletedVoting(ctx.sql) &&
+      !haveAllMembersCompletedVoting(ctx.sql, current.phase) &&
       (current.phase !== 1 || !message.force)
     ) {
       ctx.reply({

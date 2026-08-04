@@ -233,6 +233,11 @@ export const noteHandlers: MessageHandlers<
       replyForbidden(ctx);
       return;
     }
+    const phase = getPhase(ctx.sql);
+    if (phase.kind !== "step") {
+      replyForbidden(ctx);
+      return;
+    }
 
     const ownCount = countUserNoteVotes(
       ctx.sql,
@@ -244,7 +249,7 @@ export const noteHandlers: MessageHandlers<
     if (message.kind === "subjective" && ownCount > 0) {
       removeUserNoteVotes(ctx.sql, message.noteId, ctx.userId, message.kind);
     } else {
-      if (hasReachedVoteLimit(ctx.sql, ctx.userId, message.kind)) {
+      if (hasReachedVoteLimit(ctx.sql, ctx.userId, message.kind, phase.phase)) {
         ctx.reply({
           type: "error",
           code: "forbidden",
