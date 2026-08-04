@@ -25,6 +25,6 @@ export const roomNotify = {
     toast("ルームを解散しました");
   },
   cannotPublishNote() {
-    toast.error("移動できません");
+    toast.error("まだ共有できません");
   },
 };
