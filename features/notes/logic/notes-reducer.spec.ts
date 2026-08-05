@@ -5,6 +5,7 @@ import {
   applyServerMessage,
   moveNoteLocally,
   type Note,
+  voteNoteLocally,
 } from "./notes-reducer";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
@@ -265,6 +266,26 @@ describe("applyServerMessage", () => {
 
     expect(result).toBe(notes);
     expect(result).toEqual([existing]);
+  });
+});
+
+describe("voteNoteLocally", () => {
+  it("集計が未公開の付箋へ楽観投票しても count を復元しない", () => {
+    const hidden = makeNote({
+      dotVotes: {
+        subjective: { votedByMe: false, ownCount: 0 },
+        objective: { votedByMe: false, ownCount: 0 },
+      },
+    });
+
+    const result = voteNoteLocally([hidden], hidden.id, "subjective");
+
+    expect(result.accepted).toBe(true);
+    expect(result.notes[0]?.dotVotes.subjective).toEqual({
+      votedByMe: true,
+      ownCount: 1,
+    });
+    expect(result.notes[0]?.dotVotes.subjective).not.toHaveProperty("count");
   });
 });
 

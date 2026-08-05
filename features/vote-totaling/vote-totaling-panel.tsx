@@ -51,6 +51,7 @@ export function calculateVoteTotaling({
         publicVoteCount(note.dotVotes.subjective.count) * SUBJECTIVE_POINT +
         publicVoteCount(note.dotVotes.objective.count) * OBJECTIVE_POINT,
     }))
+    .filter((row) => row.subjectiveCount + row.objectiveCount > 0)
     .sort(
       (a, b) =>
         b.score - a.score ||

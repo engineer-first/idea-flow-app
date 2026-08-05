@@ -13,7 +13,17 @@ function setup(
     onOpenChange: vi.fn(),
     isVotingComplete: true,
     members: buildMembers(2, ME),
-    notes: buildNotes(3),
+    notes: buildNotes(3).map((note, index) => ({
+      ...note,
+      dotVotes: {
+        subjective: {
+          count: index === 0 ? 1 : 0,
+          votedByMe: false,
+          ownCount: 0,
+        },
+        objective: { count: 0, votedByMe: false, ownCount: 0 },
+      },
+    })),
     decision: null,
     isHost: true,
     isDisconnected: false,

@@ -468,7 +468,9 @@ describe("サーバーメッセージ → 画面反映", () => {
       visibility: "private",
       content: "公開前のメモ",
     });
-    const { socket } = connectWithSnapshot([privateNote]);
+    const { socket } = connectWithSnapshot([privateNote], {
+      phase: buildPhaseStep(2, 1),
+    });
     const canvas = screen.getByTestId("board-canvas");
     const scroller = canvas.parentElement;
     if (!scroller) throw new Error("ボードスクローラーがありません");
@@ -498,7 +500,9 @@ describe("サーバーメッセージ → 画面反映", () => {
 
   it("共有応答でマイ付箋が消えても、同じポインター操作で移動・ドロップできる", () => {
     const privateNote = protocolNote({ visibility: "private" });
-    const { socket } = connectWithSnapshot([privateNote]);
+    const { socket } = connectWithSnapshot([privateNote], {
+      phase: buildPhaseStep(2, 1),
+    });
     const canvas = screen.getByTestId("board-canvas");
     const scroller = canvas.parentElement;
     if (!scroller) throw new Error("ボードスクローラーがありません");
@@ -533,7 +537,9 @@ describe("サーバーメッセージ → 画面反映", () => {
 
   it("マイ付箋からボードへ公開した同じポインター操作で、マイ付箋へ戻せる", () => {
     const privateNote = protocolNote({ visibility: "private" });
-    const { socket } = connectWithSnapshot([privateNote]);
+    const { socket } = connectWithSnapshot([privateNote], {
+      phase: buildPhaseStep(2, 1),
+    });
     const canvas = screen.getByTestId("board-canvas");
     const scroller = canvas.parentElement;
     if (!scroller) throw new Error("ボードスクローラーがありません");
@@ -574,7 +580,9 @@ describe("サーバーメッセージ → 画面反映", () => {
 
   it("マイ付箋からボード→マイ付箋→再びボードへ、一回のドラッグで往復できる", () => {
     const privateNote = protocolNote({ visibility: "private" });
-    const { socket } = connectWithSnapshot([privateNote]);
+    const { socket } = connectWithSnapshot([privateNote], {
+      phase: buildPhaseStep(2, 1),
+    });
     const canvas = screen.getByTestId("board-canvas");
     const scroller = canvas.parentElement;
     if (!scroller) throw new Error("ボードスクローラーがありません");
@@ -665,7 +673,9 @@ describe("サーバーメッセージ → 画面反映", () => {
   });
 
   it("自分の共有付箋をマイ付箋領域へドラッグすると非公開に戻し、note:moveを送らない", () => {
-    const { socket } = connectWithSnapshot([protocolNote()]);
+    const { socket } = connectWithSnapshot([protocolNote()], {
+      phase: buildPhaseStep(2, 1),
+    });
     const toolbar = screen.getByTestId("private-notes-toolbar");
     Object.defineProperty(toolbar, "getBoundingClientRect", {
       value: () => ({ left: 600, top: 0, right: 900, bottom: 600 }),
@@ -700,7 +710,9 @@ describe("サーバーメッセージ → 画面反映", () => {
   });
 
   it("共有付箋をマイ付箋領域へ入れた瞬間に、サーバー応答を待たずリストへ表示を切り替える", () => {
-    connectWithSnapshot([protocolNote()]);
+    connectWithSnapshot([protocolNote()], {
+      phase: buildPhaseStep(2, 1),
+    });
     const toolbar = screen.getByTestId("private-notes-toolbar");
     Object.defineProperty(toolbar, "getBoundingClientRect", {
       value: () => ({ left: 600, top: 0, right: 900, bottom: 600 }),
@@ -730,7 +742,9 @@ describe("サーバーメッセージ → 画面反映", () => {
   });
 
   it("自分の共有付箋をマイ付箋領域へドラッグして非公開に戻し、さらに再びボードへドラッグして公開しドロップ位置を確定できる", () => {
-    const { socket } = connectWithSnapshot([protocolNote()]);
+    const { socket } = connectWithSnapshot([protocolNote()], {
+      phase: buildPhaseStep(2, 1),
+    });
     const toolbar = screen.getByTestId("private-notes-toolbar");
     Object.defineProperty(toolbar, "getBoundingClientRect", {
       value: () => ({ left: 600, top: 0, right: 900, bottom: 600 }),

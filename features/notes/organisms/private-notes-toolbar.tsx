@@ -53,10 +53,20 @@ export function PrivateNotesToolbar({
           付箋を追加
         </Button>
       </CardHeader>
-      <CardContent className="min-w-0 flex-1 p-3">
-        <div
-          className="h-full overflow-x-auto"
+      <CardContent className="min-w-0 flex-1 p-0">
+        <section
+          className="h-full overflow-x-auto p-3"
+          aria-label="マイ付箋一覧"
           data-testid="private-notes-scroll"
+          onClick={(e) => {
+            const target = e.target as HTMLElement;
+            if (!target.closest("[data-testid='note-card']")) {
+              onSelect(null);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") onSelect(null);
+          }}
         >
           <div
             className="flex h-full min-w-max flex-nowrap items-center gap-3"
@@ -88,7 +98,7 @@ export function PrivateNotesToolbar({
               />
             ))}
           </div>
-        </div>
+        </section>
       </CardContent>
     </Card>
   );

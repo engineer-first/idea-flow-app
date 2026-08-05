@@ -41,6 +41,24 @@ export class RoomBroadcaster {
     }
   }
 
+  // 投票のように、特定ユーザーの状態だけを同期したい場合の配信。
+  // 同一ユーザーの複数タブには反映しつつ、他者にはイベント自体を送らない。
+  broadcastNoteToUser(
+    userId: string,
+    buildMessage: (
+      viewerId: string,
+    ) => Extract<ServerMessage, { type: "note:inserted" | "note:updated" }>,
+  ): void {
+    for (const socket of this.connections.getWebSockets()) {
+      const attachment =
+        socket.deserializeAttachment() as SocketAttachment | null;
+      if (!attachment || attachment.userId !== userId) continue;
+      const message = buildMessage(attachment.userId);
+      if (!visibleTo({ viewerId: attachment.userId }, message.note)) continue;
+      this.trySend(socket, JSON.stringify(message));
+    }
+  }
+
   // subject（ノート）が可視な相手にだけ同一メッセージを送る。
   broadcast(
     message: ServerMessage,
