@@ -161,7 +161,6 @@ export function RoomBoardView({
     handlePointerDown: handleCanvasPointerDown,
     handlePointerMove: handleCanvasPointerMove,
     handlePointerEnd: handleCanvasPointerEnd,
-    handleWheel: handleCanvasWheel,
   } = useCanvasCamera({
     viewportRef: boardScrollerRef,
     notes,
@@ -291,7 +290,6 @@ export function RoomBoardView({
         onCanvasPointerDown={handleCanvasPointerDown}
         onCanvasPointerMove={handleCanvasPointerMove}
         onCanvasPointerEnd={handleCanvasPointerEnd}
-        onCanvasWheel={handleCanvasWheel}
         onZoomIn={zoomIn}
         onZoomOut={zoomOut}
         onResetZoom={resetZoom}

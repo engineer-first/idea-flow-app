@@ -42,7 +42,6 @@ const meta = {
     onCanvasPointerDown: fn(),
     onCanvasPointerMove: fn(),
     onCanvasPointerEnd: fn(),
-    onCanvasWheel: fn(),
     onZoomIn: fn(),
     onZoomOut: fn(),
     onResetZoom: fn(),

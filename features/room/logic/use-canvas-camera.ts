@@ -2,7 +2,6 @@
 
 import {
   type PointerEvent as ReactPointerEvent,
-  type WheelEvent as ReactWheelEvent,
   type RefObject,
   useCallback,
   useEffect,
@@ -30,6 +29,10 @@ type CanvasPan = {
   startClientY: number;
   startCamera: CanvasCamera;
 };
+
+type ScheduledFrame =
+  | { type: "animation"; id: number }
+  | { type: "timeout"; id: ReturnType<typeof setTimeout> };
 
 type UseCanvasCameraArgs = {
   viewportRef: RefObject<HTMLDivElement | null>;
@@ -81,7 +84,7 @@ export function useCanvasCamera({ viewportRef, notes }: UseCanvasCameraArgs) {
   const notesRef = useRef(notes);
   const panRef = useRef<CanvasPan | null>(null);
   const pendingCameraRef = useRef<CanvasCamera | null>(null);
-  const frameRef = useRef<number | null>(null);
+  const frameRef = useRef<ScheduledFrame | null>(null);
   const hasDefaultedRef = useRef(false);
   const hasFitRef = useRef(false);
   const spacePressedRef = useRef(false);
@@ -100,17 +103,23 @@ export function useCanvasCamera({ viewportRef, notes }: UseCanvasCameraArgs) {
     cameraRef.current = next;
     pendingCameraRef.current = next;
     if (frameRef.current !== null) return;
-    const requestFrame =
-      typeof window !== "undefined" && window.requestAnimationFrame
-        ? window.requestAnimationFrame.bind(window)
-        : (callback: FrameRequestCallback) =>
-            window.setTimeout(() => callback(Date.now()), 0);
-    frameRef.current = requestFrame(() => {
+    const applyPendingCamera = () => {
       frameRef.current = null;
       const pending = pendingCameraRef.current;
       pendingCameraRef.current = null;
       if (pending) setCamera(pending);
-    });
+    };
+    if (typeof window !== "undefined" && window.requestAnimationFrame) {
+      frameRef.current = {
+        type: "animation",
+        id: window.requestAnimationFrame(applyPendingCamera),
+      };
+    } else {
+      frameRef.current = {
+        type: "timeout",
+        id: globalThis.setTimeout(applyPendingCamera, 0),
+      };
+    }
   }, []);
 
   const getViewportPoint = useCallback(
@@ -208,7 +217,7 @@ export function useCanvasCamera({ viewportRef, notes }: UseCanvasCameraArgs) {
   );
 
   const handleWheel = useCallback(
-    (event: ReactWheelEvent<HTMLDivElement>) => {
+    (event: WheelEvent) => {
       event.preventDefault();
       const point = getViewportPoint(event.clientX, event.clientY);
       if (!point) return;
@@ -228,6 +237,15 @@ export function useCanvasCamera({ viewportRef, notes }: UseCanvasCameraArgs) {
   );
 
   useEffect(() => {
+    const element = viewportRef.current;
+    if (!element) return;
+    element.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      element.removeEventListener("wheel", handleWheel);
+    };
+  }, [handleWheel, viewportRef]);
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.code !== "Space" || isEditableTarget(event.target)) return;
       spacePressedRef.current = true;
@@ -235,13 +253,24 @@ export function useCanvasCamera({ viewportRef, notes }: UseCanvasCameraArgs) {
     const handleKeyUp = (event: KeyboardEvent) => {
       if (event.code === "Space") spacePressedRef.current = false;
     };
+    const handleWindowBlur = () => {
+      spacePressedRef.current = false;
+    };
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("blur", handleWindowBlur);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("blur", handleWindowBlur);
       if (frameRef.current !== null) {
-        window.cancelAnimationFrame(frameRef.current);
+        const frame = frameRef.current;
+        frameRef.current = null;
+        if (frame.type === "animation") {
+          window.cancelAnimationFrame(frame.id);
+        } else {
+          globalThis.clearTimeout(frame.id);
+        }
       }
     };
   }, []);

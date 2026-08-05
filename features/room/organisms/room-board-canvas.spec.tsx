@@ -32,7 +32,6 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardCanvas>[0]> = {}) {
     onCanvasPointerDown: vi.fn(),
     onCanvasPointerMove: vi.fn(),
     onCanvasPointerEnd: vi.fn(),
-    onCanvasWheel: vi.fn(),
     onZoomIn: vi.fn(),
     onZoomOut: vi.fn(),
     onResetZoom: vi.fn(),

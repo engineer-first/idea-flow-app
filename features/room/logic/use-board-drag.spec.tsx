@@ -1,6 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import type { PointerEvent as ReactPointerEvent, RefObject } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { CANVAS_COORDINATE_LIMIT } from "@/contracts/board";
 import { buildNote } from "@/contracts/room-protocol.fixture";
 import { useBoardDrag } from "./use-board-drag";
 
@@ -192,6 +193,42 @@ describe("useBoardDrag", () => {
 
     expect(args.onNoteDragMove).toHaveBeenCalledWith("shared-1", 200, 200);
     expect(args.onNoteDragEnd).toHaveBeenCalledWith("shared-1", 200, 200);
+  });
+
+  it("キャンバス境界を越えた位置からのドラッグでも掴んだ位置を保つ", () => {
+    const { args, result } = setup({
+      notes: [
+        buildNote({
+          id: "shared-1",
+          authorId: ME,
+          x: CANVAS_COORDINATE_LIMIT,
+          y: 100,
+        }),
+      ],
+      worldPointFromClient: (clientX: number, clientY: number) => ({
+        x:
+          clientX === 100
+            ? CANVAS_COORDINATE_LIMIT + 100
+            : CANVAS_COORDINATE_LIMIT,
+        y: clientY,
+      }),
+    });
+
+    act(() => {
+      result.current.handleSharedNoteDragStart(
+        "shared-1",
+        pointerEvent(1, 100, 100),
+      );
+    });
+    act(() => {
+      result.current.handlePointerMove(pointerEvent(1, 200, 100));
+    });
+
+    expect(args.onNoteDragMove).toHaveBeenCalledWith(
+      "shared-1",
+      CANVAS_COORDINATE_LIMIT - 100,
+      100,
+    );
   });
 
   it("canPublish が false の場合、マイ付箋をボードへ運ぶと onPublishBlocked を1回だけ呼び通信を遮断する", () => {

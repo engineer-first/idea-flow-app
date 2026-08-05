@@ -159,7 +159,7 @@ describe("RoomBoardView", () => {
     const canvas = screen.getByTestId("board-canvas");
     const viewport = canvas.parentElement;
     expect(viewport).toHaveClass("overflow-hidden");
-    expect(viewport).toHaveStyle({ backgroundSize: expect.any(String) });
+    expect(viewport?.style.backgroundSize).toBeTruthy();
     expect(viewport?.style.backgroundImage).toContain("radial-gradient");
     expect(viewport?.style.backgroundImage).toContain("var(--foreground) 30%");
     expect(viewport?.style.backgroundImage).not.toContain("linear-gradient");

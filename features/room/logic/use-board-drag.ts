@@ -114,12 +114,7 @@ export function useBoardDrag({
         return null;
       }
       const point = worldPointFromClient(clientX, clientY);
-      return point
-        ? {
-            x: clampCanvasCoordinate(point.x),
-            y: clampCanvasCoordinate(point.y),
-          }
-        : null;
+      return point;
     },
     [boardScrollerRef, worldPointFromClient],
   );

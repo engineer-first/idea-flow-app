@@ -6,7 +6,6 @@
 import type {
   CSSProperties,
   PointerEvent as ReactPointerEvent,
-  WheelEvent as ReactWheelEvent,
   RefObject,
 } from "react";
 import { NOTE_WIDTH } from "@/contracts/board";
@@ -68,7 +67,6 @@ export type RoomBoardCanvasProps = {
   onCanvasPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onCanvasPointerMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onCanvasPointerEnd: (event: ReactPointerEvent<HTMLDivElement>) => void;
-  onCanvasWheel: (event: ReactWheelEvent<HTMLDivElement>) => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onResetZoom: () => void;
@@ -117,7 +115,6 @@ export function RoomBoardCanvas({
   onCanvasPointerDown,
   onCanvasPointerMove,
   onCanvasPointerEnd,
-  onCanvasWheel,
   onZoomIn,
   onZoomOut,
   onResetZoom,
@@ -186,7 +183,6 @@ export function RoomBoardCanvas({
           onPointerMove={onCanvasPointerMove}
           onPointerUp={onCanvasPointerEnd}
           onPointerCancel={onCanvasPointerEnd}
-          onWheel={onCanvasWheel}
         >
           <div
             data-testid="board-canvas"

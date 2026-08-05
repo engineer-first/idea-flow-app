@@ -55,6 +55,18 @@ describe("IdeaSupportSidebar", () => {
       }),
     );
 
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "発想支援を閉じる",
+      }),
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "発想支援を開く",
+      }),
+    );
+
     expect(screen.getByText("オズボーンのチェックリスト")).toBeInTheDocument();
   });
 });

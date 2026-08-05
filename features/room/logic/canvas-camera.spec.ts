@@ -1,8 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import type {
-  PointerEvent as ReactPointerEvent,
-  WheelEvent as ReactWheelEvent,
-} from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { describe, expect, it, vi } from "vitest";
 import {
   clampCanvasZoom,
@@ -134,37 +131,119 @@ describe("canvas-camera", () => {
     raf.mockRestore();
   });
 
+  it("window がない環境のフォールバックを unmount 時に停止する", () => {
+    vi.useFakeTimers();
+    const viewport = createViewport();
+    const browserWindow = window;
+    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+    const cancelAnimationFrameSpy = vi.spyOn(
+      browserWindow,
+      "cancelAnimationFrame",
+    );
+    const { result, unmount } = renderHook(() =>
+      useCanvasCamera({ viewportRef: { current: viewport }, notes: [] }),
+    );
+    const cameraBeforeSchedule = result.current.camera;
+
+    try {
+      vi.stubGlobal("window", undefined);
+      act(() => {
+        result.current.handleWheel({
+          clientX: 100,
+          clientY: 100,
+          deltaX: 10,
+          deltaY: 20,
+          ctrlKey: false,
+          metaKey: false,
+          shiftKey: false,
+          preventDefault: vi.fn(),
+        } as unknown as Parameters<typeof result.current.handleWheel>[0]);
+      });
+      vi.stubGlobal("window", browserWindow);
+
+      expect(result.current.camera).toEqual(cameraBeforeSchedule);
+      unmount();
+
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+      expect(cancelAnimationFrameSpy).not.toHaveBeenCalled();
+
+      act(() => {
+        vi.runOnlyPendingTimers();
+      });
+      expect(result.current.camera).toEqual(cameraBeforeSchedule);
+    } finally {
+      vi.stubGlobal("window", browserWindow);
+      clearTimeoutSpy.mockRestore();
+      cancelAnimationFrameSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it("フォーカスを失うとSpace押下状態を解除する", () => {
+    const viewport = createViewport();
+    const note = document.createElement("div");
+    const { result } = renderHook(() =>
+      useCanvasCamera({ viewportRef: { current: viewport }, notes: [] }),
+    );
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { code: "Space" }));
+      window.dispatchEvent(new Event("blur"));
+      result.current.handlePointerDown(
+        pointerEvent(viewport, { target: note }),
+      );
+    });
+
+    expect(result.current.isPanning).toBe(false);
+    expect(viewport.setPointerCapture).not.toHaveBeenCalled();
+  });
+
   it("Ctrl/Cmdホイールでカーソル位置を固定してズームする", () => {
     const viewport = createViewport();
+    const addEventListener = vi.spyOn(viewport, "addEventListener");
+    const removeEventListener = vi.spyOn(viewport, "removeEventListener");
     const raf = vi
       .spyOn(window, "requestAnimationFrame")
       .mockImplementation((callback) => {
         callback(0);
         return 1;
       });
-    const { result } = renderHook(() =>
+    const { result, unmount } = renderHook(() =>
       useCanvasCamera({ viewportRef: { current: viewport }, notes: [] }),
     );
     const pointer = { x: 250, y: 200 };
     const worldBefore = screenToWorld(pointer, result.current.camera);
-    const preventDefault = vi.fn();
+    const wheelEvent = new WheelEvent("wheel", {
+      cancelable: true,
+      clientX: 260,
+      clientY: 220,
+      deltaX: 0,
+      deltaY: -100,
+      ctrlKey: true,
+      metaKey: false,
+      shiftKey: false,
+    });
+    const preventDefault = vi.spyOn(wheelEvent, "preventDefault");
 
     act(() => {
-      result.current.handleWheel({
-        clientX: 260,
-        clientY: 220,
-        deltaX: 0,
-        deltaY: -100,
-        ctrlKey: true,
-        metaKey: false,
-        shiftKey: false,
-        preventDefault,
-      } as unknown as ReactWheelEvent<HTMLDivElement>);
+      viewport.dispatchEvent(wheelEvent);
     });
 
+    expect(addEventListener).toHaveBeenCalledWith(
+      "wheel",
+      expect.any(Function),
+      { passive: false },
+    );
     expect(result.current.camera.zoom).toBeGreaterThan(1);
     expect(screenToWorld(pointer, result.current.camera)).toEqual(worldBefore);
     expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(wheelEvent.defaultPrevented).toBe(true);
+
+    unmount();
+    expect(removeEventListener).toHaveBeenCalledWith(
+      "wheel",
+      addEventListener.mock.calls.find(([type]) => type === "wheel")?.[1],
+    );
     raf.mockRestore();
   });
 });
