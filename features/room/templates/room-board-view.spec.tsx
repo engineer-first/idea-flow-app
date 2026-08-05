@@ -153,12 +153,6 @@ describe("RoomBoardView", () => {
     ).toBeInTheDocument();
   });
 
-  it("付箋が0件のときは空状態メッセージを表示する", () => {
-    setup({ notes: [] });
-
-    expect(screen.getByText("共有付箋はまだありません")).toBeInTheDocument();
-  });
-
   it("ツールバーの付箋追加ボタンでonAddPrivateNoteを呼ぶ", () => {
     const onAddPrivateNote = vi.fn();
     setup({ onAddPrivateNote });
@@ -582,18 +576,18 @@ describe("RoomBoardView", () => {
       expect(onNextPhase).toHaveBeenCalledTimes(1);
     });
 
-    it("Step 1-5 は投票結果の確認後も「次のステップへ」を表示しない", () => {
+    it("Step 1-5 は投票結果の確認後も、未決定なら「次のステップへ」を無効にする", () => {
       setup({ isHost: true, phase: buildPhaseStep(5), decision: null });
 
       // 結果ステップで自動表示される投票結果ダイアログを閉じてから検証する。
       fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
 
       expect(
-        screen.queryByRole("button", { name: "次のステップへ" }),
-      ).not.toBeInTheDocument();
+        screen.getByRole("button", { name: "次のステップへ" }),
+      ).toBeDisabled();
     });
 
-    it("Step 1-5 で課題が決定されても「次のステップへ」を表示しない", () => {
+    it("Step 1-5 で課題が決定されると2-1への「次のステップへ」を表示する", () => {
       setup({
         isHost: true,
         phase: buildPhaseStep(5),
@@ -603,8 +597,8 @@ describe("RoomBoardView", () => {
       fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
 
       expect(
-        screen.queryByRole("button", { name: "次のステップへ" }),
-      ).not.toBeInTheDocument();
+        screen.getByRole("button", { name: "次のステップへ" }),
+      ).not.toBeDisabled();
     });
 
     it("Step 2-1 では次のステップ(2-2)が未実装のため「次のステップへ」を無効にする", () => {

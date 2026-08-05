@@ -35,13 +35,14 @@ export function DotVoteControls({
         const isDisabled =
           disabled ||
           (isObjective ? isLimitReached : !summary.votedByMe && isLimitReached);
+        const displayCount = summary.count ?? summary.ownCount;
 
         return (
           <div key={kind} className="flex items-center gap-1">
             <DotVoteButton
               kind={kind}
-              // 投票中は総数が非公開なので、未公開値を UI の型境界で扱う。
-              count={summary.count ?? 0}
+              // 投票中は総数が非公開なので、本人の投票数を表示する。
+              count={displayCount}
               votedByMe={summary.votedByMe}
               disabled={isDisabled}
               onClick={() => onVote(noteId, kind)}

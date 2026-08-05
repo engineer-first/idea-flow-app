@@ -70,16 +70,24 @@ export type RoomBoardHeaderProps = {
 };
 
 function getPhaseContext(phase: RoomPhase): {
+  phaseLabel: string | null;
   title: string;
   step: number;
   stepCount: number;
   stepLabel: string;
 } {
   if (phase.kind === "lobby") {
-    return { title: "開始待ち", step: 0, stepCount: 1, stepLabel: "準備中" };
+    return {
+      phaseLabel: null,
+      title: "開始待ち",
+      step: 0,
+      stepCount: 1,
+      stepLabel: "準備中",
+    };
   }
 
   return {
+    phaseLabel: `フェーズ${phase.phase}`,
     title: PHASE_TITLES[phase.phase],
     step: phase.step,
     stepCount: PHASE_STEP_COUNTS[phase.phase],
@@ -137,6 +145,11 @@ export function RoomBoardHeader({
           IdeaFlow
         </p>
         <span aria-hidden="true" className="h-4 w-px bg-border" />
+        {context.phaseLabel !== null ? (
+          <p className="shrink-0 text-xs font-semibold text-muted-foreground">
+            {context.phaseLabel}
+          </p>
+        ) : null}
         <p className="shrink-0 text-xs font-semibold">{context.title}</p>
         <p className="flex min-w-0 shrink items-center gap-1 whitespace-nowrap text-xs text-muted-foreground">
           <span className="shrink-0 font-medium text-foreground">
@@ -258,13 +271,24 @@ export function RoomBoardHeader({
           </Popover>
 
           {isResultStep(phase) ? (
-            <Button
-              type="button"
-              className="h-10 px-4"
-              onClick={onShowVoteResult}
-            >
-              投票結果を表示
-            </Button>
+            <>
+              <Button
+                type="button"
+                className="h-10 px-4"
+                onClick={onShowVoteResult}
+              >
+                投票結果を表示
+              </Button>
+              {isHost ? (
+                <NextPhaseConfirmDialog
+                  phase={phase}
+                  disabled={
+                    isDisconnected || isNextPhasePending || isNextPhaseBlocked
+                  }
+                  onConfirm={onNextPhase}
+                />
+              ) : null}
+            </>
           ) : isHost ? (
             <NextPhaseConfirmDialog
               phase={phase}

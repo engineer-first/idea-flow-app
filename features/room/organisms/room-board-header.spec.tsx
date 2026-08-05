@@ -102,6 +102,21 @@ describe("RoomBoardHeader", () => {
     ).toHaveAttribute("aria-valuenow", "2");
   });
 
+  it("フェーズ番号を表示して、フェーズ1とフェーズ2を識別できる", () => {
+    const { rerender } = render(
+      <RoomBoardHeader {...setupProps({ phase: buildPhaseStep(1) })} />,
+    );
+
+    expect(screen.getByText("フェーズ1")).toBeInTheDocument();
+
+    rerender(
+      <RoomBoardHeader {...setupProps({ phase: buildPhaseStep(1, 2) })} />,
+    );
+
+    expect(screen.getByText("フェーズ2")).toBeInTheDocument();
+    expect(screen.queryByText("フェーズ1")).not.toBeInTheDocument();
+  });
+
   it("タイマーを右上のセッション操作群にまとめる", () => {
     setup({ isHost: true });
 
@@ -148,12 +163,12 @@ describe("RoomBoardHeader", () => {
       ).toBeDisabled();
     });
 
-    it("結果ステップでは「次のステップへ」を表示しない", () => {
+    it("結果ステップでもホストには「次のステップへ」を表示する", () => {
       setup({ isHost: true, phase: buildPhaseStep(5) });
 
       expect(
-        screen.queryByRole("button", { name: "次のステップへ" }),
-      ).not.toBeInTheDocument();
+        screen.getByRole("button", { name: "次のステップへ" }),
+      ).toBeInTheDocument();
     });
 
     it("確認ダイアログの確定で onNextPhase を呼ぶ", () => {

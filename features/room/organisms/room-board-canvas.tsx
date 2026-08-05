@@ -262,11 +262,6 @@ export function RoomBoardCanvas({
               </StickyNote>
             ) : null}
           </div>
-          {notes.length === 0 ? (
-            <p className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-sm text-muted-foreground">
-              共有付箋はまだありません
-            </p>
-          ) : null}
         </div>
         <div
           className="pointer-events-none absolute bottom-3 left-3 z-40"
@@ -302,7 +297,7 @@ export function RoomBoardCanvas({
         {isHmwWritingStep(phase) ? (
           // 下端はマイ付箋ドック（h-48 + 余白）を避ける。ボードが縦に狭い
           // 画面ではパネル内スクロールに逃がす（#198 の全画面化で緩和される）。
-          <div className="pointer-events-none absolute top-3 bottom-56 left-3 z-30 flex items-start">
+          <div className="pointer-events-none absolute top-16 bottom-56 left-3 z-30 flex items-start">
             <HmwTemplatePanel
               className="pointer-events-auto max-h-full overflow-y-auto"
               onTemplateSelect={onHmwTemplateSelect}

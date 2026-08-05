@@ -64,10 +64,12 @@ describe("RoomBoardCanvas", () => {
     expect(screen.getAllByTestId("note-card")).toHaveLength(3);
   });
 
-  it("付箋が 0 件のときは空状態メッセージを表示する（empty）", () => {
+  it("付箋が 0 件でも共有付箋の空状態メッセージを表示しない", () => {
     setup({ notes: [] });
 
-    expect(screen.getByText("共有付箋はまだありません")).toBeInTheDocument();
+    expect(
+      screen.queryByText("共有付箋はまだありません"),
+    ).not.toBeInTheDocument();
   });
 
   it("ボード背景を直接押すと onSelect(null) で選択を解除する", () => {
@@ -171,7 +173,9 @@ describe("RoomBoardCanvas", () => {
     it("Step 2-1 では HMW テンプレートパネルを表示する", () => {
       setup({ phase: buildPhaseStep(1, 2), notes: [] });
 
-      expect(screen.getByTestId("hmw-template-panel")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("hmw-template-panel").parentElement,
+      ).toHaveClass("top-16");
     });
 
     it("フェーズ1のステップでは HMW テンプレートパネルを表示しない", () => {
