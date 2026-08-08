@@ -20,6 +20,7 @@ const meta = {
     ],
     disabled: false,
     selectedNoteId: null,
+    canDeleteNote: true,
     canCreateNote: true,
     canMoveNote: true,
     canEditNote: true,

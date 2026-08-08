@@ -14,6 +14,7 @@ const meta = {
     isOwnDrag: false,
     isSelected: false,
     canEditNote: true,
+    canDeleteNote: true,
     canMoveNote: true,
     canShowVote: true,
     canVote: true,

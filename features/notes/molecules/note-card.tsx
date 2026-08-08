@@ -252,7 +252,7 @@ export function NoteCard({
         onChange={(event) => setLocalContent(event.target.value)}
         onBlur={(event) => {
           setIsEditing(false);
-          if (disabled || editingDisabled) {
+          if (disabled || editingDisabled || !canEditNote) {
             return;
           }
           onContentChange(note.id, event.target.value);

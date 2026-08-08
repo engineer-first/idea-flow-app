@@ -186,13 +186,13 @@ describe("PrivateNotesToolbar", () => {
   it("canEditNoteがfalseの場合は編集できない", () => {
     render(
       <PrivateNotesToolbar
-        notes={[buildNote({ visibility: "private" })]}
+        notes={[buildNote({ id: "note-1", visibility: "private" })]}
         disabled={false}
         canCreateNote={true}
         canMoveNote={true}
         canEditNote={false}
         canDeleteNote={false}
-        selectedNoteId={null}
+        selectedNoteId="note-1"
         onSelect={vi.fn()}
         onAdd={vi.fn()}
         onContentChange={vi.fn()}
@@ -200,6 +200,14 @@ describe("PrivateNotesToolbar", () => {
         onDragStart={vi.fn()}
       />,
     );
+
+    const surface = screen.getByRole("button", { name: "付箋" });
+
+    fireEvent.pointerDown(surface, { pointerId: 1 });
+    fireEvent.pointerUp(surface, { pointerId: 1 });
+
+    fireEvent.pointerDown(surface, { pointerId: 2 });
+    fireEvent.pointerUp(surface, { pointerId: 2 });
 
     expect(screen.getByRole("textbox")).toHaveAttribute("readonly");
   });

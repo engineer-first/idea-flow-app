@@ -648,8 +648,11 @@ describe("RoomBoardView", () => {
       const [first] = screen.getAllByTestId("note-card");
 
       clickNote(first);
+      clickNote(first);
 
-      expect(within(first).getByRole("textbox")).toBeInTheDocument();
+      expect(within(first).getByRole("textbox")).not.toHaveAttribute(
+        "readonly",
+      );
     });
 
     it("Step2では付箋編集できる", () => {
@@ -661,7 +664,12 @@ describe("RoomBoardView", () => {
 
       clickNote(first);
 
-      expect(within(first).getByRole("textbox")).toBeInTheDocument();
+      clickNote(first);
+      clickNote(first);
+
+      expect(within(first).getByRole("textbox")).not.toHaveAttribute(
+        "readonly",
+      );
     });
 
     it("Step3以降では付箋編集できない", () => {
@@ -671,6 +679,9 @@ describe("RoomBoardView", () => {
 
       const [first] = screen.getAllByTestId("note-card");
 
+      clickNote(first);
+
+      clickNote(first);
       clickNote(first);
 
       expect(within(first).getByRole("textbox")).toHaveAttribute("readonly");

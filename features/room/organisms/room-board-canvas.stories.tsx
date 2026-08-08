@@ -91,6 +91,7 @@ export const Empty: Story = {
 export const Grouped: Story = {
   args: {
     phase: STEP_1_3,
+    permissions: getBoardPermissions(STEP_1_3),
     notes: [
       buildNote({ id: "note-1", x: 100, y: 100 }),
       buildNote({ id: "note-2", x: 350, y: 100 }),
@@ -162,8 +163,8 @@ export const Decided: Story = {
 // ボード上に浮かぶ。オーバーレイの位置決めはこのコンポーネントの責務。
 export const HmwWritingStep: Story = {
   args: {
-    phase: buildPhaseStep(1, 2),
-    permissions: getBoardPermissions(buildPhaseStep(1, 2)),
+    phase: buildPhaseStep(2, 1),
+    permissions: getBoardPermissions(buildPhaseStep(2, 1)),
     notes: [],
     hmwDecidedIssue: buildCarryover().content,
   },
@@ -172,7 +173,8 @@ export const HmwWritingStep: Story = {
 // 長文の決定課題は max-w-xl 内で折り返して全文表示し、左端パネルの帯を侵食しない。
 export const HmwWritingStepLongIssue: Story = {
   args: {
-    phase: buildPhaseStep(1, 2),
+    phase: buildPhaseStep(2, 1),
+    permissions: getBoardPermissions(buildPhaseStep(2, 1)),
     notes: [],
     hmwDecidedIssue: buildCarryover({
       content:
@@ -187,6 +189,7 @@ export const HmwWritingStepLongIssue: Story = {
 export const HmwCarryoverOnly: Story = {
   args: {
     phase: buildPhaseStep(2, 2),
+    permissions: getBoardPermissions(buildPhaseStep(2, 2)),
     hmwDecidedIssue: buildCarryover().content,
   },
 };

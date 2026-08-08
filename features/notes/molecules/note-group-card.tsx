@@ -35,14 +35,20 @@ export function NoteGroupCard({
   }, [name, isEditing]);
 
   useEffect(() => {
-    if (isEditing) {
-      inputRef.current?.focus();
-      inputRef.current?.select();
+    if (!canGroupNote && isEditing) {
+      setIsEditing(false);
+      setLocalName(name);
     }
-  }, [isEditing]);
+  }, [canGroupNote, isEditing, name]);
 
   const handleSubmit = () => {
     setIsEditing(false);
+
+    if (!canGroupNote) {
+      setLocalName(name);
+      return;
+    }
+
     const trimmed = localName.trim();
     if (trimmed && trimmed !== name) {
       onUpdateName(trimmed);
