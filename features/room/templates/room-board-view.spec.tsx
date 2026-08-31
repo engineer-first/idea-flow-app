@@ -663,8 +663,6 @@ describe("RoomBoardView", () => {
       const [first] = screen.getAllByTestId("note-card");
 
       clickNote(first);
-
-      clickNote(first);
       clickNote(first);
 
       expect(within(first).getByRole("textbox")).not.toHaveAttribute(
