@@ -203,12 +203,18 @@ export function NoteCard({
     if (disabled) {
       return;
     }
-    if (
-      canDeleteNote &&
-      (event.key === "Backspace" || event.key === "Delete")
-    ) {
-      onDelete(note.id);
+
+    if (event.key === "Backspace" || event.key === "Delete") {
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (canDeleteNote) {
+        onDelete(note.id);
+      }
+
+      return;
     }
+
     if (event.key === "Enter" && canEditNote && !editingDisabled) {
       event.preventDefault();
       setIsEditing(true);
