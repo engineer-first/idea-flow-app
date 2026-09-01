@@ -35,6 +35,7 @@ export function StickyNote({
     <div
       data-slot="sticky-note"
       data-testid={testId}
+      data-note-id={noteId}
       data-selected={isSelected || undefined}
       data-decided={isDecided || undefined}
       data-editing={dataEditing || undefined}
