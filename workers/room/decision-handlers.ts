@@ -2,7 +2,7 @@
 import { setDecision } from "./decisions";
 import { type MessageHandlers, replyForbidden } from "./handler-context";
 import { isHostUser } from "./members";
-import { requireNote } from "./notes";
+import { requireNoteInCurrentPhase } from "./notes";
 import { getPhase } from "./phase";
 
 export const decisionHandlers: MessageHandlers<"note:decide"> = {
@@ -12,7 +12,7 @@ export const decisionHandlers: MessageHandlers<"note:decide"> = {
       return;
     }
 
-    const note = requireNote(ctx, message.noteId);
+    const note = requireNoteInCurrentPhase(ctx, message.noteId);
     if (!note) return;
     if (note.visibility !== "shared") {
       replyForbidden(ctx);

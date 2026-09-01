@@ -473,7 +473,7 @@ describe("RoomDO note:decide の認可", () => {
       const now = new Date().toISOString();
       state.storage.sql.exec(
         `INSERT INTO notes
-           (id, author_id, content, visibility, color, x, y, created_at, updated_at)
+          (id, author_id, content, visibility, color, x, y, created_at, updated_at)
          VALUES (?1, ?2, '', ?3, 'yellow', 0, 0, ?4, ?4)`,
         noteId,
         USER_A,
@@ -2156,6 +2156,15 @@ describe("RoomDO Step 2-1 の境界ゲート", () => {
         visibility: "private",
       },
     });
+    expect(
+      await runInRoomDO(
+        roomName,
+        (_instance, state) =>
+          state.storage.sql
+            .exec("SELECT phase FROM notes WHERE author_id = ?1", USER_A)
+            .one().phase,
+      ),
+    ).toBe(2);
     ws.close();
   });
 
@@ -2361,6 +2370,166 @@ describe("RoomDO Step 2-1 の境界ゲート", () => {
     expect(await nextJson(ws)).toMatchObject({
       type: "note:deleted",
       noteId: inserted.note.id,
+    });
+    ws.close();
+  });
+
+  it("Step 2-2 では publish した HMW が全員に共有され、近接してもグループ化されない", async () => {
+    const roomName = "room-step2-2-share-hmw";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.upsertMember(USER_B, "Member");
+    await stub.setPhase(buildPhaseStep(1, 2), USER_A);
+
+    const authorWs = await connectDirectly(roomName, USER_A, USER_A);
+    authorWs.send(JSON.stringify({ type: "note:create", content: "HMW" }));
+    const inserted = (await nextJson(authorWs)) as { note: { id: string } };
+
+    await stub.setPhase(buildPhaseStep(2, 2), USER_A);
+    const memberWs = await connectDirectly(roomName, USER_B, USER_A);
+    authorWs.send(
+      JSON.stringify({
+        type: "note:publish",
+        noteId: inserted.note.id,
+        x: 100,
+        y: 100,
+      }),
+    );
+
+    expect(await nextJson(memberWs)).toMatchObject({
+      type: "note:inserted",
+      note: { id: inserted.note.id, visibility: "shared" },
+    });
+    expect(
+      await runInRoomDO(
+        roomName,
+        (_instance, state) =>
+          state.storage.sql.exec("SELECT COUNT(*) AS count FROM groups").one()
+            .count,
+      ),
+    ).toBe(0);
+
+    authorWs.close();
+    memberWs.close();
+  });
+
+  it("Step 2-2 では投票、Step 2-3 では付箋作成・移動を forbidden にする", async () => {
+    const roomName = "room-step2-operation-gates";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(2, 2), USER_A);
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(
+      JSON.stringify({
+        type: "note:vote",
+        noteId: "99999999-9999-4999-8999-999999999999",
+        kind: "subjective",
+      }),
+    );
+    expect(await nextJson(ws)).toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+
+    await stub.setPhase(buildPhaseStep(3, 2), USER_A);
+    ws.send(JSON.stringify({ type: "note:create", content: "禁止" }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+    ws.send(
+      JSON.stringify({
+        type: "note:move",
+        noteId: "99999999-9999-4999-8999-999999999999",
+        x: 100,
+        y: 100,
+      }),
+    );
+    expect(await nextJson(ws)).toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+    ws.close();
+  });
+
+  it("付箋は作成時のフェーズに紐づき、Step 2-2 の snapshot は HMW だけを返す", async () => {
+    const roomName = "room-step2-note-phase-isolation";
+    const oldNoteId = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+    const hmwNoteId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeef";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(2, 2), USER_A);
+    await runInRoomDO(roomName, (_instance, state) => {
+      const now = new Date().toISOString();
+      state.storage.sql.exec(
+        `INSERT INTO notes
+           (id, author_id, content, visibility, color, x, y, created_at, updated_at, phase)
+         VALUES (?1, ?2, '課題', 'shared', 'yellow', 0, 0, ?3, ?3, 1),
+                (?4, ?2, 'HMW', 'shared', 'blue', 100, 100, ?3, ?3, 2)`,
+        oldNoteId,
+        USER_A,
+        now,
+        hmwNoteId,
+      );
+    });
+
+    const storedNotes = await runInRoomDO(roomName, (_instance, state) =>
+      state.storage.sql
+        .exec("SELECT id, phase FROM notes ORDER BY id")
+        .toArray(),
+    );
+    expect(storedNotes).toEqual([
+      { id: hmwNoteId, phase: 2 },
+      { id: oldNoteId, phase: 1 },
+    ]);
+    const response = await stub.fetch("https://do/ws", {
+      headers: {
+        Upgrade: "websocket",
+        [USER_ID_HEADER]: USER_A,
+        [HOST_ID_HEADER]: USER_A,
+      },
+    });
+    expect(response.status).toBe(101);
+    const ws = response.webSocket;
+    if (!ws) throw new Error("WebSocket 接続を確立できませんでした。");
+    ws.accept();
+    const snapshot = (await nextJson(ws)) as {
+      notes: { id: string }[];
+    };
+    expect(snapshot.notes.map((note) => note.id)).toEqual([hmwNoteId]);
+    ws.close();
+  });
+
+  it("フェーズ2ではフェーズ1の付箋への投票を forbidden にする", async () => {
+    const roomName = "room-step2-old-note-vote-forbidden";
+    const oldNoteId = "ffffffff-ffff-4fff-8fff-fffffffffff0";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(3, 2), USER_A);
+    await runInRoomDO(roomName, (_instance, state) => {
+      const now = new Date().toISOString();
+      state.storage.sql.exec(
+        `INSERT INTO notes
+           (id, author_id, content, visibility, color, x, y, created_at, updated_at, phase)
+         VALUES (?1, ?2, '課題', 'shared', 'yellow', 0, 0, ?3, ?3, 1)`,
+        oldNoteId,
+        USER_A,
+        now,
+      );
+    });
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(
+      JSON.stringify({
+        type: "note:vote",
+        noteId: oldNoteId,
+        kind: "subjective",
+      }),
+    );
+    expect(await nextJson(ws)).toMatchObject({
+      type: "error",
+      code: "forbidden",
     });
     ws.close();
   });

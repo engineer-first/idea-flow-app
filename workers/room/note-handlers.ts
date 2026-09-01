@@ -25,7 +25,7 @@ import {
   moveNote,
   type NoteRow,
   publishNote,
-  requireNote,
+  requireNoteInCurrentPhase,
   toProtocolNote,
   touchNote,
   unpublishNote,
@@ -70,6 +70,11 @@ export const noteHandlers: MessageHandlers<
   | "note:vote-reset"
 > = {
   "note:create": (ctx, message) => {
+    const phase = getPhase(ctx.sql);
+    if (phase.kind !== "step") {
+      replyForbidden(ctx);
+      return;
+    }
     const now = new Date().toISOString();
     const color = getMemberColor(ctx.sql, ctx.userId) ?? "yellow";
 
@@ -83,13 +88,14 @@ export const noteHandlers: MessageHandlers<
       y: NOTE_SPAWN_Y_MIN + Math.random() * NOTE_SPAWN_JITTER,
       created_at: now,
       updated_at: now,
+      phase: phase.phase,
     };
     insertNote(ctx.sql, note);
     broadcastNoteInserted(ctx.sql, ctx.broadcaster, note);
   },
 
   "note:publish": (ctx, message) => {
-    const row = requireNote(ctx, message.noteId);
+    const row = requireNoteInCurrentPhase(ctx, message.noteId);
     if (!row) return;
     if (row.author_id !== ctx.userId || row.visibility !== "private") {
       replyForbidden(ctx);
@@ -108,7 +114,7 @@ export const noteHandlers: MessageHandlers<
   },
 
   "note:unpublish": (ctx, message) => {
-    const row = requireNote(ctx, message.noteId);
+    const row = requireNoteInCurrentPhase(ctx, message.noteId);
     if (!row) return;
     if (row.author_id !== ctx.userId || row.visibility !== "shared") {
       replyForbidden(ctx);
@@ -131,7 +137,7 @@ export const noteHandlers: MessageHandlers<
   },
 
   "note:update-content": (ctx, message) => {
-    const row = requireNote(ctx, message.noteId);
+    const row = requireNoteInCurrentPhase(ctx, message.noteId);
     if (!row) return;
     if (
       !canEdit(row, ctx.userId) ||
@@ -150,7 +156,7 @@ export const noteHandlers: MessageHandlers<
   },
 
   "note:move": (ctx, message) => {
-    const row = requireNote(ctx, message.noteId);
+    const row = requireNoteInCurrentPhase(ctx, message.noteId);
     if (!row) return;
     if (!canEdit(row, ctx.userId)) {
       replyForbidden(ctx);
@@ -175,6 +181,11 @@ export const noteHandlers: MessageHandlers<
     if (!row) {
       return;
     }
+    const phase = getPhase(ctx.sql);
+    if (phase.kind !== "step" || row.phase !== phase.phase) {
+      replyForbidden(ctx);
+      return;
+    }
     if (!canEdit(row, ctx.userId)) {
       replyForbidden(ctx);
       return;
@@ -195,7 +206,7 @@ export const noteHandlers: MessageHandlers<
   },
 
   "note:delete": (ctx, message) => {
-    const row = requireNote(ctx, message.noteId);
+    const row = requireNoteInCurrentPhase(ctx, message.noteId);
     if (!row) return;
     if (
       row.author_id !== ctx.userId ||
@@ -216,7 +227,7 @@ export const noteHandlers: MessageHandlers<
   },
 
   "note:vote": (ctx, message) => {
-    const row = requireNote(ctx, message.noteId);
+    const row = requireNoteInCurrentPhase(ctx, message.noteId);
     if (!row) return;
     if (!isVisibleTo(row, ctx.userId)) {
       replyForbidden(ctx);
@@ -255,7 +266,7 @@ export const noteHandlers: MessageHandlers<
   },
 
   "note:vote-reset": (ctx, message) => {
-    const row = requireNote(ctx, message.noteId);
+    const row = requireNoteInCurrentPhase(ctx, message.noteId);
     if (!row) return;
     if (!isVisibleTo(row, ctx.userId)) {
       replyForbidden(ctx);
