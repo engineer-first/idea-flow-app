@@ -14,6 +14,28 @@ const STEP_1_1 = buildPhaseStep(1);
 const STEP_1_4 = buildPhaseStep(4);
 const STEP_1_5 = buildPhaseStep(5);
 const STEP_2_1 = buildPhaseStep(1, 2);
+const CANVAS_HUD_POSITIONS = [
+  [180, 120],
+  [380, 220],
+  [630, 280],
+  [180, 380],
+  [470, 520],
+  [850, 410],
+] as const;
+const CANVAS_HUD_CONTENTS = [
+  "ユーザーが最初に何を迷うか？",
+  "オンボーディングの離脱ポイントはどこか？",
+  "どの機能が最も使われていないか？",
+  "価値を感じるまでの時間が長い？",
+  "サポートへの問い合わせが多い内容は？",
+  "チームで共有しづらい理由は？",
+] as const;
+const CANVAS_HUD_NOTES = buildNotes(6).map((note, index) => ({
+  ...note,
+  content: CANVAS_HUD_CONTENTS[index] ?? note.content,
+  x: CANVAS_HUD_POSITIONS[index]?.[0] ?? note.x,
+  y: CANVAS_HUD_POSITIONS[index]?.[1] ?? note.y,
+}));
 
 const meta = {
   title: "Room/RoomBoardView",
@@ -36,6 +58,7 @@ const meta = {
     currentUserId: ME,
     hostUserId: ME,
     isNextPhasePending: false,
+    signOutAction: fn(),
     privateNotes: [],
     hmwDecidedIssue: null,
     onAddPrivateNote: fn(),
@@ -66,7 +89,7 @@ const meta = {
   },
   decorators: [
     (Story) => (
-      <div style={{ height: "80vh", padding: 16 }}>
+      <div style={{ height: "100vh" }}>
         <Story />
       </div>
     ),
@@ -107,6 +130,21 @@ export const ManyMembers: Story = {
   },
 };
 
+// 選定した Canvas HUD 案の基準状態。
+// 10人・課題整理 Step 1・タイマー稼働中を同時に表示して幅と視線集中を確認する。
+export const CanvasHud: Story = {
+  args: {
+    members: buildMembers(10, ME),
+    notes: CANVAS_HUD_NOTES,
+    phase: STEP_1_1,
+    timer: {
+      status: "running",
+      endsAt: Date.now() + 138_000,
+      durationMs: 180_000,
+    },
+  },
+};
+
 // 非ホストの状態（自分は ring のみ。ホストラベルは hostUserId のメンバーに付く）。
 export const NonHost: Story = {
   args: {
@@ -118,6 +156,7 @@ export const NonHost: Story = {
 
 export const DotVoting: Story = {
   args: {
+    phase: buildPhaseStep(4),
     notes: buildNotes(3).map((note, index) => ({
       ...note,
       dotVotes: {

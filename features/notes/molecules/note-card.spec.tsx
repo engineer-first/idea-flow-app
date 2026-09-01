@@ -105,6 +105,24 @@ describe("NoteCard", () => {
       ).toBeInTheDocument();
     });
 
+    it("投票中に集計が非公開でも本人の投票数を表示する", () => {
+      setup({
+        note: buildNote({
+          dotVotes: {
+            subjective: { votedByMe: true, ownCount: 1 },
+            objective: { votedByMe: true, ownCount: 2 },
+          },
+        }),
+      });
+
+      expect(
+        screen.getByRole("button", { name: "主観ドット投票を取り消す" }),
+      ).toHaveTextContent("主観1");
+      expect(
+        screen.getByRole("button", { name: "客観ドットを追加" }),
+      ).toHaveTextContent("客観2");
+    });
+
     it("ドット投票ボタンでonVoteを呼ぶ", () => {
       const onVote = vi.fn();
       setup({ onVote });

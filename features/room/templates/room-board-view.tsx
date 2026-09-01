@@ -25,6 +25,7 @@ import type { RoomScreenConnectionStatus } from "../logic/connection-status";
 import { roomNotify } from "../logic/room-notify";
 import type { Decision, Member } from "../logic/room-reducer";
 import { useBoardDrag } from "../logic/use-board-drag";
+import { useCanvasCamera } from "../logic/use-canvas-camera";
 import { LeaveConfirmDialog } from "../molecules/leave-confirm-dialog";
 import { VoteTotalingDialog } from "../molecules/vote-totaling-dialog";
 import { RoomBoardCanvas } from "../organisms/room-board-canvas";
@@ -49,6 +50,7 @@ export type RoomBoardViewProps = {
   // ホストの userId（メンバー一覧の「ホスト」ラベル表示用）。
   hostUserId: string;
   isNextPhasePending: boolean;
+  signOutAction?: () => Promise<void>;
   privateNotes: Note[];
   // ボード上に掲示する、フェーズ1から持ち越された決定課題の本文。
   // 解決（carryovers からの取り出し）はコンテナの責務。null なら非表示。
@@ -99,6 +101,7 @@ export function RoomBoardView({
   currentUserId,
   hostUserId,
   isNextPhasePending,
+  signOutAction,
   privateNotes,
   hmwDecidedIssue,
   onAddPrivateNote,
@@ -147,6 +150,23 @@ export function RoomBoardView({
   const isDisconnected = isMounted ? connectionStatus !== "open" : true;
 
   const {
+    camera,
+    gridStyle,
+    isPanning,
+    worldPointFromClient,
+    fitToNotes,
+    zoomIn,
+    zoomOut,
+    resetZoom,
+    handlePointerDown: handleCanvasPointerDown,
+    handlePointerMove: handleCanvasPointerMove,
+    handlePointerEnd: handleCanvasPointerEnd,
+  } = useCanvasCamera({
+    viewportRef: boardScrollerRef,
+    notes,
+  });
+
+  const {
     drag,
     renderedNotes,
     renderedPrivateNotes,
@@ -160,6 +180,7 @@ export function RoomBoardView({
     currentUserId,
     boardRootRef,
     boardScrollerRef,
+    worldPointFromClient,
     privateToolbarRef,
     canPublish: isPublishAllowedStep(phase),
     onPublishBlocked: roomNotify.cannotPublishNote,
@@ -213,7 +234,7 @@ export function RoomBoardView({
     <div
       ref={boardRootRef}
       data-testid="room-board-view-root"
-      className="flex h-full flex-col gap-3"
+      className="relative flex h-full flex-col"
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerEnd}
       onPointerCancel={handlePointerEnd}
@@ -232,6 +253,7 @@ export function RoomBoardView({
         hostUserId={hostUserId}
         isNextPhasePending={isNextPhasePending}
         isNextPhaseBlocked={isNextPhaseBlocked}
+        signOutAction={signOutAction}
         voteRemaining={voteRemaining}
         isLeaving={isLeaving}
         onShowVoteResult={() => setVoteTotalingDialogOpen(true)}
@@ -262,6 +284,16 @@ export function RoomBoardView({
         hmwDecidedIssue={hmwDecidedIssue}
         boardScrollerRef={boardScrollerRef}
         privateToolbarRef={privateToolbarRef}
+        camera={camera}
+        gridStyle={gridStyle}
+        isPanning={isPanning}
+        onCanvasPointerDown={handleCanvasPointerDown}
+        onCanvasPointerMove={handleCanvasPointerMove}
+        onCanvasPointerEnd={handleCanvasPointerEnd}
+        onZoomIn={zoomIn}
+        onZoomOut={zoomOut}
+        onResetZoom={resetZoom}
+        onFitToNotes={fitToNotes}
         onSelect={setSelectedNoteId}
         onHmwTemplateSelect={onHmwTemplateSelect}
         onNoteDragStart={handleSharedNoteDragStart}

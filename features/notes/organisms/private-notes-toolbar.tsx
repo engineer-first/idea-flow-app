@@ -42,12 +42,12 @@ export function PrivateNotesToolbar({
   return (
     <Card
       ref={toolbarRef}
-      className={cn("flex h-48 w-full flex-row overflow-hidden", className)}
+      className={cn("flex h-28 w-full flex-row overflow-hidden", className)}
       data-testid="private-notes-toolbar"
       data-return-drop-target={isReturnDropTarget || undefined}
     >
-      <CardHeader className="w-36 shrink-0 justify-center border-r border-border p-3">
-        <CardTitle className="text-base">マイ付箋</CardTitle>
+      <CardHeader className="w-40 shrink-0 justify-center border-r border-border p-3">
+        <CardTitle className="text-sm">マイ付箋</CardTitle>
         <Button type="button" size="sm" disabled={disabled} onClick={onAdd}>
           <Plus aria-hidden="true" />
           付箋を追加
@@ -94,7 +94,7 @@ export function PrivateNotesToolbar({
                 onVoteReset={() => {}}
                 hideVoteControls={true}
                 className="relative shrink-0"
-                style={{ width: "200px", height: "150px" }}
+                style={{ width: "140px", height: "88px" }}
               />
             ))}
           </div>

@@ -812,12 +812,12 @@ describe("サーバーメッセージ → 画面反映", () => {
 
     // 2回目の publish が送られたこと
     expect(socket.sent).toContain(
-      JSON.stringify({ type: "note:publish", noteId: NOTE_ID, x: 150, y: 150 }),
+      JSON.stringify({ type: "note:publish", noteId: NOTE_ID, x: 140, y: 140 }),
     );
 
     // 最終的に note:move で確定すること
     expect(socket.sent).toContain(
-      JSON.stringify({ type: "note:move", noteId: NOTE_ID, x: 160, y: 160 }),
+      JSON.stringify({ type: "note:move", noteId: NOTE_ID, x: 150, y: 150 }),
     );
   });
 
@@ -966,7 +966,9 @@ describe("ユーザー操作 → プロトコルメッセージ送信", () => {
   });
 
   it("客観ドットはサーバー応答前でも残数までしか送信しない", () => {
-    const { socket } = connectWithSnapshot([protocolNote()]);
+    const { socket } = connectWithSnapshot([protocolNote()], {
+      phase: buildPhaseStep(4),
+    });
     const button = screen.getByRole("button", { name: "客観ドットを追加" });
 
     fireEvent.click(button);

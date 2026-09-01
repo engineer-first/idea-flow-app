@@ -11,7 +11,7 @@
 // - lobby: 開始前ロビー（メンバー確認・招待）。
 // - step: phase × step の進行状態。現在は課題整理の phase1 step1-5 のみ。
 import { z } from "zod";
-import { BOARD_HEIGHT, BOARD_WIDTH } from "./board";
+import { CANVAS_COORDINATE_LIMIT } from "./board";
 import { RoomPhaseSchema } from "./phase";
 
 export const NOTE_CONTENT_MAX_LENGTH = 2000;
@@ -57,14 +57,20 @@ export const NOTE_COLOR_PALETTE = [
 export const NoteColorSchema = z.enum(NOTE_COLOR_PALETTE);
 export type NoteColor = z.infer<typeof NoteColorSchema>;
 
+export const CanvasCoordinateSchema = z
+  .number()
+  .finite()
+  .min(-CANVAS_COORDINATE_LIMIT)
+  .max(CANVAS_COORDINATE_LIMIT);
+
 export const NoteSchema = z.object({
   id: z.string().uuid(),
   authorId: z.string().uuid(),
   content: z.string(),
   visibility: z.enum(["private", "shared"]),
   color: NoteColorSchema,
-  x: z.number(),
-  y: z.number(),
+  x: CanvasCoordinateSchema,
+  y: CanvasCoordinateSchema,
   createdAt: z.string(),
   updatedAt: z.string(),
   dotVotes: z.object({
@@ -133,8 +139,8 @@ export const CarryoverSchema = z.object({
 export type Carryover = z.infer<typeof CarryoverSchema>;
 
 const NotePositionSchema = {
-  x: z.number().finite().min(0).max(BOARD_WIDTH),
-  y: z.number().finite().min(0).max(BOARD_HEIGHT),
+  x: CanvasCoordinateSchema,
+  y: CanvasCoordinateSchema,
 };
 
 // ---------------------------------------------------------------
@@ -256,8 +262,8 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("note:drag"),
     noteId: z.string().uuid(),
-    x: z.number(),
-    y: z.number(),
+    x: CanvasCoordinateSchema,
+    y: CanvasCoordinateSchema,
   }),
   z.object({
     type: z.literal("group:updated"),

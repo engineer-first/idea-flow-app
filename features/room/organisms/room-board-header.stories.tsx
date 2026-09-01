@@ -14,7 +14,7 @@ const meta = {
   title: "Room/RoomBoardHeader",
   component: RoomBoardHeader,
   parameters: {
-    layout: "padded",
+    layout: "fullscreen",
   },
   args: {
     inviteCode: "AB12CD",
@@ -30,6 +30,7 @@ const meta = {
     hostUserId: ME,
     isNextPhasePending: false,
     isNextPhaseBlocked: false,
+    signOutAction: fn(),
     voteRemaining: { subjective: 5, objective: 10 },
     isLeaving: false,
     onShowVoteResult: fn(),
@@ -41,6 +42,13 @@ const meta = {
     onTimerExtend: fn(),
     onTimerStop: fn(),
   },
+  decorators: [
+    (Story) => (
+      <div className="relative h-96 overflow-hidden bg-muted/20">
+        <Story />
+      </div>
+    ),
+  ],
 } satisfies Meta<typeof RoomBoardHeader>;
 
 export default meta;

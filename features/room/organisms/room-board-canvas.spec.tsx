@@ -26,6 +26,16 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardCanvas>[0]> = {}) {
     hmwDecidedIssue: null,
     boardScrollerRef: createRef<HTMLDivElement>(),
     privateToolbarRef: createRef<HTMLDivElement>(),
+    camera: { x: 0, y: 0, zoom: 1 },
+    gridStyle: {},
+    isPanning: false,
+    onCanvasPointerDown: vi.fn(),
+    onCanvasPointerMove: vi.fn(),
+    onCanvasPointerEnd: vi.fn(),
+    onZoomIn: vi.fn(),
+    onZoomOut: vi.fn(),
+    onResetZoom: vi.fn(),
+    onFitToNotes: vi.fn(),
     onSelect: vi.fn(),
     onHmwTemplateSelect: vi.fn(),
     onNoteDragStart: vi.fn(),
@@ -53,10 +63,12 @@ describe("RoomBoardCanvas", () => {
     expect(screen.getAllByTestId("note-card")).toHaveLength(3);
   });
 
-  it("付箋が 0 件のときは空状態メッセージを表示する（empty）", () => {
+  it("付箋が 0 件でも共有付箋の空状態メッセージを表示しない", () => {
     setup({ notes: [] });
 
-    expect(screen.getByText("共有付箋はまだありません")).toBeInTheDocument();
+    expect(
+      screen.queryByText("共有付箋はまだありません"),
+    ).not.toBeInTheDocument();
   });
 
   it("ボード背景を直接押すと onSelect(null) で選択を解除する", () => {
@@ -131,12 +143,13 @@ describe("RoomBoardCanvas", () => {
     expect(screen.getByRole("button", { name: "付箋を追加" })).toBeDisabled();
   });
 
-  it("発想支援サイドバーを閉じた状態で表示する", () => {
+  it("発想支援サイドバーを閉じた状態でHUDと重ならない位置に表示する", () => {
     setup();
 
     expect(
       screen.getByRole("button", { name: "発想支援を開く" }),
     ).toBeInTheDocument();
+    expect(screen.getByTestId("idea-support-dock")).toHaveClass("top-16");
   });
 
   describe("HMW オーバーレイ", () => {
@@ -159,7 +172,9 @@ describe("RoomBoardCanvas", () => {
     it("Step 2-1 では HMW テンプレートパネルを表示する", () => {
       setup({ phase: buildPhaseStep(1, 2), notes: [] });
 
-      expect(screen.getByTestId("hmw-template-panel")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("hmw-template-panel").parentElement,
+      ).toHaveClass("top-16");
     });
 
     it("フェーズ1のステップでは HMW テンプレートパネルを表示しない", () => {

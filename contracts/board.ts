@@ -1,9 +1,6 @@
-// ボードのレイアウト定数。UI（room-board-view / note-card）とサーバー
-// （RoomDO の入力検証）の両方から参照されるため、コントラクト層に置く。
-// 値がズレて「サーバーでは弾かれるがUI上はドラッグできてしまう」ような
-// 不整合が起きないようにする。
-export const BOARD_WIDTH = 2000;
-export const BOARD_HEIGHT = 1200;
+// キャンバスの世界座標に設ける安全上限。UI上は無限に見える範囲だが、
+// 異常な入力でCSS transformやD1/DOの値が壊れないよう、境界で共有する。
+export const CANVAS_COORDINATE_LIMIT = 1_000_000;
 
 export const NOTE_WIDTH = 200;
 export const NOTE_HEIGHT = 150;
