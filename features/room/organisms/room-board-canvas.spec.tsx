@@ -146,23 +146,23 @@ describe("RoomBoardCanvas", () => {
   });
 
   it("発想支援が利用できないステップではサイドバーを表示しない", () => {
-  setup({
-    phase: buildPhaseStep(1),
+    setup({
+      phase: buildPhaseStep(1),
+    });
+
+    expect(
+      screen.queryByRole("button", { name: "発想支援を開く" }),
+    ).not.toBeInTheDocument();
   });
 
-  expect(
-    screen.queryByRole("button", { name: "発想支援を開く" }),
-  ).not.toBeInTheDocument();
-});
+  it("発想支援サイドバーを閉じた状態でHUDと重ならない位置に表示する", () => {
+    setup();
 
-it("発想支援サイドバーを閉じた状態でHUDと重ならない位置に表示する", () => {
-  setup();
-
-  expect(
-    screen.getByRole("button", { name: "発想支援を開く" }),
-  ).toBeInTheDocument();
-  expect(screen.getByTestId("idea-support-dock")).toHaveClass("top-16");
-});
+    expect(
+      screen.getByRole("button", { name: "発想支援を開く" }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("idea-support-dock")).toHaveClass("top-16");
+  });
 
   it("Step1-1では個人付箋を削除できる", () => {
     const onPrivateNoteDelete = vi.fn();

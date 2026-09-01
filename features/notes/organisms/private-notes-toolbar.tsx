@@ -50,7 +50,7 @@ export function PrivateNotesToolbar({
   return (
     <Card
       ref={toolbarRef}
-      className={cn("flex h-28 w-full flex-row overflow-hidden", className)}
+      className={cn("flex h-48 w-full flex-row overflow-hidden", className)}
       data-testid="private-notes-toolbar"
       data-return-drop-target={isReturnDropTarget || undefined}
     >
@@ -112,7 +112,7 @@ export function PrivateNotesToolbar({
                 onVoteReset={() => {}}
                 hideVoteControls={true}
                 className="relative shrink-0"
-                style={{ width: "140px", height: "88px" }}
+                style={{ width: "200px", height: "150px" }}
               />
             ))}
           </div>
