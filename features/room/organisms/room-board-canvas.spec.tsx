@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { buildPhaseStep } from "@/contracts/phase.fixture";
@@ -7,6 +7,7 @@ import {
   buildNote,
   buildNotes,
 } from "@/contracts/room-protocol.fixture";
+import { getBoardPermissions } from "../logic/board-permissions";
 import { RoomBoardCanvas } from "./room-board-canvas";
 
 function setup(overrides: Partial<Parameters<typeof RoomBoardCanvas>[0]> = {}) {
@@ -16,6 +17,7 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardCanvas>[0]> = {}) {
     phase: buildPhaseStep(1),
     decision: null,
     isHost: false,
+    permissions: getBoardPermissions(buildPhaseStep(1)),
     privateNotes: [],
     selectedNoteId: null,
     draggingNoteId: null,
@@ -143,13 +145,51 @@ describe("RoomBoardCanvas", () => {
     expect(screen.getByRole("button", { name: "付箋を追加" })).toBeDisabled();
   });
 
-  it("発想支援サイドバーを閉じた状態でHUDと重ならない位置に表示する", () => {
-    setup();
+  it("発想支援が利用できないステップではサイドバーを表示しない", () => {
+    setup({
+      phase: buildPhaseStep(1),
+    });
 
     expect(
-      screen.getByRole("button", { name: "発想支援を開く" }),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId("idea-support-dock")).toHaveClass("top-16");
+      screen.queryByRole("button", { name: "発想支援を開く" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("Step1-1では個人付箋を削除できる", () => {
+    const onPrivateNoteDelete = vi.fn();
+
+    setup({
+      phase: buildPhaseStep(1),
+      permissions: getBoardPermissions(buildPhaseStep(1)),
+      privateNotes: [buildNote({ id: "note-1", visibility: "private" })],
+      onPrivateNoteDelete,
+    });
+
+    const toolbar = screen.getByTestId("private-notes-toolbar");
+    const surface = within(toolbar).getByRole("button", { name: "付箋" });
+
+    fireEvent.keyDown(surface, { key: "Backspace" });
+
+    expect(onPrivateNoteDelete).toHaveBeenCalledWith("note-1");
+  });
+
+  it("Step1-2では個人付箋をBackspace/Deleteで削除できない", () => {
+    const onPrivateNoteDelete = vi.fn();
+
+    setup({
+      phase: buildPhaseStep(2),
+      permissions: getBoardPermissions(buildPhaseStep(2)),
+      privateNotes: [buildNote({ visibility: "private" })],
+      onPrivateNoteDelete,
+    });
+
+    const toolbar = screen.getByTestId("private-notes-toolbar");
+    const surface = within(toolbar).getByRole("button", { name: "付箋" });
+
+    fireEvent.keyDown(surface, { key: "Backspace" });
+    fireEvent.keyDown(surface, { key: "Delete" });
+
+    expect(onPrivateNoteDelete).not.toHaveBeenCalled();
   });
 
   describe("HMW オーバーレイ", () => {
@@ -270,5 +310,32 @@ describe("RoomBoardCanvas", () => {
         }),
       ).not.toBeInTheDocument();
     });
+  });
+  it("Step1-1ではマイ付箋ツールバーを表示する", () => {
+    setup({
+      phase: buildPhaseStep(1),
+      permissions: getBoardPermissions(buildPhaseStep(1)),
+    });
+
+    expect(screen.getByTestId("private-notes-dock")).toBeInTheDocument();
+  });
+
+  it("Step1-3ではマイ付箋ツールバーを表示しない", () => {
+    setup({
+      phase: buildPhaseStep(3),
+      permissions: getBoardPermissions(buildPhaseStep(3)),
+    });
+
+    expect(screen.queryByTestId("private-notes-dock")).not.toBeInTheDocument();
+  });
+  it("Step1-4では投票可能状態になる", () => {
+    setup({
+      phase: buildPhaseStep(4),
+      permissions: getBoardPermissions(buildPhaseStep(4)),
+    });
+
+    expect(
+      screen.getAllByRole("button", { name: /投票/ }).length,
+    ).toBeGreaterThan(0);
   });
 });

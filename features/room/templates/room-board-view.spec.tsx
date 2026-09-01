@@ -323,10 +323,18 @@ describe("RoomBoardView", () => {
 
   it("付箋のドット投票ボタンでonNoteVoteを呼ぶ", () => {
     const onNoteVote = vi.fn();
-    setup({ onNoteVote });
+
+    setup({
+      phase: buildPhaseStep(4),
+      onNoteVote,
+    });
+
+    const [firstNote] = screen.getAllByTestId("note-card");
 
     fireEvent.click(
-      screen.getAllByRole("button", { name: "主観ドットを投票" })[0],
+      within(firstNote).getByRole("button", {
+        name: "主観ドットを投票",
+      }),
     );
 
     expect(onNoteVote).toHaveBeenCalledWith("note-1", "subjective");
@@ -630,6 +638,179 @@ describe("RoomBoardView", () => {
       ).toBeDisabled();
     });
   });
+
+  describe("ステップごとの付箋編集制御", () => {
+    it("Step1では付箋編集できる", () => {
+      setup({
+        phase: buildPhaseStep(1),
+      });
+
+      const [first] = screen.getAllByTestId("note-card");
+
+      clickNote(first);
+      clickNote(first);
+
+      expect(within(first).getByRole("textbox")).not.toHaveAttribute(
+        "readonly",
+      );
+    });
+
+    it("Step2では付箋編集できる", () => {
+      setup({
+        phase: buildPhaseStep(2),
+      });
+
+      const [first] = screen.getAllByTestId("note-card");
+
+      clickNote(first);
+      clickNote(first);
+
+      expect(within(first).getByRole("textbox")).not.toHaveAttribute(
+        "readonly",
+      );
+    });
+
+    it("Step3以降では付箋編集できない", () => {
+      setup({
+        phase: buildPhaseStep(3),
+      });
+
+      const [first] = screen.getAllByTestId("note-card");
+
+      clickNote(first);
+
+      clickNote(first);
+      clickNote(first);
+
+      expect(within(first).getByRole("textbox")).toHaveAttribute("readonly");
+    });
+    it("Step1-4では付箋追加入口を表示しない", () => {
+      setup({
+        phase: buildPhaseStep(4),
+      });
+
+      expect(
+        screen.queryByRole("button", {
+          name: "付箋を追加",
+        }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("グループ編集制御", () => {
+    it("Step1-2では自動グループ表示を行わない", () => {
+      const note1 = buildNote({ id: "note-1", x: 100, y: 100 });
+      const note2 = buildNote({ id: "note-2", x: 350, y: 100 });
+
+      setup({
+        phase: buildPhaseStep(2),
+        notes: [note1, note2],
+      });
+
+      expect(screen.queryByTestId("note-group-card")).not.toBeInTheDocument();
+    });
+
+    it("Step3ではグループ名編集できる", () => {
+      setup({
+        phase: buildPhaseStep(3),
+        groups: [
+          {
+            id: "g1",
+            name: "テスト",
+            noteIds: ["note-1", "note-2"],
+          },
+        ],
+      });
+
+      fireEvent.click(screen.getByText("テスト"));
+
+      expect(screen.getByTestId("group-name-input")).toBeInTheDocument();
+    });
+
+    it("Step4ではグループ名編集できない", () => {
+      setup({
+        phase: buildPhaseStep(4),
+        groups: [
+          {
+            id: "g1",
+            name: "テスト",
+            noteIds: ["note-1", "note-2"],
+          },
+        ],
+      });
+
+      fireEvent.click(screen.getByText("テスト"));
+
+      expect(screen.queryByTestId("group-name-input")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("投票UI表示制御", () => {
+    it("Step1-1では投票UIを表示しない", () => {
+      setup({
+        phase: buildPhaseStep(1),
+      });
+
+      expect(
+        screen.queryByRole("button", {
+          name: "主観ドットを投票",
+        }),
+      ).not.toBeInTheDocument();
+    });
+    it("Step3では投票UIを表示しない", () => {
+      setup({
+        phase: buildPhaseStep(3),
+      });
+
+      expect(
+        screen.queryByRole("button", {
+          name: "主観ドットを投票",
+        }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("Step4では投票UIを表示する", () => {
+      setup({
+        phase: buildPhaseStep(4),
+      });
+
+      expect(
+        screen.getAllByRole("button", {
+          name: "主観ドットを投票",
+        }),
+      ).toHaveLength(2);
+    });
+
+    it("Step1-5では投票UIを表示するが操作できない", () => {
+      setup({
+        phase: buildPhaseStep(5),
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
+
+      const buttons = screen.getAllByRole("button", {
+        name: "主観ドットを投票",
+      });
+
+      expect(buttons).toHaveLength(2);
+
+      buttons.forEach((button) => {
+        expect(button).toBeDisabled();
+      });
+    });
+  });
+
+  describe("アイデアサポート表示制御", () => {
+    it("フェーズ1ではアイデアサポートを表示しない", () => {
+      setup({
+        phase: buildPhaseStep(1),
+      });
+
+      expect(
+        screen.queryByTestId("idea-support-sidebar"),
+      ).not.toBeInTheDocument();
+    });
+  });
 });
 
 describe("退出・解散ボタン", () => {
@@ -745,59 +926,5 @@ describe("参加者 HUD", () => {
 
     expect(seventhAvatarWrapper).toHaveClass("hidden", "xl:inline-flex");
     expect(seventhAvatarWrapper?.classList.contains("inline-flex")).toBe(false);
-  });
-});
-
-describe("ホワイトボード移動制御 (cannotPublishNote)", () => {
-  it("Step 1-1（共有非許可ステップ）でマイ付箋をボードへドラッグした際に cannotPublishNote が1回呼ばれる", () => {
-    notifyMocks.cannotPublishNote.mockReset();
-    setup({
-      phase: buildPhaseStep(1, 1),
-      privateNotes: [buildNote({ id: "private-1", authorId: ME })],
-    });
-
-    const canvas = screen.getByTestId("board-canvas");
-    const scroller = canvas.parentElement;
-    if (!scroller) throw new Error("ボードスクローラーがありません");
-    Object.defineProperty(scroller, "getBoundingClientRect", {
-      value: () => ({ left: 0, top: 0, right: 800, bottom: 500 }),
-    });
-    const toolbar = screen.getByTestId("private-notes-toolbar");
-    Object.defineProperty(toolbar, "getBoundingClientRect", {
-      value: () => ({ left: 0, top: 540, right: 800, bottom: 600 }),
-    });
-
-    const handle = within(toolbar).getByRole("button", { name: "付箋" });
-    fireEvent.pointerDown(handle, {
-      button: 0,
-      pointerId: 1,
-      clientX: 100,
-      clientY: 550,
-    });
-    fireEvent.pointerMove(handle, {
-      button: 0,
-      pointerId: 1,
-      clientX: 110,
-      clientY: 550,
-    });
-
-    const root = screen.getByTestId("room-board-view-root");
-    fireEvent.pointerMove(root, {
-      button: 0,
-      pointerId: 1,
-      clientX: 300,
-      clientY: 200,
-    });
-
-    expect(notifyMocks.cannotPublishNote).toHaveBeenCalledTimes(1);
-
-    // 連続ドラッグで追加発報されないことを確認
-    fireEvent.pointerMove(root, {
-      button: 0,
-      pointerId: 1,
-      clientX: 310,
-      clientY: 210,
-    });
-    expect(notifyMocks.cannotPublishNote).toHaveBeenCalledTimes(1);
   });
 });

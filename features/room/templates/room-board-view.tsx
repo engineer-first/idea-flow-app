@@ -21,6 +21,7 @@ import {
 } from "@/contracts/room-protocol";
 import { isHmwWritingStep } from "@/features/hmw";
 import type { Note } from "@/features/notes";
+import { getBoardPermissions } from "../logic/board-permissions";
 import type { RoomScreenConnectionStatus } from "../logic/connection-status";
 import { roomNotify } from "../logic/room-notify";
 import type { Decision, Member } from "../logic/room-reducer";
@@ -148,6 +149,7 @@ export function RoomBoardView({
 
   // ハイドレーション直後の高速接続確立によるMismatchedを防ぐため、マウント完了までは接続中（非活性）扱いにする
   const isDisconnected = isMounted ? connectionStatus !== "open" : true;
+  const permissions = getBoardPermissions(phase);
 
   const {
     camera,
@@ -270,6 +272,7 @@ export function RoomBoardView({
         notes={renderedNotes}
         groups={groups}
         phase={phase}
+        permissions={permissions}
         decision={decision}
         isHost={isHost}
         privateNotes={toolbarNotes}

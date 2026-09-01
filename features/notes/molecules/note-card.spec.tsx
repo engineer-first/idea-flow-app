@@ -11,6 +11,11 @@ function setup(overrides: Partial<Parameters<typeof NoteCard>[0]> = {}) {
     note: buildNote(),
     isOwnDrag: false,
     isSelected: false,
+    canEditNote: true,
+    canDeleteNote: true,
+    canMoveNote: true,
+    canShowVote: true,
+    canVote: true,
     onSelect: vi.fn(),
     onDragStart: vi.fn(),
     onContentChange: vi.fn(),
@@ -357,6 +362,21 @@ describe("NoteCard", () => {
       fireEvent.keyDown(getNoteSurface(), { key: "Delete" });
 
       expect(onDelete).toHaveBeenCalledWith("note-1");
+    });
+
+    it("canDeleteNote=falseではBackspace/DeleteでもonDeleteを呼ばない", () => {
+      const onDelete = vi.fn();
+
+      setup({
+        isSelected: true,
+        canDeleteNote: false,
+        onDelete,
+      });
+
+      fireEvent.keyDown(getNoteSurface(), { key: "Backspace" });
+      fireEvent.keyDown(getNoteSurface(), { key: "Delete" });
+
+      expect(onDelete).not.toHaveBeenCalled();
     });
 
     it("編集中のBackspaceは文字削除でありonDeleteを呼ばない", () => {

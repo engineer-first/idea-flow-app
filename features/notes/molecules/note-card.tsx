@@ -31,6 +31,11 @@ export type NoteCardProps = {
   // メッセージを黙って破棄するため、UI操作自体を止めないと「入力したのに
   // サーバーへ届かず再接続後の snapshot で消える」体験になってしまう。
   disabled?: boolean;
+  canEditNote: boolean;
+  canDeleteNote: boolean;
+  canMoveNote: boolean;
+  canShowVote: boolean;
+  canVote: boolean;
   onSelect: (noteId: string) => void;
   onDragStart: (
     noteId: string,
@@ -63,6 +68,11 @@ export function NoteCard({
   editingDisabled = false,
   isDecided = false,
   disabled = false,
+  canEditNote,
+  canDeleteNote,
+  canMoveNote,
+  canShowVote,
+  canVote,
   onSelect,
   onDragStart,
   onContentChange,
@@ -114,6 +124,13 @@ export function NoteCard({
     }
   }, [editingDisabled, isEditing, note.content]);
 
+  useEffect(() => {
+    if (!canEditNote && isEditing) {
+      setIsEditing(false);
+      setLocalContent(note.content);
+    }
+  }, [canEditNote, isEditing, note.content]);
+
   // 状態に応じてフォーカスを移す。サーフェスにフォーカスがないと
   // Backspace削除などのキー操作を受け取れない。
   useEffect(() => {
@@ -159,6 +176,9 @@ export function NoteCard({
       if (distance < DRAG_THRESHOLD_PX) {
         return;
       }
+      if (!canMoveNote) {
+        return;
+      }
       origin.didDrag = true;
       // キャプチャをリリースし、ドラッグ処理を親に移管する
       event.currentTarget.releasePointerCapture?.(event.pointerId);
@@ -174,7 +194,7 @@ export function NoteCard({
     if (!origin) {
       return;
     }
-    if (origin.wasSelected && !editingDisabled) {
+    if (origin.wasSelected && canEditNote && !editingDisabled) {
       setIsEditing(true);
     }
   }
@@ -183,12 +203,19 @@ export function NoteCard({
     if (disabled) {
       return;
     }
+
     if (event.key === "Backspace" || event.key === "Delete") {
       event.preventDefault();
-      onDelete(note.id);
+      event.stopPropagation();
+
+      if (canDeleteNote) {
+        onDelete(note.id);
+      }
+
       return;
     }
-    if (event.key === "Enter" && !editingDisabled) {
+
+    if (event.key === "Enter" && canEditNote && !editingDisabled) {
       event.preventDefault();
       setIsEditing(true);
     }
@@ -231,7 +258,7 @@ export function NoteCard({
         onChange={(event) => setLocalContent(event.target.value)}
         onBlur={(event) => {
           setIsEditing(false);
-          if (disabled || editingDisabled) {
+          if (disabled || editingDisabled || !canEditNote) {
             return;
           }
           onContentChange(note.id, event.target.value);
@@ -250,13 +277,13 @@ export function NoteCard({
         }`}
         placeholder="メモを入力..."
       />
-      {!hideVoteControls && (
+      {!hideVoteControls && canShowVote && (
         <div className="relative z-20">
           <DotVoteControls
             noteId={note.id}
             dotVotes={note.dotVotes}
             voteRemaining={voteRemaining}
-            disabled={disabled}
+            disabled={disabled || !canVote}
             onVote={onVote}
             onVoteReset={onVoteReset}
           />
