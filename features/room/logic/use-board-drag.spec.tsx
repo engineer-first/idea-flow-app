@@ -25,6 +25,34 @@ function fakeElementRef(rect: {
   };
 }
 
+function fakeToolbarWithNotes(
+  noteRects: Array<{
+    noteId: string;
+    left: number;
+    right: number;
+  }>,
+): RefObject<HTMLDivElement | null> {
+  return {
+    current: {
+      getBoundingClientRect: () => ({
+        left: 0,
+        top: 540,
+        right: 1000,
+        bottom: 590,
+      }),
+      querySelectorAll: () =>
+        noteRects.map(({ noteId, left, right }) => ({
+          dataset: { noteId },
+          getBoundingClientRect: () => ({
+            left,
+            right,
+            width: right - left,
+          }),
+        })),
+    } as unknown as HTMLDivElement,
+  };
+}
+
 function pointerEvent(
   pointerId: number,
   clientX: number,
@@ -104,6 +132,64 @@ describe("useBoardDrag", () => {
     expect(result.current.drag?.status).toBe("shared");
   });
 
+  it("マイ付箋エリア内でドラッグした付箋の並び順を変更する", () => {
+    const { args, result } = setup({
+      privateNotes: [
+        buildNote({ id: "private-1", authorId: ME, visibility: "private" }),
+        buildNote({ id: "private-2", authorId: ME, visibility: "private" }),
+        buildNote({ id: "private-3", authorId: ME, visibility: "private" }),
+      ],
+    });
+
+    act(() => {
+      result.current.handlePrivateDragStart(
+        "private-1",
+        pointerEvent(1, 250, 560),
+      );
+      result.current.handlePointerMove(pointerEvent(1, 580, 560));
+      result.current.handlePointerEnd(pointerEvent(1, 580, 560));
+    });
+
+    expect(result.current.renderedPrivateNotes.map((note) => note.id)).toEqual([
+      "private-2",
+      "private-3",
+      "private-1",
+    ]);
+    expect(args.onPrivateNotePublish).not.toHaveBeenCalled();
+    expect(args.onPrivateNoteUnpublish).not.toHaveBeenCalled();
+  });
+
+  it("並び替え後に別の付箋を抜いても残った付箋の相対順を維持する", () => {
+    const initialPrivateNotes = [
+      buildNote({ id: "a", authorId: ME, visibility: "private" }),
+      buildNote({ id: "c", authorId: ME, visibility: "private" }),
+      buildNote({ id: "b", authorId: ME, visibility: "private" }),
+    ];
+    const { args, result, rerender } = setup({
+      privateNotes: [...initialPrivateNotes],
+    });
+
+    // サーバー上は a,c,b でも、b を中央へ移動して表示順を a,b,c にする。
+    act(() => {
+      result.current.handlePrivateDragStart("b", pointerEvent(1, 580, 560));
+      result.current.handlePointerMove(pointerEvent(1, 330, 560));
+      result.current.handlePointerEnd(pointerEvent(1, 330, 560));
+    });
+    expect(result.current.renderedPrivateNotes.map((note) => note.id)).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
+
+    // a をボードへ抜いた後は、古い固定位置で b を末尾へ送らず b,c を保つ。
+    args.privateNotes = args.privateNotes.filter((note) => note.id !== "a");
+    rerender();
+    expect(result.current.renderedPrivateNotes.map((note) => note.id)).toEqual([
+      "b",
+      "c",
+    ]);
+  });
+
   it("自分の共有付箋をツールバーへ戻すと unpublish して returning になる", () => {
     const { args, result } = setup();
 
@@ -128,6 +214,75 @@ describe("useBoardDrag", () => {
         (note) => note.id === "shared-1" && note.visibility === "private",
       ),
     ).toBe(true);
+  });
+
+  it("共有付箋をマイ付箋へ戻す位置に応じて末尾へ挿入する", () => {
+    const existing = [
+      buildNote({ id: "private-1", authorId: ME, visibility: "private" }),
+      buildNote({ id: "private-2", authorId: ME, visibility: "private" }),
+    ];
+    const { args, result, rerender } = setup({ privateNotes: existing });
+
+    act(() => {
+      result.current.handleSharedNoteDragStart(
+        "shared-1",
+        pointerEvent(1, 100, 100),
+      );
+      result.current.handlePointerMove(pointerEvent(1, 580, 560));
+      result.current.handlePointerEnd(pointerEvent(1, 580, 560));
+    });
+
+    expect(result.current.renderedPrivateNotes.map((note) => note.id)).toEqual([
+      "private-1",
+      "private-2",
+      "shared-1",
+    ]);
+
+    args.privateNotes = [
+      ...existing,
+      buildNote({ id: "shared-1", authorId: ME, visibility: "private" }),
+    ];
+    rerender();
+    expect(result.current.renderedPrivateNotes.map((note) => note.id)).toEqual([
+      "private-1",
+      "private-2",
+      "shared-1",
+    ]);
+  });
+
+  it("付箋の中央より左なら手前、右なら直後を挿入位置にする", () => {
+    const privateNotes = [
+      buildNote({ id: "private-1", authorId: ME, visibility: "private" }),
+      buildNote({ id: "private-2", authorId: ME, visibility: "private" }),
+    ];
+    const toolbarRef = fakeToolbarWithNotes([
+      { noteId: "private-1", left: 600, right: 800 },
+      { noteId: "private-2", left: 812, right: 1012 },
+    ]);
+    const before = setup({ privateNotes, privateToolbarRef: toolbarRef });
+
+    act(() => {
+      before.result.current.handleSharedNoteDragStart(
+        "shared-1",
+        pointerEvent(1, 100, 100),
+      );
+      before.result.current.handlePointerMove(pointerEvent(1, 650, 560));
+    });
+    expect(
+      before.result.current.renderedPrivateNotes.map((note) => note.id),
+    ).toEqual(["shared-1", "private-1", "private-2"]);
+
+    const after = setup({ privateNotes, privateToolbarRef: toolbarRef });
+    act(() => {
+      after.result.current.handleSharedNoteDragStart(
+        "shared-1",
+        pointerEvent(1, 100, 100),
+      );
+      after.result.current.handlePointerMove(pointerEvent(1, 750, 560));
+    });
+    expect(
+      after.result.current.renderedPrivateNotes.map((note) => note.id),
+    ).toEqual(["private-1", "shared-1", "private-2"]);
   });
 
   it("他人の共有付箋はツールバーに重ねても unpublish しない", () => {

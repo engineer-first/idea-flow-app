@@ -10,6 +10,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
   useCallback,
+  useEffect,
   useRef,
   useState,
 } from "react";
@@ -23,6 +24,7 @@ export type BoardDrag = {
   note: Note;
   pointerId: number;
   status: "private" | "shared" | "returning";
+  privateDropIndex: number | null;
   x: number;
   y: number;
   grabOffsetX: number;
@@ -71,6 +73,26 @@ function getGrabOffset(event: ReactPointerEvent<HTMLButtonElement>) {
   };
 }
 
+function applyPrivateOrder(source: Note[], order: string[]) {
+  const noteById = new Map(source.map((note) => [note.id, note]));
+  const ordered = order.flatMap((noteId) => {
+    const note = noteById.get(noteId);
+    if (!note) return [];
+    noteById.delete(noteId);
+    return [note];
+  });
+  return [...ordered, ...noteById.values()];
+}
+
+function placePrivateNote(source: Note[], noteId: string, index: number) {
+  const note = source.find((candidate) => candidate.id === noteId);
+  if (!note) return source;
+  const withoutNote = source.filter((candidate) => candidate.id !== noteId);
+  const next = [...withoutNote];
+  next.splice(Math.min(Math.max(index, 0), next.length), 0, note);
+  return next;
+}
+
 /**
  * ホワイトボードとマイ付箋ツールバー間の付箋ドラッグ状態を管理するカスタムフックです。
  *
@@ -94,6 +116,10 @@ export function useBoardDrag({
   onPrivateNoteUnpublish,
 }: UseBoardDragArgs) {
   const [drag, setDrag] = useState<BoardDrag | null>(null);
+  const [privateOrder, setPrivateOrder] = useState<string[]>([]);
+  const [pendingReturnedNotes, setPendingReturnedNotes] = useState<
+    Record<string, Note>
+  >({});
   // pointermove は React の再レンダーより速く連続発火するため、最新状態は
   // ref で参照する（state はレンダー反映用）。
   const dragRef = useRef<BoardDrag | null>(null);
@@ -110,11 +136,46 @@ export function useBoardDrag({
     drag?.status === "returning"
       ? notes.filter((note) => note.id !== drag.note.id)
       : notes;
-  const renderedPrivateNotes =
+  const privateNotesWithPending = [
+    ...privateNotes,
+    ...Object.values(pendingReturnedNotes).filter(
+      (pending) => !privateNotes.some((note) => note.id === pending.id),
+    ),
+  ];
+  const privateNotesWithReturning =
     drag?.status === "returning" &&
-    !privateNotes.some((note) => note.id === drag.note.id)
-      ? [{ ...drag.note, visibility: "private" as const }, ...privateNotes]
-      : privateNotes;
+    !privateNotesWithPending.some((note) => note.id === drag.note.id)
+      ? [
+          { ...drag.note, visibility: "private" as const },
+          ...privateNotesWithPending,
+        ]
+      : privateNotesWithPending;
+  let renderedPrivateNotes = applyPrivateOrder(
+    privateNotesWithReturning,
+    privateOrder,
+  );
+  if (
+    (drag?.status === "private" || drag?.status === "returning") &&
+    drag.privateDropIndex !== null
+  ) {
+    renderedPrivateNotes = placePrivateNote(
+      renderedPrivateNotes,
+      drag.note.id,
+      drag.privateDropIndex,
+    );
+  }
+
+  useEffect(() => {
+    setPendingReturnedNotes((pending) => {
+      const confirmedIds = new Set(privateNotes.map((note) => note.id));
+      const next = Object.fromEntries(
+        Object.entries(pending).filter(([noteId]) => !confirmedIds.has(noteId)),
+      );
+      return Object.keys(next).length === Object.keys(pending).length
+        ? pending
+        : next;
+    });
+  }, [privateNotes]);
 
   const isPointerOverPrivateToolbar = useCallback(
     (clientX: number, clientY: number) => {
@@ -157,6 +218,38 @@ export function useBoardDrag({
     [boardScrollerRef],
   );
 
+  const privateDropIndexFromPointer = useCallback(
+    (clientX: number, draggingNoteId: string) => {
+      const toolbar = privateToolbarRef.current;
+      const noteElements = toolbar?.querySelectorAll
+        ? Array.from(
+            toolbar.querySelectorAll<HTMLElement>(
+              "[data-testid='note-card'][data-note-id]",
+            ),
+          ).filter((element) => element.dataset.noteId !== draggingNoteId)
+        : [];
+      if (noteElements.length > 0) {
+        const index = noteElements.findIndex((element) => {
+          const rect = element.getBoundingClientRect();
+          return clientX < rect.left + rect.width / 2;
+        });
+        return index === -1 ? noteElements.length : index;
+      }
+
+      const rect = toolbar?.getBoundingClientRect();
+      if (!rect) return 0;
+      const width = Math.max(rect.right - rect.left, 1);
+      return Math.min(
+        privateNotes.length,
+        Math.max(
+          0,
+          Math.round(((clientX - rect.left) / width) * privateNotes.length),
+        ),
+      );
+    },
+    [privateNotes.length, privateToolbarRef],
+  );
+
   const handleSharedNoteDragStart = useCallback(
     (noteId: string, event: ReactPointerEvent<HTMLButtonElement>) => {
       const note = notes.find((n) => n.id === noteId);
@@ -168,6 +261,7 @@ export function useBoardDrag({
         note,
         pointerId: event.pointerId,
         status: "shared",
+        privateDropIndex: null,
         x: note.x,
         y: note.y,
         grabOffsetX,
@@ -189,6 +283,9 @@ export function useBoardDrag({
         note,
         pointerId: event.pointerId,
         status: "private",
+        privateDropIndex: privateNotes.findIndex(
+          (candidate) => candidate.id === noteId,
+        ),
         x: note.x,
         y: note.y,
         grabOffsetX,
@@ -209,7 +306,22 @@ export function useBoardDrag({
           current.note.authorId === currentUserId
         ) {
           onPrivateNoteUnpublish(current.note.id);
-          updateDrag({ ...current, status: "returning" });
+          updateDrag({
+            ...current,
+            status: "returning",
+            privateDropIndex: privateDropIndexFromPointer(
+              event.clientX,
+              current.note.id,
+            ),
+          });
+        } else if (current.status === "private") {
+          updateDrag({
+            ...current,
+            privateDropIndex: privateDropIndexFromPointer(
+              event.clientX,
+              current.note.id,
+            ),
+          });
         }
         return;
       }
@@ -247,6 +359,7 @@ export function useBoardDrag({
       canPublish,
       currentUserId,
       isPointerOverPrivateToolbar,
+      privateDropIndexFromPointer,
       onNoteDragMove,
       onNoteDragStart,
       onPrivateNotePublish,
@@ -269,11 +382,43 @@ export function useBoardDrag({
           current.grabOffsetY,
         ) ?? { x: current.x, y: current.y };
         onNoteDragEnd(current.note.id, position.x, position.y);
+      } else if (current.privateDropIndex !== null) {
+        const privateDropIndex = current.privateDropIndex;
+        setPrivateOrder((order) =>
+          placePrivateNote(
+            applyPrivateOrder(
+              current.status === "returning"
+                ? [
+                    ...privateNotes,
+                    { ...current.note, visibility: "private" as const },
+                  ]
+                : privateNotes,
+              order,
+            ),
+            current.note.id,
+            privateDropIndex,
+          ).map((note) => note.id),
+        );
+        if (current.status === "returning") {
+          setPendingReturnedNotes((pending) => ({
+            ...pending,
+            [current.note.id]: {
+              ...current.note,
+              visibility: "private" as const,
+            },
+          }));
+        }
       }
       boardRootRef.current?.releasePointerCapture?.(event.pointerId);
       updateDrag(null);
     },
-    [boardPositionFromPointer, boardRootRef, onNoteDragEnd, updateDrag],
+    [
+      boardPositionFromPointer,
+      boardRootRef,
+      onNoteDragEnd,
+      privateNotes,
+      updateDrag,
+    ],
   );
 
   return {
