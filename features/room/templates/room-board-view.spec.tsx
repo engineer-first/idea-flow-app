@@ -622,12 +622,12 @@ describe("RoomBoardView", () => {
       ).not.toBeDisabled();
     });
 
-    it("Step 2-1 では次のステップ(2-2)が未実装のため「次のステップへ」を無効にする", () => {
+    it("Step 2-1 では次のステップ(2-2)へ進める", () => {
       setup({ isHost: true, phase: buildPhaseStep(1, 2), notes: [] });
 
       expect(
         screen.getByRole("button", { name: "次のステップへ" }),
-      ).toBeDisabled();
+      ).not.toBeDisabled();
     });
   });
 });

@@ -19,7 +19,6 @@ import {
   type DotVoteKind,
   type TimerState,
 } from "@/contracts/room-protocol";
-import { isHmwWritingStep } from "@/features/hmw";
 import type { Note } from "@/features/notes";
 import type { RoomScreenConnectionStatus } from "../logic/connection-status";
 import { roomNotify } from "../logic/room-notify";
@@ -213,9 +212,7 @@ export function RoomBoardView({
   // 「次のステップへ」を進められない状態。
   // - 結果ステップ: 決定が確定するまで進めない（サーバーの遷移ゲートと対の
   //   UI 側の入口無効化）
-  // - Step 2-1: 次の Step 2-2 は未実装（issue #165）
-  const isNextPhaseBlocked =
-    (isResultStep(phase) && decision === null) || isHmwWritingStep(phase);
+  const isNextPhaseBlocked = isResultStep(phase) && decision === null;
 
   // ツールバー発のドラッグでボード側にまだ実体がない間だけ、ゴーストを描く。
   const dragGhost =
