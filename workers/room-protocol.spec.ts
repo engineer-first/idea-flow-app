@@ -1081,21 +1081,20 @@ describe("note:vote（課題ドット投票）", () => {
     });
 
     send(member, { type: "note:vote", noteId, kind: "subjective" });
-    const toOwner = await expectType(owner, "note:updated");
     const toMember = await expectType(member, "note:updated");
 
-    expect(toOwner.note.dotVotes.subjective).toEqual({
-      votedByMe: false,
-      ownCount: 0,
-    });
     expect(toMember.note.dotVotes.subjective).toEqual({
       votedByMe: true,
       ownCount: 1,
     });
-    for (const message of [toOwner, toMember]) {
-      expect(message.note.dotVotes.subjective).not.toHaveProperty("count");
-      expect(message.note.dotVotes.objective).not.toHaveProperty("count");
-    }
+    expect(toMember.note.dotVotes.subjective).not.toHaveProperty("count");
+    expect(toMember.note.dotVotes.objective).not.toHaveProperty("count");
+    expect(
+      await Promise.race([
+        owner.next(),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 50)),
+      ]),
+    ).toBeNull();
 
     member.close();
     const reconnected = await connectRoomAs(MEMBER, roomId);
