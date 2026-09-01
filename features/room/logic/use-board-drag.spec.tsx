@@ -1,13 +1,14 @@
 import { act, renderHook } from "@testing-library/react";
 import type { PointerEvent as ReactPointerEvent, RefObject } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { CANVAS_COORDINATE_LIMIT } from "@/contracts/board";
 import { buildNote } from "@/contracts/room-protocol.fixture";
 import { useBoardDrag } from "./use-board-drag";
 
 const ME = "11111111-1111-4111-8111-111111111111";
 
 // jsdom は getBoundingClientRect が常に 0 を返すため、rect を持つ疑似要素を
-// ref として注入する（hook は rect と scroll 位置しか参照しない）。
+// ref として注入する（hook はビューポートの矩形しか参照しない）。
 function fakeElementRef(rect: {
   left: number;
   top: number;
@@ -74,6 +75,10 @@ function setup(overrides: Partial<Parameters<typeof useBoardDrag>[0]> = {}) {
       top: 0,
       right: 800,
       bottom: 500,
+    }),
+    worldPointFromClient: (clientX: number, clientY: number) => ({
+      x: clientX,
+      y: clientY,
     }),
     privateToolbarRef: fakeElementRef({
       left: 200,
@@ -323,6 +328,62 @@ describe("useBoardDrag", () => {
 
     expect(args.onNoteDragEnd).toHaveBeenCalledWith("shared-1", 250, 180);
     expect(result.current.drag).toBeNull();
+  });
+
+  it("付箋を掴んだ位置を保ったまま移動・ドロップする", () => {
+    const { args, result } = setup();
+
+    act(() => {
+      result.current.handleSharedNoteDragStart(
+        "shared-1",
+        pointerEvent(1, 150, 140),
+      );
+    });
+    act(() => {
+      result.current.handlePointerMove(pointerEvent(1, 250, 240));
+    });
+    act(() => {
+      result.current.handlePointerEnd(pointerEvent(1, 250, 240));
+    });
+
+    expect(args.onNoteDragMove).toHaveBeenCalledWith("shared-1", 200, 200);
+    expect(args.onNoteDragEnd).toHaveBeenCalledWith("shared-1", 200, 200);
+  });
+
+  it("キャンバス境界を越えた位置からのドラッグでも掴んだ位置を保つ", () => {
+    const { args, result } = setup({
+      notes: [
+        buildNote({
+          id: "shared-1",
+          authorId: ME,
+          x: CANVAS_COORDINATE_LIMIT,
+          y: 100,
+        }),
+      ],
+      worldPointFromClient: (clientX: number, clientY: number) => ({
+        x:
+          clientX === 100
+            ? CANVAS_COORDINATE_LIMIT + 100
+            : CANVAS_COORDINATE_LIMIT,
+        y: clientY,
+      }),
+    });
+
+    act(() => {
+      result.current.handleSharedNoteDragStart(
+        "shared-1",
+        pointerEvent(1, 100, 100),
+      );
+    });
+    act(() => {
+      result.current.handlePointerMove(pointerEvent(1, 200, 100));
+    });
+
+    expect(args.onNoteDragMove).toHaveBeenCalledWith(
+      "shared-1",
+      CANVAS_COORDINATE_LIMIT - 100,
+      100,
+    );
   });
 
   it("canPublish が false の場合、マイ付箋をボードへ運ぶと onPublishBlocked を1回だけ呼び通信を遮断する", () => {

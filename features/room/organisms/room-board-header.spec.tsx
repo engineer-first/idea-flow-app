@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { buildPhaseStep } from "@/contracts/phase.fixture";
 import { buildMembers } from "@/contracts/room-protocol.fixture";
@@ -6,8 +6,10 @@ import { RoomBoardHeader } from "./room-board-header";
 
 const ME = "11111111-1111-4111-8111-111111111111";
 
-function setup(overrides: Partial<Parameters<typeof RoomBoardHeader>[0]> = {}) {
-  const props = {
+function setupProps(
+  overrides: Partial<Parameters<typeof RoomBoardHeader>[0]> = {},
+) {
+  return {
     inviteCode: "AB12CD",
     inviteUrl: "https://idea-flow.example/invite/AB12CD",
     phase: buildPhaseStep(1),
@@ -33,19 +35,46 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardHeader>[0]> = {}) {
     onTimerStop: vi.fn(),
     ...overrides,
   };
+}
+
+function setup(overrides: Partial<Parameters<typeof RoomBoardHeader>[0]> = {}) {
+  const props = setupProps(overrides);
   render(<RoomBoardHeader {...props} />);
   return props;
 }
 
+function openRoomMenu() {
+  fireEvent.click(screen.getByRole("button", { name: "ルームメニューを開く" }));
+}
+
 describe("RoomBoardHeader", () => {
   describe("招待情報（host 限定）", () => {
-    it("host には招待URLと招待コードのコピー操作を表示する", () => {
+    it("host の招待情報は常設せずルームメニュー内に表示する", () => {
       setup({ isHost: true });
+
+      expect(screen.queryByText("招待URL")).not.toBeInTheDocument();
+
+      openRoomMenu();
 
       expect(screen.getByText("招待URL")).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: "招待コードをコピー" }),
       ).toHaveTextContent("AB12CD");
+    });
+
+    it("招待ラベルの下に値を配置する", () => {
+      setup({ isHost: true });
+      openRoomMenu();
+
+      const invite = screen.getByTestId("board-view-invite");
+      expect(within(invite).getByText("招待URL")).toHaveClass("block");
+      expect(
+        within(invite).getByRole("button", { name: "招待URLをコピー" }),
+      ).toHaveClass("block", "text-left");
+      expect(within(invite).getByText("招待コード")).toHaveClass("block");
+      expect(
+        within(invite).getByRole("button", { name: "招待コードをコピー" }),
+      ).toHaveClass("block", "text-left");
     });
 
     it("非 host には招待情報を表示しない", () => {
@@ -55,10 +84,62 @@ describe("RoomBoardHeader", () => {
     });
   });
 
-  it("現在ステップのラベルと残り投票数を表示する", () => {
+  it("現在地をキャンバス左上のフローティングHUDに表示する", () => {
     setup({ phase: buildPhaseStep(2) });
 
-    expect(screen.getByText("1-2 共有する")).toBeInTheDocument();
+    expect(screen.getByTestId("board-context-hud")).toHaveClass(
+      "absolute",
+      "top-3",
+      "left-3",
+      "rounded-xl",
+    );
+    expect(screen.getByText("課題整理")).toBeInTheDocument();
+    expect(screen.getByText(/Step 2\/5/).parentElement).toHaveClass(
+      "whitespace-nowrap",
+    );
+    expect(
+      screen.getByRole("progressbar", { name: "課題整理の進行状況" }),
+    ).toHaveAttribute("aria-valuenow", "2");
+  });
+
+  it("フェーズ番号を表示して、フェーズ1とフェーズ2を識別できる", () => {
+    const { rerender } = render(
+      <RoomBoardHeader {...setupProps({ phase: buildPhaseStep(1) })} />,
+    );
+
+    expect(screen.getByText("フェーズ1")).toBeInTheDocument();
+
+    rerender(
+      <RoomBoardHeader {...setupProps({ phase: buildPhaseStep(1, 2) })} />,
+    );
+
+    expect(screen.getByText("フェーズ2")).toBeInTheDocument();
+    expect(screen.queryByText("フェーズ1")).not.toBeInTheDocument();
+  });
+
+  it("タイマーを右上のセッション操作群にまとめる", () => {
+    setup({ isHost: true });
+
+    const sessionControls = screen.getByTestId("board-control-hud");
+    expect(sessionControls).toHaveClass("justify-end", "gap-2");
+    expect(
+      within(sessionControls).getByTestId("room-timer"),
+    ).toBeInTheDocument();
+    const membersButton = within(sessionControls).getByRole("button", {
+      name: "参加者 2人",
+    });
+    expect(membersButton.parentElement).toHaveClass("backdrop-blur-xl");
+  });
+
+  it("投票残数は投票ステップだけ表示する", () => {
+    const { rerender } = render(
+      <RoomBoardHeader {...setupProps({ phase: buildPhaseStep(1) })} />,
+    );
+
+    expect(screen.queryByText("主観 残り5")).not.toBeInTheDocument();
+
+    rerender(<RoomBoardHeader {...setupProps({ phase: buildPhaseStep(4) })} />);
+
     expect(screen.getByText("主観 残り5")).toBeInTheDocument();
   });
 
@@ -80,6 +161,14 @@ describe("RoomBoardHeader", () => {
       expect(
         screen.getByRole("button", { name: "次のステップへ" }),
       ).toBeDisabled();
+    });
+
+    it("結果ステップでもホストには「次のステップへ」を表示する", () => {
+      setup({ isHost: true, phase: buildPhaseStep(5) });
+
+      expect(
+        screen.getByRole("button", { name: "次のステップへ" }),
+      ).toBeInTheDocument();
     });
 
     it("確認ダイアログの確定で onNextPhase を呼ぶ", () => {
@@ -131,6 +220,7 @@ describe("RoomBoardHeader", () => {
   describe("退出・解散", () => {
     it("host は「ルームを解散」、非 host は「退出する」の文言になる", () => {
       setup({ isHost: true });
+      openRoomMenu();
       expect(
         screen.getByRole("button", { name: "ルームを解散" }),
       ).toBeInTheDocument();
@@ -140,6 +230,7 @@ describe("RoomBoardHeader", () => {
       const onLeaveClick = vi.fn();
       setup({ onLeaveClick });
 
+      openRoomMenu();
       fireEvent.click(screen.getByRole("button", { name: "退出する" }));
 
       expect(onLeaveClick).toHaveBeenCalledTimes(1);
@@ -147,18 +238,30 @@ describe("RoomBoardHeader", () => {
 
     it("isLeaving 中はボタンが無効になり進行中の文言になる", () => {
       setup({ isLeaving: true });
+      openRoomMenu();
       const button = screen.getByRole("button", { name: /退出/ });
       expect(button).toBeDisabled();
       expect(button).toHaveTextContent("退出中…");
     });
   });
 
-  it("メンバー一覧とタイマーを表示する", () => {
+  it("参加者を重ねたアバターと人数に圧縮し、詳細はポップオーバーで表示する", () => {
     setup({
       timer: { status: "paused", remainingMs: 30_000, durationMs: 60_000 },
     });
 
+    expect(
+      screen.getByRole("button", { name: "参加者 2人" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "参加者 2人" }));
     expect(screen.getByText("Yuki Tanaka")).toBeInTheDocument();
     expect(screen.getByRole("timer")).toHaveTextContent("00:30");
+  });
+
+  it("参加者一覧はアバターのリング分の余白を確保する", () => {
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: "参加者 2人" }));
+
+    expect(screen.getByRole("list")).toHaveClass("p-1");
   });
 });

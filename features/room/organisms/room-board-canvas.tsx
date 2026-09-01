@@ -1,16 +1,21 @@
 "use client";
 
-// ボード面。スクロールする無限風キャンバスに共有付箋・グループ枠・
+// ボード面。カメラで移動・拡大縮小する世界レイヤーに共有付箋・グループ枠・
 // ドラッグ中のゴーストを描き、下端にマイ付箋ドックを重ねる。
 // ドラッグの状態機械は持たない（logic/use-board-drag が view で束ねる）。
-import type { PointerEvent as ReactPointerEvent, RefObject } from "react";
-import { BOARD_HEIGHT, BOARD_WIDTH, NOTE_WIDTH } from "@/contracts/board";
+import type {
+  CSSProperties,
+  PointerEvent as ReactPointerEvent,
+  RefObject,
+} from "react";
+import { NOTE_WIDTH } from "@/contracts/board";
 import {
   calculateRenderGroups,
   type PersistentGroup,
 } from "@/contracts/grouping";
 import {
   isAtOrAfterGroupingStep,
+  isIdeaSupportAvailableStep,
   isResultStep,
   type RoomPhase,
 } from "@/contracts/phase";
@@ -30,7 +35,10 @@ import {
   StickyNote,
 } from "@/features/notes";
 import { cn } from "@/lib/utils";
+import type { BoardPermissions } from "../logic/board-permissions";
+import type { CanvasCamera } from "../logic/canvas-camera";
 import type { Decision } from "../logic/room-reducer";
+import { CanvasZoomControls } from "../molecules/canvas-zoom-controls";
 import {
   DECIDE_NOTE_ACTION_INSET,
   DECIDE_NOTE_ACTION_SIZE,
@@ -55,6 +63,17 @@ export type RoomBoardCanvasProps = {
   hmwDecidedIssue: string | null;
   boardScrollerRef: RefObject<HTMLDivElement | null>;
   privateToolbarRef: RefObject<HTMLDivElement | null>;
+  permissions: BoardPermissions;
+  camera: CanvasCamera;
+  gridStyle: CSSProperties;
+  isPanning: boolean;
+  onCanvasPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onCanvasPointerMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onCanvasPointerEnd: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onResetZoom: () => void;
+  onFitToNotes: () => void;
   onSelect: (noteId: string | null) => void;
   onHmwTemplateSelect: (content: string) => void;
   onNoteDragStart: (
@@ -93,6 +112,17 @@ export function RoomBoardCanvas({
   hmwDecidedIssue,
   boardScrollerRef,
   privateToolbarRef,
+  permissions,
+  camera,
+  gridStyle,
+  isPanning,
+  onCanvasPointerDown,
+  onCanvasPointerMove,
+  onCanvasPointerEnd,
+  onZoomIn,
+  onZoomOut,
+  onResetZoom,
+  onFitToNotes,
   onSelect,
   onHmwTemplateSelect,
   onNoteDragStart,
@@ -123,9 +153,18 @@ export function RoomBoardCanvas({
   function handleBoardPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     // 付箋の上のpointerdownはバブリングしてくるので、ボード背景を
     // 直接押したときだけ選択を解除する。
-    if (event.target === event.currentTarget) {
+    if (
+      event.button === 0 &&
+      (event.target === event.currentTarget ||
+        (event.target as HTMLElement).dataset.canvasBackground === "true")
+    ) {
       onSelect(null);
     }
+  }
+
+  function handleViewportPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    handleBoardPointerDown(event);
+    onCanvasPointerDown(event);
   }
 
   function handleNoteDelete(noteId: string) {
@@ -140,20 +179,25 @@ export function RoomBoardCanvas({
       <div className="relative h-full min-h-80" data-testid="board-frame">
         <div
           ref={boardScrollerRef}
-          className="h-full overflow-auto rounded-md border border-border bg-muted/30"
+          className={`relative h-full overflow-hidden bg-muted/20 ${
+            isPanning ? "cursor-grabbing" : "cursor-grab"
+          }`}
+          style={gridStyle}
+          onPointerDown={handleViewportPointerDown}
+          onPointerMove={onCanvasPointerMove}
+          onPointerUp={onCanvasPointerEnd}
+          onPointerCancel={onCanvasPointerEnd}
         >
           <div
             data-testid="board-canvas"
-            className="relative"
-            style={{ width: BOARD_WIDTH, height: BOARD_HEIGHT }}
-            onPointerDown={handleBoardPointerDown}
+            data-canvas-background="true"
+            className="absolute top-0 left-0 min-h-full min-w-full"
+            style={{
+              transform: `translate3d(${camera.x}px, ${camera.y}px, 0) scale(${camera.zoom})`,
+              transformOrigin: "0 0",
+              willChange: "transform",
+            }}
           >
-            {notes.length === 0 ? (
-              <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-                共有付箋はまだありません
-              </p>
-            ) : null}
-
             {renderGroups.map((rg) => {
               const handleUpdateName = (newName: string) => {
                 if (rg.isTemp && rg.representativeNoteId) {
@@ -169,6 +213,7 @@ export function RoomBoardCanvas({
                   key={rg.id}
                   group={rg}
                   name={rg.name}
+                  canGroupNote={permissions.canGroupNote}
                   onUpdateName={handleUpdateName}
                 />
               );
@@ -181,6 +226,11 @@ export function RoomBoardCanvas({
                 isOwnDrag={draggingNoteId === note.id}
                 isSelected={selectedNoteId === note.id}
                 editingDisabled={isResultStep(phase)}
+                canDeleteNote={permissions.canDeleteNote}
+                canEditNote={permissions.canEditNote}
+                canMoveNote={permissions.canMoveNote}
+                canShowVote={permissions.canShowVote}
+                canVote={permissions.canVote}
                 isDecided={decision?.noteId === note.id}
                 disabled={isDisconnected}
                 onSelect={onSelect}
@@ -219,6 +269,18 @@ export function RoomBoardCanvas({
             ) : null}
           </div>
         </div>
+        <div
+          className="pointer-events-none absolute bottom-3 left-3 z-40"
+          data-testid="canvas-zoom-hud"
+        >
+          <CanvasZoomControls
+            zoom={camera.zoom}
+            onZoomOut={onZoomOut}
+            onResetZoom={onResetZoom}
+            onZoomIn={onZoomIn}
+            onFitToNotes={onFitToNotes}
+          />
+        </div>
         {/* バナー（top）とパネル（left）は別条件で出す: Step 2-2 以降は
             テンプレートを出さないが、決定課題の掲示は続ける（#165 で再利用）。 */}
         {hmwDecidedIssue !== null ? (
@@ -241,7 +303,7 @@ export function RoomBoardCanvas({
         {isHmwWritingStep(phase) ? (
           // 下端はマイ付箋ドック（h-48 + 余白）を避ける。ボードが縦に狭い
           // 画面ではパネル内スクロールに逃がす（#198 の全画面化で緩和される）。
-          <div className="pointer-events-none absolute top-3 bottom-56 left-3 z-30 flex items-start">
+          <div className="pointer-events-none absolute top-16 bottom-56 left-3 z-30 flex items-start">
             <HmwTemplatePanel
               className="pointer-events-auto max-h-full overflow-y-auto"
               onTemplateSelect={onHmwTemplateSelect}
@@ -249,28 +311,36 @@ export function RoomBoardCanvas({
             />
           </div>
         ) : null}
-        <div
-          className="pointer-events-none absolute inset-x-3 bottom-3 z-30 flex justify-center"
-          data-testid="private-notes-dock"
-        >
-          <PrivateNotesToolbar
-            notes={privateNotes}
-            disabled={isDisconnected}
-            editingDisabled={isResultStep(phase)}
-            className="pointer-events-auto max-w-5xl"
-            toolbarRef={privateToolbarRef}
-            isReturnDropTarget={isReturnDropTarget}
-            selectedNoteId={selectedNoteId}
-            onSelect={onSelect}
-            onAdd={onAddPrivateNote}
-            onContentChange={onPrivateNoteContentChange}
-            onDelete={onPrivateNoteDelete}
-            onDragStart={onPrivateNoteDragStart}
-          />
-        </div>
-        <div className="pointer-events-none absolute inset-y-3 right-3 z-30">
-          <IdeaSupportSidebar />
-        </div>
+        {permissions.showPrivateToolbar ? (
+          <div
+            className="pointer-events-none absolute inset-x-3 bottom-3 z-30 flex justify-center"
+            data-testid="private-notes-dock"
+          >
+            <PrivateNotesToolbar
+              notes={privateNotes}
+              disabled={isDisconnected}
+              canDeleteNote={permissions.canDeleteNote}
+              canCreateNote={permissions.canCreateNote}
+              canEditNote={permissions.canEditNote}
+              canMoveNote={permissions.canMoveNote}
+              editingDisabled={isResultStep(phase)}
+              className="pointer-events-auto max-w-5xl"
+              toolbarRef={privateToolbarRef}
+              isReturnDropTarget={isReturnDropTarget}
+              selectedNoteId={selectedNoteId}
+              onSelect={onSelect}
+              onAdd={onAddPrivateNote}
+              onContentChange={onPrivateNoteContentChange}
+              onDelete={onPrivateNoteDelete}
+              onDragStart={onPrivateNoteDragStart}
+            />
+          </div>
+        ) : null}
+        {isIdeaSupportAvailableStep(phase) ? (
+          <div className="pointer-events-none absolute inset-y-3 right-3 z-30">
+            <IdeaSupportSidebar />
+          </div>
+        ) : null}
       </div>
     </div>
   );

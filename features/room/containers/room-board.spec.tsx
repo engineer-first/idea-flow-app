@@ -812,12 +812,12 @@ describe("サーバーメッセージ → 画面反映", () => {
 
     // 2回目の publish が送られたこと
     expect(socket.sent).toContain(
-      JSON.stringify({ type: "note:publish", noteId: NOTE_ID, x: 150, y: 150 }),
+      JSON.stringify({ type: "note:publish", noteId: NOTE_ID, x: 140, y: 140 }),
     );
 
     // 最終的に note:move で確定すること
     expect(socket.sent).toContain(
-      JSON.stringify({ type: "note:move", noteId: NOTE_ID, x: 160, y: 160 }),
+      JSON.stringify({ type: "note:move", noteId: NOTE_ID, x: 150, y: 150 }),
     );
   });
 
@@ -938,7 +938,11 @@ describe("ユーザー操作 → プロトコルメッセージ送信", () => {
   });
 
   it("付箋の主観ドットボタンで note:vote が送信される", () => {
-    const { socket } = connectWithSnapshot([protocolNote()]);
+    const { socket } = connectWithSnapshot([protocolNote()], {
+      phase: buildPhaseStep(4),
+    });
+
+    screen.debug();
 
     fireEvent.click(screen.getByRole("button", { name: "主観ドットを投票" }));
 
@@ -952,7 +956,9 @@ describe("ユーザー操作 → プロトコルメッセージ送信", () => {
   });
 
   it("付箋の客観ドットボタンで note:vote が送信される", () => {
-    const { socket } = connectWithSnapshot([protocolNote()]);
+    const { socket } = connectWithSnapshot([protocolNote()], {
+      phase: buildPhaseStep(4),
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "客観ドットを追加" }));
 
@@ -966,7 +972,9 @@ describe("ユーザー操作 → プロトコルメッセージ送信", () => {
   });
 
   it("客観ドットはサーバー応答前でも残数までしか送信しない", () => {
-    const { socket } = connectWithSnapshot([protocolNote()]);
+    const { socket } = connectWithSnapshot([protocolNote()], {
+      phase: buildPhaseStep(4),
+    });
     const button = screen.getByRole("button", { name: "客観ドットを追加" });
 
     fireEvent.click(button);
@@ -990,7 +998,9 @@ describe("ユーザー操作 → プロトコルメッセージ送信", () => {
   });
 
   it("客観ドット更新のサーバー反映でローカル選択済みの主観ドットを外さない", () => {
-    const { socket } = connectWithSnapshot([protocolNote()]);
+    const { socket } = connectWithSnapshot([protocolNote()], {
+      phase: buildPhaseStep(4),
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "主観ドットを投票" }));
     fireEvent.click(screen.getByRole("button", { name: "客観ドットを追加" }));
@@ -1013,14 +1023,19 @@ describe("ユーザー操作 → プロトコルメッセージ送信", () => {
   });
 
   it("付箋の客観ドットリセットボタンで note:vote-reset が送信される", () => {
-    const { socket } = connectWithSnapshot([
-      protocolNote({
-        dotVotes: {
-          subjective: { count: 0, votedByMe: false, ownCount: 0 },
-          objective: { count: 2, votedByMe: true, ownCount: 2 },
-        },
-      }),
-    ]);
+    const { socket } = connectWithSnapshot(
+      [
+        protocolNote({
+          dotVotes: {
+            subjective: { count: 0, votedByMe: false, ownCount: 0 },
+            objective: { count: 2, votedByMe: true, ownCount: 2 },
+          },
+        }),
+      ],
+      {
+        phase: buildPhaseStep(4),
+      },
+    );
 
     fireEvent.click(
       screen.getByRole("button", { name: "客観ドットを0に戻す" }),
@@ -1118,6 +1133,8 @@ describe("Step 2-1（HMW 個人執筆）", () => {
     const { socket } = connectAtHmwStep();
 
     fireEvent.click(screen.getByRole("button", { name: "付箋を追加" }));
+
+    console.log(socket.sent.map((raw) => JSON.parse(raw)));
 
     expect(socket.sent.map((raw) => JSON.parse(raw))).toContainEqual({
       type: "note:create",

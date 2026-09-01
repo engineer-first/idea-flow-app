@@ -8,11 +8,14 @@ import {
   buildNote,
   buildNotes,
 } from "@/contracts/room-protocol.fixture";
+import { getBoardPermissions } from "../logic/board-permissions";
 import { RoomBoardCanvas } from "./room-board-canvas";
 
 const STEP_1_1 = buildPhaseStep(1);
 const STEP_1_2 = buildPhaseStep(2);
 const STEP_1_3 = buildPhaseStep(3);
+const STEP_1_4 = buildPhaseStep(4);
+const STEP_1_5 = buildPhaseStep(5);
 
 const meta = {
   title: "Room/RoomBoardCanvas",
@@ -25,6 +28,7 @@ const meta = {
     groups: [],
     phase: STEP_1_1,
     decision: null,
+    permissions: getBoardPermissions(STEP_1_1),
     isHost: true,
     privateNotes: [],
     selectedNoteId: null,
@@ -36,6 +40,16 @@ const meta = {
     hmwDecidedIssue: null,
     boardScrollerRef: createRef<HTMLDivElement>(),
     privateToolbarRef: createRef<HTMLDivElement>(),
+    camera: { x: 0, y: 0, zoom: 1 },
+    gridStyle: {},
+    isPanning: false,
+    onCanvasPointerDown: fn(),
+    onCanvasPointerMove: fn(),
+    onCanvasPointerEnd: fn(),
+    onZoomIn: fn(),
+    onZoomOut: fn(),
+    onResetZoom: fn(),
+    onFitToNotes: fn(),
     onSelect: fn(),
     onHmwTemplateSelect: fn(),
     onNoteDragStart: fn(),
@@ -77,6 +91,7 @@ export const Empty: Story = {
 export const Grouped: Story = {
   args: {
     phase: STEP_1_3,
+    permissions: getBoardPermissions(STEP_1_3),
     notes: [
       buildNote({ id: "note-1", x: 100, y: 100 }),
       buildNote({ id: "note-2", x: 350, y: 100 }),
@@ -127,14 +142,16 @@ export const Disconnected: Story = {
 
 export const ReadyToDecide: Story = {
   args: {
-    phase: buildPhaseStep(5),
+    phase: STEP_1_5,
+    permissions: getBoardPermissions(STEP_1_5),
     selectedNoteId: "note-1",
   },
 };
 
 export const Decided: Story = {
   args: {
-    phase: buildPhaseStep(5),
+    phase: STEP_1_5,
+    permissions: getBoardPermissions(STEP_1_5),
     decision: buildDecision({
       noteId: "note-1",
       decidedBy: "11111111-1111-4111-8111-111111111111",
@@ -146,7 +163,8 @@ export const Decided: Story = {
 // ボード上に浮かぶ。オーバーレイの位置決めはこのコンポーネントの責務。
 export const HmwWritingStep: Story = {
   args: {
-    phase: buildPhaseStep(1, 2),
+    phase: buildPhaseStep(2, 1),
+    permissions: getBoardPermissions(buildPhaseStep(2, 1)),
     notes: [],
     hmwDecidedIssue: buildCarryover().content,
   },
@@ -155,7 +173,8 @@ export const HmwWritingStep: Story = {
 // 長文の決定課題は max-w-xl 内で折り返して全文表示し、左端パネルの帯を侵食しない。
 export const HmwWritingStepLongIssue: Story = {
   args: {
-    phase: buildPhaseStep(1, 2),
+    phase: buildPhaseStep(2, 1),
+    permissions: getBoardPermissions(buildPhaseStep(2, 1)),
     notes: [],
     hmwDecidedIssue: buildCarryover({
       content:
@@ -170,6 +189,55 @@ export const HmwWritingStepLongIssue: Story = {
 export const HmwCarryoverOnly: Story = {
   args: {
     phase: buildPhaseStep(2, 2),
+    permissions: getBoardPermissions(buildPhaseStep(2, 2)),
     hmwDecidedIssue: buildCarryover().content,
+  },
+};
+
+// Step1-1: 個人で付箋を書く
+export const Step1Writing: Story = {
+  args: {
+    phase: STEP_1_1,
+    permissions: getBoardPermissions(STEP_1_1),
+  },
+};
+
+// Step1-2: 共有・移動
+export const Step1Sharing: Story = {
+  args: {
+    phase: STEP_1_2,
+    permissions: getBoardPermissions(STEP_1_2),
+  },
+};
+
+// Step1-3: グループ化
+export const Step1Grouping: Story = {
+  args: {
+    phase: STEP_1_3,
+    permissions: getBoardPermissions(STEP_1_3),
+    groups: [
+      {
+        id: "g1",
+        name: "課題グループ",
+        noteIds: ["note-1", "note-2"],
+      },
+    ],
+  },
+};
+
+// Step1-4: 投票
+export const Step1Voting: Story = {
+  args: {
+    phase: STEP_1_4,
+    permissions: getBoardPermissions(STEP_1_4),
+  },
+};
+
+// Step1-5: 結果確認
+export const Step1Result: Story = {
+  args: {
+    phase: STEP_1_5,
+    permissions: getBoardPermissions(STEP_1_5),
+    selectedNoteId: "note-1",
   },
 };

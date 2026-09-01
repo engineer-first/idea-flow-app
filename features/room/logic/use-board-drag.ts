@@ -5,7 +5,7 @@
 // returning（自分の共有付箋をツールバーへ戻す = unpublish 待ち）を管理する。
 // RoomDO の応答を待たずに表示を確定させるため、renderedNotes /
 // renderedPrivateNotes として「表示用に畳み込んだ」配列を返す。
-// DOM 参照は rect と scroll 位置の読み取りだけに限定し、JSX は持たない。
+// DOM 参照はビューポートの矩形読み取りだけに限定し、JSX は持たない。
 import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
@@ -14,8 +14,9 @@ import {
   useRef,
   useState,
 } from "react";
-import { BOARD_HEIGHT, BOARD_WIDTH } from "@/contracts/board";
+import { NOTE_HEIGHT, NOTE_WIDTH } from "@/contracts/board";
 import type { Note } from "@/features/notes";
+import { type CanvasPoint, clampCanvasCoordinate } from "./canvas-camera";
 
 /**
  * ドラッグ中の付箋の状態と位置情報を保持する型。
@@ -40,6 +41,10 @@ export type UseBoardDragArgs = {
   currentUserId: string;
   boardRootRef: RefObject<HTMLDivElement | null>;
   boardScrollerRef: RefObject<HTMLDivElement | null>;
+  worldPointFromClient: (
+    clientX: number,
+    clientY: number,
+  ) => CanvasPoint | null;
   privateToolbarRef: RefObject<HTMLDivElement | null>;
   canPublish?: boolean;
   onPublishBlocked?: () => void;
@@ -49,29 +54,6 @@ export type UseBoardDragArgs = {
   onPrivateNotePublish: (noteId: string, x: number, y: number) => void;
   onPrivateNoteUnpublish: (noteId: string) => void;
 };
-
-/**
- * ポインターイベントから、掴んだ付箋要素内の相対位置（グラブオフセット）を算出します。
- *
- * @param event - ポインターダウン/移動イベント
- * @returns 付箋左上からの相対X/Yオフセット
- */
-function getGrabOffset(event: ReactPointerEvent<HTMLButtonElement>) {
-  if (
-    !event.currentTarget ||
-    typeof event.currentTarget.getBoundingClientRect !== "function"
-  ) {
-    return { grabOffsetX: 0, grabOffsetY: 0 };
-  }
-  const rect = event.currentTarget.getBoundingClientRect();
-  if (!rect || (rect.width === 0 && rect.height === 0)) {
-    return { grabOffsetX: 0, grabOffsetY: 0 };
-  }
-  return {
-    grabOffsetX: Math.max(0, event.clientX - rect.left),
-    grabOffsetY: Math.max(0, event.clientY - rect.top),
-  };
-}
 
 function applyPrivateOrder(source: Note[], order: string[]) {
   const noteById = new Map(source.map((note) => [note.id, note]));
@@ -106,6 +88,7 @@ export function useBoardDrag({
   currentUserId,
   boardRootRef,
   boardScrollerRef,
+  worldPointFromClient,
   privateToolbarRef,
   canPublish = true,
   onPublishBlocked,
@@ -192,7 +175,7 @@ export function useBoardDrag({
   );
 
   const boardPositionFromPointer = useCallback(
-    (clientX: number, clientY: number, grabOffsetX = 0, grabOffsetY = 0) => {
+    (clientX: number, clientY: number) => {
       const scroller = boardScrollerRef.current;
       if (!scroller) return null;
       const rect = scroller.getBoundingClientRect();
@@ -204,18 +187,9 @@ export function useBoardDrag({
       ) {
         return null;
       }
-      return {
-        x: Math.min(
-          Math.max(clientX - grabOffsetX - rect.left + scroller.scrollLeft, 0),
-          BOARD_WIDTH,
-        ),
-        y: Math.min(
-          Math.max(clientY - grabOffsetY - rect.top + scroller.scrollTop, 0),
-          BOARD_HEIGHT,
-        ),
-      };
+      return worldPointFromClient(clientX, clientY);
     },
-    [boardScrollerRef],
+    [boardScrollerRef, worldPointFromClient],
   );
 
   const privateDropIndexFromPointer = useCallback(
@@ -256,7 +230,10 @@ export function useBoardDrag({
       if (!note) return;
       hasNotifiedBlockedRef.current = false;
       boardRootRef.current?.setPointerCapture?.(event.pointerId);
-      const { grabOffsetX, grabOffsetY } = getGrabOffset(event);
+      const pointerPosition = boardPositionFromPointer(
+        event.clientX,
+        event.clientY,
+      );
       updateDrag({
         note,
         pointerId: event.pointerId,
@@ -264,12 +241,18 @@ export function useBoardDrag({
         privateDropIndex: null,
         x: note.x,
         y: note.y,
-        grabOffsetX,
-        grabOffsetY,
+        grabOffsetX: pointerPosition ? pointerPosition.x - note.x : 0,
+        grabOffsetY: pointerPosition ? pointerPosition.y - note.y : 0,
       });
       onNoteDragStart(noteId);
     },
-    [notes, boardRootRef, onNoteDragStart, updateDrag],
+    [
+      boardPositionFromPointer,
+      notes,
+      boardRootRef,
+      onNoteDragStart,
+      updateDrag,
+    ],
   );
 
   const handlePrivateDragStart = useCallback(
@@ -278,7 +261,13 @@ export function useBoardDrag({
       if (!note) return;
       hasNotifiedBlockedRef.current = false;
       boardRootRef.current?.setPointerCapture?.(event.pointerId);
-      const { grabOffsetX, grabOffsetY } = getGrabOffset(event);
+      const rect = event.currentTarget?.getBoundingClientRect?.();
+      const grabOffsetX = rect?.width
+        ? ((event.clientX - rect.left) / rect.width) * NOTE_WIDTH
+        : 0;
+      const grabOffsetY = rect?.height
+        ? ((event.clientY - rect.top) / rect.height) * NOTE_HEIGHT
+        : 0;
       updateDrag({
         note,
         pointerId: event.pointerId,
@@ -326,33 +315,32 @@ export function useBoardDrag({
         return;
       }
 
-      const position = boardPositionFromPointer(
-        event.clientX,
-        event.clientY,
-        current.grabOffsetX,
-        current.grabOffsetY,
-      );
+      const position = boardPositionFromPointer(event.clientX, event.clientY);
       if (!position) return;
+      const nextPosition = {
+        x: clampCanvasCoordinate(position.x - current.grabOffsetX),
+        y: clampCanvasCoordinate(position.y - current.grabOffsetY),
+      };
       if (current.status === "private" || current.status === "returning") {
         if (!canPublish) {
           if (!hasNotifiedBlockedRef.current) {
             onPublishBlocked?.();
             hasNotifiedBlockedRef.current = true;
           }
-          updateDrag({ ...current, status: "shared", ...position });
+          updateDrag({ ...current, status: "shared", ...nextPosition });
           return;
         }
         // ボードに入った瞬間に共有化する。以後の座標は既存のdrag配信を使う。
-        onPrivateNotePublish(current.note.id, position.x, position.y);
+        onPrivateNotePublish(current.note.id, nextPosition.x, nextPosition.y);
         onNoteDragStart(current.note.id);
       } else if (!canPublish) {
-        updateDrag({ ...current, status: "shared", ...position });
+        updateDrag({ ...current, status: "shared", ...nextPosition });
         return;
       }
       // publish と同じ WebSocket 接続で送るため、publish のあとに届く drag は
       // RoomDO 側でも公開後の付箋として処理される。
-      onNoteDragMove(current.note.id, position.x, position.y);
-      updateDrag({ ...current, status: "shared", ...position });
+      onNoteDragMove(current.note.id, nextPosition.x, nextPosition.y);
+      updateDrag({ ...current, status: "shared", ...nextPosition });
     },
     [
       boardPositionFromPointer,
@@ -375,12 +363,16 @@ export function useBoardDrag({
       if (!current || current.pointerId !== event.pointerId) return;
       hasNotifiedBlockedRef.current = false;
       if (current.status === "shared") {
-        const position = boardPositionFromPointer(
+        const pointerPosition = boardPositionFromPointer(
           event.clientX,
           event.clientY,
-          current.grabOffsetX,
-          current.grabOffsetY,
-        ) ?? { x: current.x, y: current.y };
+        );
+        const position = pointerPosition
+          ? {
+              x: clampCanvasCoordinate(pointerPosition.x - current.grabOffsetX),
+              y: clampCanvasCoordinate(pointerPosition.y - current.grabOffsetY),
+            }
+          : { x: current.x, y: current.y };
         onNoteDragEnd(current.note.id, position.x, position.y);
       } else if (current.privateDropIndex !== null) {
         const privateDropIndex = current.privateDropIndex;

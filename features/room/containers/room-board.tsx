@@ -36,6 +36,7 @@ export type RoomBoardProps = {
   // SSR 時にサーバーから取得した初期状態。再接続時の flicker を抑える。
   initialMembers: Member[];
   initialPhase: RoomPhase;
+  signOutAction?: () => Promise<void>;
   // テストからフェイク WebSocket を注入するための口。本番では未指定。
   webSocketFactory?: RoomSocketFactory;
 };
@@ -49,6 +50,7 @@ export function RoomBoard({
   hostUserId,
   initialMembers,
   initialPhase,
+  signOutAction,
   webSocketFactory,
 }: RoomBoardProps) {
   const [isNextPhasePending, setIsNextPhasePending] = useState(false);
@@ -198,6 +200,7 @@ export function RoomBoard({
         currentUserId={currentUserId}
         hostUserId={hostUserId}
         isNextPhasePending={isNextPhasePending}
+        signOutAction={signOutAction}
         onAddPrivateNote={handleAddPrivateNote}
         onHmwTemplateSelect={handleHmwTemplateSelect}
         onPrivateNoteContentChange={notes.changeNoteContent}
