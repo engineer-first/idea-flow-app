@@ -1063,7 +1063,56 @@ describe("note:vote（課題ドット投票）", () => {
     owner.close();
   });
 
-  it("主観ドットは1票まで投票でき、投票者へだけ状態が届く", async () => {
+  it("Step 2-3 の note:updated と再接続 snapshot では他人の票を送らない", async () => {
+    const { roomId, owner, member } = await setupStartedRoom();
+    const noteId = "33333333-3333-4333-8333-333333333333";
+
+    await runInRoomDO(roomId, async (instance, state) => {
+      await instance.setPhase(buildPhaseStep(3, 2), OWNER.sub);
+      const now = new Date().toISOString();
+      state.storage.sql.exec(
+        `INSERT INTO notes
+           (id, author_id, content, visibility, color, x, y, created_at, updated_at, phase)
+         VALUES (?1, ?2, 'HMW', 'shared', 'yellow', 0, 0, ?3, ?3, 2)`,
+        noteId,
+        OWNER.sub,
+        now,
+      );
+    });
+
+    send(member, { type: "note:vote", noteId, kind: "subjective" });
+    const toMember = await expectType(member, "note:updated");
+
+    expect(toMember.note.dotVotes.subjective).toEqual({
+      votedByMe: true,
+      ownCount: 1,
+    });
+    expect(toMember.note.dotVotes.subjective).not.toHaveProperty("count");
+    expect(toMember.note.dotVotes.objective).not.toHaveProperty("count");
+    expect(
+      await Promise.race([
+        owner.next(),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 50)),
+      ]),
+    ).toBeNull();
+
+    member.close();
+    const reconnected = await connectRoomAs(MEMBER, roomId);
+    const snapshot = await expectType(reconnected, "snapshot");
+    expect(snapshot.phase).toEqual(buildPhaseStep(3, 2));
+    const snapshotNote = snapshot.notes.find((note) => note.id === noteId);
+    expect(snapshotNote?.dotVotes.subjective).toEqual({
+      votedByMe: true,
+      ownCount: 1,
+    });
+    expect(snapshotNote?.dotVotes.subjective).not.toHaveProperty("count");
+    expect(snapshotNote?.dotVotes.objective).not.toHaveProperty("count");
+
+    reconnected.close();
+    owner.close();
+  });
+
+  it("主観ドットは1票まで投票でき、投票中は総数を除いて全員へ届く", async () => {
     const { owner, member } = await setupStartedRoom();
     const noteId = await createNote({ owner, member });
 

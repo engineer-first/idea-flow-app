@@ -787,6 +787,13 @@ describe("RoomDO phase:next", () => {
     // 全員が主観1票・客観3票をちょうど使い切った状態を直接作る。
     await runInRoomDO(roomName, (_instance, state) => {
       const now = new Date().toISOString();
+      state.storage.sql.exec(
+        `INSERT INTO notes
+           (id, author_id, content, visibility, color, x, y, created_at, updated_at)
+         VALUES ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', ?1, '', 'shared', 'yellow', 0, 0, ?2, ?2)`,
+        USER_A,
+        now,
+      );
       for (const userId of [USER_A, USER_B]) {
         state.storage.sql.exec(
           `INSERT INTO note_votes (note_id, user_id, kind, created_at, vote_count)
@@ -809,6 +816,189 @@ describe("RoomDO phase:next", () => {
       type: "phase:updated",
       phase: buildPhaseStep(5),
     });
+    ws.close();
+  });
+
+  it("フェーズ1の票をフェーズ2の上限・完了判定に持ち越さない", async () => {
+    const roomName = "room-phase-votes-are-isolated";
+    const phase1NoteId = "11111111-1111-4111-8111-111111111111";
+    const phase2NoteId = "22222222-2222-4222-8222-222222222222";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(4), USER_A);
+    await runInRoomDO(roomName, (_instance, state) => {
+      const now = new Date().toISOString();
+      state.storage.sql.exec(
+        `INSERT INTO notes
+           (id, author_id, content, visibility, color, x, y, created_at, updated_at, phase)
+         VALUES (?1, ?2, '課題', 'shared', 'yellow', 0, 0, ?3, ?3, 1),
+                (?4, ?2, 'HMW', 'shared', 'yellow', 100, 0, ?3, ?3, 2)`,
+        phase1NoteId,
+        USER_A,
+        now,
+        phase2NoteId,
+      );
+      state.storage.sql.exec(
+        `INSERT INTO note_votes (note_id, user_id, kind, created_at, vote_count)
+         VALUES (?1, ?2, 'subjective', ?3, 1),
+                (?1, ?2, 'objective', ?3, 3)`,
+        phase1NoteId,
+        USER_A,
+        now,
+      );
+    });
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "phase:next" }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "snapshot",
+      phase: buildPhaseStep(5),
+    });
+    await nextJson(ws);
+
+    ws.send(JSON.stringify({ type: "note:decide", noteId: phase1NoteId }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "decision:updated",
+      phase: 1,
+      noteId: phase1NoteId,
+    });
+
+    ws.send(JSON.stringify({ type: "phase:next" }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "snapshot",
+      phase: buildPhaseStep(1, 2),
+    });
+    await nextJson(ws);
+
+    ws.send(JSON.stringify({ type: "phase:next" }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "phase:updated",
+      phase: buildPhaseStep(2, 2),
+    });
+    ws.send(JSON.stringify({ type: "phase:next" }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "snapshot",
+      phase: buildPhaseStep(3, 2),
+    });
+    expect(await nextJson(ws)).toMatchObject({
+      type: "phase:updated",
+      phase: buildPhaseStep(3, 2),
+    });
+
+    ws.send(
+      JSON.stringify({
+        type: "note:vote",
+        noteId: phase2NoteId,
+        kind: "subjective",
+      }),
+    );
+    expect(await nextJson(ws)).toMatchObject({ type: "note:updated" });
+
+    ws.send(JSON.stringify({ type: "phase:next" }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "error",
+      code: "voting-incomplete",
+    });
+    expect(await stub.getPhase()).toEqual(buildPhaseStep(3, 2));
+
+    for (let count = 0; count < 3; count++) {
+      ws.send(
+        JSON.stringify({
+          type: "note:vote",
+          noteId: phase2NoteId,
+          kind: "objective",
+        }),
+      );
+      expect(await nextJson(ws)).toMatchObject({ type: "note:updated" });
+    }
+
+    ws.send(JSON.stringify({ type: "phase:next" }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "snapshot",
+      phase: buildPhaseStep(4, 2),
+      notes: [
+        {
+          id: phase2NoteId,
+          dotVotes: {
+            subjective: { count: 1 },
+            objective: { count: 3 },
+          },
+        },
+      ],
+    });
+    await nextJson(ws);
+    ws.close();
+  });
+
+  it("フェーズ2を phase:next で Step 2-2 から Step 3-1 まで進められる", async () => {
+    const roomName = "room-phase2-main-transition";
+    const noteId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(2, 2), USER_A);
+    await runInRoomDO(roomName, (_instance, state) => {
+      const now = new Date().toISOString();
+      state.storage.sql.exec(
+        `INSERT INTO notes
+           (id, author_id, content, visibility, color, x, y, created_at, updated_at, phase)
+         VALUES (?1, ?2, 'HMW', 'shared', 'yellow', 0, 0, ?3, ?3, 2)`,
+        noteId,
+        USER_A,
+        now,
+      );
+    });
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+
+    ws.send(JSON.stringify({ type: "phase:next" }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "snapshot",
+      phase: buildPhaseStep(3, 2),
+    });
+    expect(await nextJson(ws)).toMatchObject({
+      type: "phase:updated",
+      phase: buildPhaseStep(3, 2),
+    });
+
+    await runInRoomDO(roomName, (_instance, state) => {
+      const now = new Date().toISOString();
+      state.storage.sql.exec(
+        `INSERT INTO note_votes (note_id, user_id, kind, created_at, vote_count)
+         VALUES (?1, ?2, 'subjective', ?3, 1),
+                (?1, ?2, 'objective', ?3, 3)`,
+        noteId,
+        USER_A,
+        now,
+      );
+    });
+
+    ws.send(JSON.stringify({ type: "phase:next" }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "snapshot",
+      phase: buildPhaseStep(4, 2),
+    });
+    expect(await nextJson(ws)).toMatchObject({
+      type: "phase:updated",
+      phase: buildPhaseStep(4, 2),
+    });
+
+    ws.send(JSON.stringify({ type: "note:decide", noteId }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "decision:updated",
+      phase: 2,
+      noteId,
+    });
+
+    ws.send(JSON.stringify({ type: "phase:next" }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "snapshot",
+      phase: buildPhaseStep(1, 3),
+    });
+    expect(await nextJson(ws)).toMatchObject({
+      type: "phase:updated",
+      phase: buildPhaseStep(1, 3),
+    });
+    expect(await stub.getPhase()).toEqual(buildPhaseStep(1, 3));
     ws.close();
   });
 
@@ -1867,6 +2057,110 @@ describe("RoomDO lobby のボード凍結", () => {
     ws.send(JSON.stringify({ type: "note:create" }));
     expect(await nextJson(ws)).toMatchObject({ type: "note:inserted" });
 
+    ws.close();
+  });
+});
+
+describe("RoomDO フェーズ2の投票・決定ゲート", () => {
+  const HMW_NOTE_ID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+
+  it("Step 2-3 では投票が許可される", async () => {
+    const roomName = "room-phase2-vote-gate";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(3, 2), USER_A);
+    await runInRoomDO(roomName, (_instance, state) => {
+      const now = new Date().toISOString();
+      state.storage.sql.exec(
+        `INSERT INTO notes
+           (id, author_id, content, visibility, color, x, y, created_at, updated_at, phase)
+         VALUES (?1, ?2, 'HMW', 'shared', 'yellow', 0, 0, ?3, ?3, 2)`,
+        HMW_NOTE_ID,
+        USER_A,
+        now,
+      );
+    });
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(
+      JSON.stringify({
+        type: "note:vote",
+        noteId: HMW_NOTE_ID,
+        kind: "subjective",
+      }),
+    );
+    expect(await nextJson(ws)).toMatchObject({ type: "note:updated" });
+    ws.close();
+  });
+
+  it("Step 2-4 ではホストのHMW決定が許可される", async () => {
+    const roomName = "room-phase2-decide-gate";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(4, 2), USER_A);
+    await runInRoomDO(roomName, (_instance, state) => {
+      const now = new Date().toISOString();
+      state.storage.sql.exec(
+        `INSERT INTO notes
+           (id, author_id, content, visibility, color, x, y, created_at, updated_at, phase)
+         VALUES (?1, ?2, 'HMW', 'shared', 'yellow', 0, 0, ?3, ?3, 2)`,
+        HMW_NOTE_ID,
+        USER_A,
+        now,
+      );
+    });
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "note:decide", noteId: HMW_NOTE_ID }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "decision:updated",
+      phase: 2,
+      noteId: HMW_NOTE_ID,
+    });
+    ws.close();
+  });
+
+  it("Step 2-4 では非ホストのHMW決定を forbidden で拒否する", async () => {
+    const roomName = "room-phase2-decide-non-host";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.upsertMember(USER_B, "Member");
+    await stub.setPhase(buildPhaseStep(4, 2), USER_A);
+    await runInRoomDO(roomName, (_instance, state) => {
+      const now = new Date().toISOString();
+      state.storage.sql.exec(
+        `INSERT INTO notes
+           (id, author_id, content, visibility, color, x, y, created_at, updated_at, phase)
+         VALUES (?1, ?2, 'HMW', 'shared', 'yellow', 0, 0, ?3, ?3, 2)`,
+        HMW_NOTE_ID,
+        USER_A,
+        now,
+      );
+    });
+
+    const ws = await connectDirectly(roomName, USER_B, USER_A);
+    ws.send(JSON.stringify({ type: "note:decide", noteId: HMW_NOTE_ID }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+    ws.close();
+  });
+
+  it("フェーズ2の投票未完了時は force でも結果ステップへ進めない", async () => {
+    const roomName = "room-phase2-voting-incomplete-force";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.upsertMember(USER_B, "Member");
+    await stub.setPhase(buildPhaseStep(3, 2), USER_A);
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "phase:next", force: true }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "error",
+      code: "voting-incomplete",
+    });
+    expect(await stub.getPhase()).toEqual(buildPhaseStep(3, 2));
     ws.close();
   });
 });

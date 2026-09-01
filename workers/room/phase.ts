@@ -55,6 +55,12 @@ function nextRoomPhase(current: RoomPhase): RoomPhase {
   if (current.phase === 2 && current.step === 1) {
     return { kind: "step", phase: 2, step: 2 };
   }
+  if (current.phase === 2 && current.step >= 2 && current.step < 4) {
+    return { ...current, step: current.step + 1 };
+  }
+  if (current.phase === 2 && current.step === 4) {
+    return { kind: "step", phase: 3, step: 1 };
+  }
   return current;
 }
 
@@ -150,8 +156,8 @@ const allowedBoardMutationsByPhase: {
       "note:move",
       "note:drag",
     ],
-    3: [],
-    4: [],
+    3: ["note:vote", "note:vote-reset"],
+    4: ["note:decide"],
   },
   3: {
     1: [],
@@ -224,12 +230,12 @@ export const phaseHandlers: MessageHandlers<"start_phase" | "phase:next"> = {
       });
       return;
     }
-    // force はホストだけが使える脱出ハッチ（上のホストチェックが先に
-    // 効く）。離脱して戻らないメンバーが居ても進行を止めないための経路。
+    // force はフェーズ1だけで使える脱出ハッチ。フェーズ2以降は全員投票を
+    // 必須にし、結果ステップへ未完了のまま進めない。
     if (
       isVotingStep(current) &&
-      !message.force &&
-      !haveAllMembersCompletedVoting(ctx.sql)
+      !haveAllMembersCompletedVoting(ctx.sql, current.phase) &&
+      (current.phase !== 1 || !message.force)
     ) {
       ctx.reply({
         type: "error",
