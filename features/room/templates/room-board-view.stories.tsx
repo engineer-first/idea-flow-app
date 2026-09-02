@@ -63,8 +63,10 @@ const meta = {
     signOutAction: fn(),
     privateNotes: [],
     hmwDecidedIssue: null,
+    decidedHmw: null,
     onAddPrivateNote: fn(),
     onHmwTemplateSelect: fn(),
+    onIdeaHintSelect: fn(),
     onPrivateNoteContentChange: fn(),
     onPrivateNoteDelete: fn(),
     onPrivateNotePublish: fn(),
@@ -333,5 +335,19 @@ export const HmwWritingStep: Story = {
       ...note,
       visibility: "private" as const,
     })),
+  },
+};
+
+export const IdeaWritingWithCarryovers: Story = {
+  args: {
+    phase: buildPhaseStep(1, 3),
+    hmwDecidedIssue: buildCarryover({
+      phase: 1,
+      content: "ユーザーが作業を後回しにしてしまう",
+    }).content,
+    decidedHmw: buildCarryover({
+      phase: 2,
+      content: "どうすれば、楽しく最初の一歩を踏み出せるだろうか？",
+    }).content,
   },
 };

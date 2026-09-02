@@ -26,6 +26,7 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardCanvas>[0]> = {}) {
     dragGhost: null,
     isReturnDropTarget: false,
     hmwDecidedIssue: null,
+    decidedHmw: null,
     boardScrollerRef: createRef<HTMLDivElement>(),
     privateToolbarRef: createRef<HTMLDivElement>(),
     camera: { x: 0, y: 0, zoom: 1 },
@@ -40,6 +41,7 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardCanvas>[0]> = {}) {
     onFitToNotes: vi.fn(),
     onSelect: vi.fn(),
     onHmwTemplateSelect: vi.fn(),
+    onIdeaHintSelect: vi.fn(),
     onNoteDragStart: vi.fn(),
     onNoteContentChange: vi.fn(),
     onNoteDelete: vi.fn(),
@@ -234,6 +236,20 @@ describe("RoomBoardCanvas", () => {
     });
   });
 
+  describe("アイデアガイド", () => {
+    it("Step 3-1 ではアイデアガイドを表示する", () => {
+      setup({ phase: buildPhaseStep(1, 3) });
+
+      expect(screen.getByTestId("idea-guide-panel")).toBeInTheDocument();
+    });
+
+    it("Step 3-2 ではアイデアガイドを表示しない", () => {
+      setup({ phase: buildPhaseStep(2, 3) });
+
+      expect(screen.queryByTestId("idea-guide-panel")).not.toBeInTheDocument();
+    });
+  });
+
   describe("決定操作", () => {
     it("ホストが結果ステップで選択した未決定の付箋右上に決定操作を表示し、押下を通知する", () => {
       const onNoteDecide = vi.fn();
@@ -326,6 +342,15 @@ describe("RoomBoardCanvas", () => {
     });
 
     expect(screen.getByTestId("private-notes-dock")).toBeInTheDocument();
+  });
+
+  it("Step3-1ではマイ付箋ツールバーを表示する", () => {
+    const phase = buildPhaseStep(1, 3);
+
+    setup({ phase, permissions: getBoardPermissions(phase) });
+
+    expect(screen.getByTestId("private-notes-dock")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "付箋を追加" })).toBeEnabled();
   });
 
   it("Step1-3ではマイ付箋ツールバーを表示しない", () => {
