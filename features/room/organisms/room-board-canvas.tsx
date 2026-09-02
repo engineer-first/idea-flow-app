@@ -38,7 +38,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { BoardPermissions } from "../logic/board-permissions";
 import type { CanvasCamera } from "../logic/canvas-camera";
-import { getIdeaValueFeasibilityMapPosition } from "../logic/idea-value-feasibility-map";
+import { getIdeaValueFeasibilityMapNotePosition } from "../logic/idea-value-feasibility-map";
 import type { Decision } from "../logic/room-reducer";
 import { CanvasZoomControls } from "../molecules/canvas-zoom-controls";
 import {
@@ -217,7 +217,7 @@ export function RoomBoardCanvas({
   }
 
   function renderIdeaMapNote(note: Note) {
-    const position = getIdeaValueFeasibilityMapPosition({
+    const position = getIdeaValueFeasibilityMapNotePosition({
       value: note.y,
       feasibility: note.x,
     });
@@ -228,7 +228,7 @@ export function RoomBoardCanvas({
         key={note.id}
         className="pointer-events-auto absolute z-10"
         data-testid={`idea-value-feasibility-map-note-${note.id}`}
-        style={{ ...position, transform: "translate(-50%, 50%)" }}
+        style={position}
       >
         {renderNoteCard(note, true)}
         {isSelectedDecidableNote ? (
@@ -244,7 +244,7 @@ export function RoomBoardCanvas({
 
   function renderIdeaMapDragGhost() {
     if (!dragGhost) return null;
-    const position = getIdeaValueFeasibilityMapPosition({
+    const position = getIdeaValueFeasibilityMapNotePosition({
       value: dragGhost.y,
       feasibility: dragGhost.x,
     });
@@ -255,7 +255,7 @@ export function RoomBoardCanvas({
         isLifted
         color={dragGhost.note.color}
         className="pointer-events-none absolute z-20"
-        style={{ ...position, transform: "translate(-50%, 50%)" }}
+        style={position}
       >
         <p className="min-h-0 flex-1 overflow-hidden p-2 text-sm text-slate-900 dark:text-slate-50">
           {dragGhost.note.content || "メモを入力..."}

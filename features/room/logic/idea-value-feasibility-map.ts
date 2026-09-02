@@ -25,6 +25,11 @@ export type IdeaValueFeasibilityMapPosition = {
   left: string;
 };
 
+export type IdeaValueFeasibilityMapNotePosition =
+  IdeaValueFeasibilityMapPosition & {
+    transform: string;
+  };
+
 export type IdeaValueFeasibilityMapBounds = {
   left: number;
   top: number;
@@ -51,6 +56,21 @@ export function getIdeaValueFeasibilityMapPosition({
   return {
     bottom: `${clampIdeaValueFeasibilityMapCoordinate(value)}%`,
     left: `${clampIdeaValueFeasibilityMapCoordinate(feasibility)}%`,
+  };
+}
+
+/**
+ * マップ端では付箋全体が平面内に収まるよう、座標に応じたtransformを返す。
+ */
+export function getIdeaValueFeasibilityMapNotePosition(
+  point: IdeaValueFeasibilityPoint,
+): IdeaValueFeasibilityMapNotePosition {
+  const position = getIdeaValueFeasibilityMapPosition(point);
+  const feasibility = clampIdeaValueFeasibilityMapCoordinate(point.feasibility);
+  const value = clampIdeaValueFeasibilityMapCoordinate(point.value);
+  return {
+    ...position,
+    transform: `translate(${feasibility === 0 ? 0 : feasibility === 100 ? -100 : -50}%, ${value === 0 ? 0 : value === 100 ? 100 : 50}%)`,
   };
 }
 

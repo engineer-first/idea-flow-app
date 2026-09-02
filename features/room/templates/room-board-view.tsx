@@ -7,10 +7,9 @@
 // 純粋にUIの関心事なので、ここでローカルに持つ。
 // 描画の実体はヘッダー（room-board-header）とボード面（room-board-canvas）が
 // 持ち、この view は UI 状態とドラッグ機械（use-board-drag）の配線に徹する。
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PersistentGroup } from "@/contracts/grouping";
 import {
-  isPhaseStep,
   isPublishAllowedStep,
   isResultStep,
   type RoomPhase,
@@ -23,14 +22,12 @@ import {
 import type { Note } from "@/features/notes";
 import { getBoardPermissions } from "../logic/board-permissions";
 import type { RoomScreenConnectionStatus } from "../logic/connection-status";
-import {
-  clampIdeaValueFeasibilityMapCoordinate,
-  getIdeaValueFeasibilityMapPointFromClientPosition,
-} from "../logic/idea-value-feasibility-map";
+import { clampIdeaValueFeasibilityMapCoordinate } from "../logic/idea-value-feasibility-map";
 import { roomNotify } from "../logic/room-notify";
 import type { Decision, Member } from "../logic/room-reducer";
 import { useBoardDrag } from "../logic/use-board-drag";
 import { useCanvasCamera } from "../logic/use-canvas-camera";
+import { useIdeaValueFeasibilityMapInput } from "../logic/use-idea-value-feasibility-map-input";
 import { LeaveConfirmDialog } from "../molecules/leave-confirm-dialog";
 import { VoteTotalingDialog } from "../molecules/vote-totaling-dialog";
 import { RoomBoardCanvas } from "../organisms/room-board-canvas";
@@ -143,7 +140,6 @@ export function RoomBoardView({
   const [voteTotalingDialogOpen, setVoteTotalingDialogOpen] = useState(false);
   const boardRootRef = useRef<HTMLDivElement>(null);
   const boardScrollerRef = useRef<HTMLDivElement>(null);
-  const ideaMapPlaneRef = useRef<HTMLDivElement>(null);
   const privateToolbarRef = useRef<HTMLDivElement>(null);
 
   const [isMounted, setIsMounted] = useState(false);
@@ -177,24 +173,14 @@ export function RoomBoardView({
     notes,
   });
 
-  const isIdeaValueFeasibilityMappingStep =
-    isPhaseStep(phase, 3, 2) || isPhaseStep(phase, 3, 3);
-  const mapPointFromClient = useCallback(
-    (clientX: number, clientY: number) => {
-      if (!isIdeaValueFeasibilityMappingStep) {
-        return worldPointFromClient(clientX, clientY);
-      }
-      const plane = ideaMapPlaneRef.current;
-      if (!plane) return null;
-      const point = getIdeaValueFeasibilityMapPointFromClientPosition(
-        clientX,
-        clientY,
-        plane.getBoundingClientRect(),
-      );
-      return point ? { x: point.feasibility, y: point.value } : null;
-    },
-    [isIdeaValueFeasibilityMappingStep, worldPointFromClient],
-  );
+  const {
+    ideaMapPlaneRef,
+    isIdeaValueFeasibilityMappingStep,
+    pointFromClient,
+  } = useIdeaValueFeasibilityMapInput({
+    phase,
+    fallbackPointFromClient: worldPointFromClient,
+  });
 
   const {
     drag,
@@ -210,7 +196,7 @@ export function RoomBoardView({
     currentUserId,
     boardRootRef,
     boardScrollerRef,
-    worldPointFromClient: mapPointFromClient,
+    worldPointFromClient: pointFromClient,
     privateToolbarRef,
     preservePrivateGrabOffset: !isIdeaValueFeasibilityMappingStep,
     clampCoordinate: isIdeaValueFeasibilityMappingStep

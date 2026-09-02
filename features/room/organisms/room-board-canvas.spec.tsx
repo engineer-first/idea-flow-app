@@ -192,6 +192,71 @@ describe("RoomBoardCanvas", () => {
     ).toBeInTheDocument();
   });
 
+  it.each([
+    { id: "bottom-left", x: 0, y: 0 },
+    { id: "bottom-right", x: 100, y: 0 },
+    { id: "top-left", x: 0, y: 100 },
+    { id: "top-right", x: 100, y: 100 },
+  ])("2軸マップの四隅（$id）でも共有付箋を平面内に完全表示し、操作できる", ({
+    id,
+    x,
+    y,
+  }) => {
+    const phase = buildPhaseStep(2, 3);
+    const onNoteDragStart = vi.fn();
+    setup({
+      phase,
+      permissions: getBoardPermissions(phase),
+      notes: [buildNote({ id, x, y })],
+      onNoteDragStart,
+    });
+
+    const mappedNote = screen.getByTestId(
+      `idea-value-feasibility-map-note-${id}`,
+    );
+    expect(mappedNote).toHaveStyle({ left: `${x}%`, bottom: `${y}%` });
+    expect(mappedNote).toHaveStyle({
+      transform: `translate(${x === 0 ? 0 : -100}%, ${y === 0 ? 0 : 100}%)`,
+    });
+
+    const surface = within(mappedNote).getByRole("button", { name: "付箋" });
+    fireEvent.pointerDown(surface, {
+      pointerId: 1,
+      clientX: 200,
+      clientY: 200,
+    });
+    fireEvent.pointerMove(surface, {
+      pointerId: 1,
+      clientX: 210,
+      clientY: 210,
+    });
+    expect(onNoteDragStart).toHaveBeenCalledWith(id, expect.anything());
+  });
+
+  it("2軸マップの端でもドラッグゴーストを平面内に完全表示する", () => {
+    const phase = buildPhaseStep(2, 3);
+    setup({
+      phase,
+      permissions: getBoardPermissions(phase),
+      dragGhost: {
+        note: buildNote({ id: "map-ghost", content: "移動中のアイデア" }),
+        x: 0,
+        y: 100,
+      },
+    });
+
+    const ghost = screen
+      .getByText("移動中のアイデア")
+      .closest<HTMLElement>("[data-slot='sticky-note']");
+    if (!ghost) throw new Error("ドラッグゴーストがありません");
+
+    expect(ghost).toHaveStyle({
+      left: "0%",
+      bottom: "100%",
+      transform: "translate(0%, 100%)",
+    });
+  });
+
   it("アイデアフェーズ以外では2軸マップを表示しない", () => {
     const phase = buildPhaseStep(2, 2);
 
