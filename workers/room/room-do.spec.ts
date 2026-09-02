@@ -2147,7 +2147,7 @@ describe("RoomDO フェーズ2の投票・決定ゲート", () => {
     ws.close();
   });
 
-  it("フェーズ2の投票未完了時は force でも結果ステップへ進めない", async () => {
+  it("未投票メンバーが残っていても、ホストは force で Step 2-4 へ進められる", async () => {
     const roomName = "room-phase2-voting-incomplete-force";
     const stub = roomStub(roomName);
     await stub.initializeNewRoom(USER_A, "Host");
@@ -2157,8 +2157,30 @@ describe("RoomDO フェーズ2の投票・決定ゲート", () => {
     const ws = await connectDirectly(roomName, USER_A, USER_A);
     ws.send(JSON.stringify({ type: "phase:next", force: true }));
     expect(await nextJson(ws)).toMatchObject({
+      type: "snapshot",
+      phase: buildPhaseStep(4, 2),
+    });
+    expect(await nextJson(ws)).toMatchObject({
+      type: "phase:updated",
+      phase: buildPhaseStep(4, 2),
+    });
+    expect(await stub.getPhase()).toEqual(buildPhaseStep(4, 2));
+    ws.close();
+  });
+
+  it("Step 2-3ではホスト以外が force を付けても進められない", async () => {
+    const roomName = "room-phase2-force-non-host";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.upsertMember(USER_B, "Member");
+    await stub.setPhase(buildPhaseStep(3, 2), USER_A);
+
+    const ws = await connectDirectly(roomName, USER_B, USER_A);
+    ws.send(JSON.stringify({ type: "phase:next", force: true }));
+
+    expect(await nextJson(ws)).toMatchObject({
       type: "error",
-      code: "voting-incomplete",
+      code: "forbidden",
     });
     expect(await stub.getPhase()).toEqual(buildPhaseStep(3, 2));
     ws.close();

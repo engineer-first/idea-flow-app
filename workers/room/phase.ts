@@ -230,12 +230,14 @@ export const phaseHandlers: MessageHandlers<"start_phase" | "phase:next"> = {
       });
       return;
     }
-    // force はフェーズ1だけで使える脱出ハッチ。フェーズ2以降は全員投票を
-    // 必須にし、結果ステップへ未完了のまま進めない。
+    // force はフェーズ1・2の投票ステップで使える脱出ハッチ。離脱者などが
+    // 投票を完了できなくても、ホストは結果ステップへ進められる。
+    const canForceIncompleteVoting =
+      (current.phase === 1 || current.phase === 2) && message.force === true;
     if (
       isVotingStep(current) &&
       !haveAllMembersCompletedVoting(ctx.sql, current.phase) &&
-      (current.phase !== 1 || !message.force)
+      !canForceIncompleteVoting
     ) {
       ctx.reply({
         type: "error",
