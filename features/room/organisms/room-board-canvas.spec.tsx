@@ -192,6 +192,14 @@ describe("RoomBoardCanvas", () => {
     expect(onPrivateNoteDelete).not.toHaveBeenCalled();
   });
 
+  it("Step2-2ではマイ付箋エリアを表示する", () => {
+    const phase = buildPhaseStep(2, 2);
+
+    setup({ phase, permissions: getBoardPermissions(phase) });
+
+    expect(screen.getByTestId("private-notes-dock")).toBeInTheDocument();
+  });
+
   describe("HMW オーバーレイ", () => {
     it("hmwDecidedIssue があるとボード上に決定課題バナーを表示する", () => {
       setup({ hmwDecidedIssue: "宿題を後回しにしてしまう" });
@@ -333,6 +341,16 @@ describe("RoomBoardCanvas", () => {
       phase: buildPhaseStep(4),
       permissions: getBoardPermissions(buildPhaseStep(4)),
     });
+
+    expect(
+      screen.getAllByRole("button", { name: /投票/ }).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("Step2-3では投票可能状態になる", () => {
+    const phase = buildPhaseStep(3, 2);
+
+    setup({ phase, permissions: getBoardPermissions(phase) });
 
     expect(
       screen.getAllByRole("button", { name: /投票/ }).length,

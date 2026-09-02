@@ -151,5 +151,43 @@ export function getBoardPermissions(phase: RoomPhase): BoardPermissions {
     };
   }
 
+  // フェーズ2 Step2-2 HMW共有
+  if (phase.phase === 2 && phase.step === 2) {
+    return {
+      showPrivateToolbar: true,
+
+      canCreateNote: false,
+      canEditNote: true,
+      canDeleteNote: false,
+      canMoveNote: true,
+
+      canGroupNote: false,
+
+      canShowVote: false,
+      canVote: false,
+
+      canDecide: false,
+    };
+  }
+
+  // フェーズ2 Step2-3 HMWステルス投票
+  if (phase.phase === 2 && phase.step === 3) {
+    return {
+      showPrivateToolbar: false,
+
+      canCreateNote: false,
+      canEditNote: false,
+      canDeleteNote: false,
+      canMoveNote: false,
+
+      canGroupNote: false,
+
+      canShowVote: true,
+      canVote: true,
+
+      canDecide: false,
+    };
+  }
+
   return ALL_DISABLED;
 }
