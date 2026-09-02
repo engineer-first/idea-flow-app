@@ -152,22 +152,30 @@ export function RoomBoard({
     (content: string) => addNote(content),
     [addNote],
   );
+  const handleIdeaHintSelect = useCallback(
+    (content: string) => addNote(content),
+    [addNote],
+  );
 
   // Step 2-1（HMW 個人執筆）はボード面に自分の付箋だけを出す個人ステップ。
   // フェーズ1の共有付箋・グループは描画しない。共有済み付箋は全員に公開済みの
   // 情報なのでこれは表示上の判断であり、可視性の境界は引き続きサーバー
   // （visibleTo）が持つ。付箋のフェーズ分離の本実装は #165 のスコープ。
   const atHmwWritingStep = isHmwWritingStep(roomState.phase);
-  // 決定課題の掲示は Step 2-1 だけでなくフェーズ2の任意ステップで続ける。
-  // Step 2-2 以降（#165）もフェーズ1の決定を参照しながら発想するため、
-  // ステップが進んでも掲示を消さない。
-  // 持ち越しはフェーズ昇順の配列。掲示するのはフェーズ1の決定。
-  const atPhase2 =
-    roomState.phase.kind === "step" && roomState.phase.phase === 2;
-  const hmwDecidedIssue = atPhase2
-    ? (roomState.carryovers.find((carryover) => carryover.phase === 1)
-        ?.content ?? null)
-    : null;
+  // フェーズ2では決定課題を、フェーズ3では決定課題と決定HMWを掲示する。
+  // 持ち越しはフェーズ昇順の配列なので、由来フェーズで取り出す。
+  const currentPhase =
+    roomState.phase.kind === "step" ? roomState.phase.phase : null;
+  const hmwDecidedIssue =
+    currentPhase === 2 || currentPhase === 3
+      ? (roomState.carryovers.find((carryover) => carryover.phase === 1)
+          ?.content ?? null)
+      : null;
+  const decidedHmw =
+    currentPhase === 3
+      ? (roomState.carryovers.find((carryover) => carryover.phase === 2)
+          ?.content ?? null)
+      : null;
 
   return (
     <>
@@ -187,6 +195,7 @@ export function RoomBoard({
         )}
         groups={atHmwWritingStep ? [] : noteGroups.groups}
         hmwDecidedIssue={hmwDecidedIssue}
+        decidedHmw={decidedHmw}
         inviteCode={inviteCode}
         inviteUrl={inviteUrl}
         phase={roomState.phase}
@@ -203,6 +212,7 @@ export function RoomBoard({
         signOutAction={signOutAction}
         onAddPrivateNote={handleAddPrivateNote}
         onHmwTemplateSelect={handleHmwTemplateSelect}
+        onIdeaHintSelect={handleIdeaHintSelect}
         onPrivateNoteContentChange={notes.changeNoteContent}
         onPrivateNoteDelete={notes.deleteNote}
         onPrivateNotePublish={notes.publishNote}

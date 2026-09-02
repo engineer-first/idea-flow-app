@@ -8,11 +8,13 @@ import { DECIDED_ISSUE_LABEL } from "../logic/hmw-content";
 export type HmwDecidedIssueBannerProps = {
   // フェーズ1から持ち越された決定課題の本文
   content: string;
+  label?: string;
   className?: string;
 };
 
 export function HmwDecidedIssueBanner({
   content,
+  label = DECIDED_ISSUE_LABEL,
   className,
 }: HmwDecidedIssueBannerProps) {
   return (
@@ -28,7 +30,7 @@ export function HmwDecidedIssueBanner({
         className="size-4 shrink-0 text-muted-foreground"
       />
       <span className="shrink-0 font-medium text-muted-foreground text-sm">
-        {DECIDED_ISSUE_LABEL}
+        {label}
       </span>
       {/* 決定課題を見ながらHMWを考えるため、省略せず折り返して全文を表示する */}
       <span className="min-w-0 whitespace-normal break-words font-semibold text-sm">

@@ -2828,3 +2828,58 @@ describe("RoomDO Step 2-1 の境界ゲート", () => {
     ws.close();
   });
 });
+
+describe("RoomDO Step 3-1 の境界ゲート", () => {
+  it("Step 3-1 では note:create で自分専用付箋を作成できる", async () => {
+    const roomName = "room-step3-1-create";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(1, 3), USER_A);
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "note:create", content: "新しいアイデア" }));
+
+    expect(await nextJson(ws)).toMatchObject({
+      type: "note:inserted",
+      note: {
+        authorId: USER_A,
+        content: "新しいアイデア",
+        visibility: "private",
+      },
+    });
+    expect(
+      await runInRoomDO(
+        roomName,
+        (_instance, state) =>
+          state.storage.sql
+            .exec("SELECT phase FROM notes WHERE author_id = ?1", USER_A)
+            .one().phase,
+      ),
+    ).toBe(3);
+    ws.close();
+  });
+
+  it("Step 3-1 では note:publish が forbidden になる", async () => {
+    const roomName = "room-step3-1-publish-forbidden";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(1, 3), USER_A);
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(
+      JSON.stringify({
+        type: "note:publish",
+        noteId: "99999999-9999-4999-8999-999999999999",
+        x: 100,
+        y: 100,
+      }),
+    );
+
+    expect(await nextJson(ws)).toMatchObject({
+      type: "error",
+      code: "forbidden",
+      message: expect.stringContaining("3-1 アイデアを個人で書く"),
+    });
+    ws.close();
+  });
+});

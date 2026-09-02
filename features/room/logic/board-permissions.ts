@@ -189,5 +189,24 @@ export function getBoardPermissions(phase: RoomPhase): BoardPermissions {
     };
   }
 
+  // フェーズ3 Step3-1 アイデア個人執筆
+  if (phase.phase === 3 && phase.step === 1) {
+    return {
+      showPrivateToolbar: true,
+
+      canCreateNote: true,
+      canEditNote: true,
+      canDeleteNote: true,
+      canMoveNote: false,
+
+      canGroupNote: false,
+
+      canShowVote: false,
+      canVote: false,
+
+      canDecide: false,
+    };
+  }
+
   return ALL_DISABLED;
 }

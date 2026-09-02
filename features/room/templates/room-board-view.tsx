@@ -55,9 +55,11 @@ export type RoomBoardViewProps = {
   // ボード上に掲示する、フェーズ1から持ち越された決定課題の本文。
   // 解決（carryovers からの取り出し）はコンテナの責務。null なら非表示。
   hmwDecidedIssue: string | null;
+  decidedHmw: string | null;
   onAddPrivateNote: () => void;
   // Step 2-1 でテンプレート・具体例を起点に付箋を作る。
   onHmwTemplateSelect: (content: string) => void;
+  onIdeaHintSelect: (content: string) => void;
   onPrivateNoteContentChange: (noteId: string, content: string) => void;
   onPrivateNoteDelete: (noteId: string) => void;
   onPrivateNotePublish: (noteId: string, x: number, y: number) => void;
@@ -104,8 +106,10 @@ export function RoomBoardView({
   signOutAction,
   privateNotes,
   hmwDecidedIssue,
+  decidedHmw,
   onAddPrivateNote,
   onHmwTemplateSelect,
+  onIdeaHintSelect,
   onPrivateNoteContentChange,
   onPrivateNoteDelete,
   onPrivateNotePublish,
@@ -282,6 +286,7 @@ export function RoomBoardView({
           drag?.status === "shared" && drag.note.authorId === currentUserId
         }
         hmwDecidedIssue={hmwDecidedIssue}
+        decidedHmw={decidedHmw}
         boardScrollerRef={boardScrollerRef}
         privateToolbarRef={privateToolbarRef}
         camera={camera}
@@ -296,6 +301,7 @@ export function RoomBoardView({
         onFitToNotes={fitToNotes}
         onSelect={setSelectedNoteId}
         onHmwTemplateSelect={onHmwTemplateSelect}
+        onIdeaHintSelect={onIdeaHintSelect}
         onNoteDragStart={handleSharedNoteDragStart}
         onNoteContentChange={onNoteContentChange}
         onNoteDelete={onNoteDelete}

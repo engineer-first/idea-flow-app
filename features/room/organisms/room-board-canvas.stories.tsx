@@ -38,6 +38,7 @@ const meta = {
     dragGhost: null,
     isReturnDropTarget: false,
     hmwDecidedIssue: null,
+    decidedHmw: null,
     boardScrollerRef: createRef<HTMLDivElement>(),
     privateToolbarRef: createRef<HTMLDivElement>(),
     camera: { x: 0, y: 0, zoom: 1 },
@@ -52,6 +53,7 @@ const meta = {
     onFitToNotes: fn(),
     onSelect: fn(),
     onHmwTemplateSelect: fn(),
+    onIdeaHintSelect: fn(),
     onNoteDragStart: fn(),
     onNoteContentChange: fn(),
     onNoteDelete: fn(),
@@ -191,6 +193,21 @@ export const HmwCarryoverOnly: Story = {
     phase: buildPhaseStep(2, 2),
     permissions: getBoardPermissions(buildPhaseStep(2, 2)),
     hmwDecidedIssue: buildCarryover().content,
+  },
+};
+
+export const IdeaWritingCarryovers: Story = {
+  args: {
+    phase: buildPhaseStep(1, 3),
+    permissions: getBoardPermissions(buildPhaseStep(1, 3)),
+    hmwDecidedIssue: buildCarryover({
+      phase: 1,
+      content: "ユーザーが作業を後回しにしてしまう",
+    }).content,
+    decidedHmw: buildCarryover({
+      phase: 2,
+      content: "どうすれば、楽しく最初の一歩を踏み出せるだろうか？",
+    }).content,
   },
 };
 

@@ -16,6 +16,7 @@ import {
 import {
   isAtOrAfterGroupingStep,
   isIdeaSupportAvailableStep,
+  isPhaseStep,
   isResultStep,
   type RoomPhase,
 } from "@/contracts/phase";
@@ -26,7 +27,7 @@ import {
   HmwTemplatePanel,
   isHmwWritingStep,
 } from "@/features/hmw";
-import { IdeaSupportSidebar } from "@/features/idea-support";
+import { IdeaGuidePanel, IdeaSupportSidebar } from "@/features/idea-support";
 import {
   type Note,
   NoteCard,
@@ -61,6 +62,8 @@ export type RoomBoardCanvasProps = {
   isReturnDropTarget: boolean;
   // 前フェーズから持ち越した決定課題。null なら非表示。
   hmwDecidedIssue: string | null;
+  // フェーズ2から持ち越した決定HMW。null なら非表示。
+  decidedHmw: string | null;
   boardScrollerRef: RefObject<HTMLDivElement | null>;
   privateToolbarRef: RefObject<HTMLDivElement | null>;
   permissions: BoardPermissions;
@@ -76,6 +79,7 @@ export type RoomBoardCanvasProps = {
   onFitToNotes: () => void;
   onSelect: (noteId: string | null) => void;
   onHmwTemplateSelect: (content: string) => void;
+  onIdeaHintSelect: (content: string) => void;
   onNoteDragStart: (
     noteId: string,
     event: ReactPointerEvent<HTMLButtonElement>,
@@ -110,6 +114,7 @@ export function RoomBoardCanvas({
   dragGhost,
   isReturnDropTarget,
   hmwDecidedIssue,
+  decidedHmw,
   boardScrollerRef,
   privateToolbarRef,
   permissions,
@@ -125,6 +130,7 @@ export function RoomBoardCanvas({
   onFitToNotes,
   onSelect,
   onHmwTemplateSelect,
+  onIdeaHintSelect,
   onNoteDragStart,
   onNoteContentChange,
   onNoteDelete,
@@ -283,21 +289,31 @@ export function RoomBoardCanvas({
         </div>
         {/* バナー（top）とパネル（left）は別条件で出す: Step 2-2 以降は
             テンプレートを出さないが、決定課題の掲示は続ける（#165 で再利用）。 */}
-        {hmwDecidedIssue !== null ? (
+        {hmwDecidedIssue !== null || decidedHmw !== null ? (
           <div
             className={cn(
-              "pointer-events-none absolute inset-x-3 top-3 z-30 flex justify-center",
+              "pointer-events-none absolute inset-x-3 top-3 z-30 flex flex-col items-center gap-2",
               // テンプレートパネル（left-3 + w-64）と重なる帯を、
               // パネル表示中はバナー側の左余白として予約する。
-              isHmwWritingStep(phase) && "left-72",
+              (isHmwWritingStep(phase) || isPhaseStep(phase, 3, 1)) &&
+                "left-72",
             )}
           >
             {/* 長文でも左端のテンプレートパネルと同じ帯を侵食しないよう
                 幅を抑える（本文は省略せず折り返して全文表示する）。 */}
-            <HmwDecidedIssueBanner
-              content={hmwDecidedIssue}
-              className="pointer-events-auto max-w-xl"
-            />
+            {hmwDecidedIssue !== null ? (
+              <HmwDecidedIssueBanner
+                content={hmwDecidedIssue}
+                className="pointer-events-auto max-w-xl"
+              />
+            ) : null}
+            {decidedHmw !== null ? (
+              <HmwDecidedIssueBanner
+                content={decidedHmw}
+                label="決定したHMW"
+                className="pointer-events-auto max-w-xl"
+              />
+            ) : null}
           </div>
         ) : null}
         {isHmwWritingStep(phase) ? (
@@ -307,6 +323,15 @@ export function RoomBoardCanvas({
             <HmwTemplatePanel
               className="pointer-events-auto max-h-full overflow-y-auto"
               onTemplateSelect={onHmwTemplateSelect}
+              disabled={isDisconnected}
+            />
+          </div>
+        ) : null}
+        {isPhaseStep(phase, 3, 1) ? (
+          <div className="pointer-events-none absolute top-16 bottom-56 left-3 z-30 flex items-start">
+            <IdeaGuidePanel
+              className="pointer-events-auto max-h-full overflow-y-auto"
+              onHintSelect={onIdeaHintSelect}
               disabled={isDisconnected}
             />
           </div>

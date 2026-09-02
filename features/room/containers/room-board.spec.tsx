@@ -1176,3 +1176,33 @@ describe("Step 2-1（HMW 個人執筆）", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe("Step 3-1（アイデア個人執筆）", () => {
+  it("フェーズ1とフェーズ2で決定した内容を両方表示する", () => {
+    connectWithSnapshot([], {
+      phase: buildPhaseStep(1, 3),
+      carryovers: [
+        buildCarryover({ phase: 1, content: "優先順位を決められない" }),
+        buildCarryover({ phase: 2, content: "どうすれば着手しやすくできるか" }),
+      ],
+    });
+
+    expect(screen.getByText("優先順位を決められない")).toBeInTheDocument();
+    expect(
+      screen.getByText("どうすれば着手しやすくできるか"),
+    ).toBeInTheDocument();
+  });
+
+  it("発想のヒントを選ぶと文言つき note:create を送る", () => {
+    const { socket } = connectWithSnapshot([], {
+      phase: buildPhaseStep(1, 3),
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "もっと簡単に" }));
+
+    expect(socket.sent.map((raw) => JSON.parse(raw))).toContainEqual({
+      type: "note:create",
+      content: "もっと簡単に",
+    });
+  });
+});

@@ -160,7 +160,7 @@ const allowedBoardMutationsByPhase: {
     4: ["note:decide"],
   },
   3: {
-    1: [],
+    1: ["note:create", "note:update-content", "note:delete"],
     2: [],
     3: [],
     4: [],
