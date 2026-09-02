@@ -28,6 +28,7 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardCanvas>[0]> = {}) {
     hmwDecidedIssue: null,
     decidedHmw: null,
     boardScrollerRef: createRef<HTMLDivElement>(),
+    ideaMapPlaneRef: createRef<HTMLDivElement>(),
     privateToolbarRef: createRef<HTMLDivElement>(),
     camera: { x: 0, y: 0, zoom: 1 },
     gridStyle: {},
@@ -154,6 +155,50 @@ describe("RoomBoardCanvas", () => {
 
     expect(
       screen.queryByRole("button", { name: "発想支援を開く" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("Step3-1では価値×実現可能性の2軸マップを表示しない", () => {
+    const phase = buildPhaseStep(1, 3);
+
+    setup({
+      phase,
+      permissions: getBoardPermissions(phase),
+      notes: [],
+    });
+
+    expect(
+      screen.queryByRole("region", { name: "価値と実現可能性の2軸マップ" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("board-scroller")).toHaveClass(
+      "[container-type:size]",
+    );
+    expect(screen.getByTestId("board-canvas")).not.toHaveClass(
+      "[container-type:size]",
+    );
+  });
+
+  it.each([
+    2, 3, 4, 5,
+  ])("Step3-%iでも価値×実現可能性の2軸マップを表示する", (step) => {
+    const phase = buildPhaseStep(step, 3);
+
+    setup({ phase, permissions: getBoardPermissions(phase) });
+
+    expect(
+      screen.getByRole("region", {
+        name: "価値と実現可能性の2軸マップ",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("アイデアフェーズ以外では2軸マップを表示しない", () => {
+    const phase = buildPhaseStep(2, 2);
+
+    setup({ phase, permissions: getBoardPermissions(phase) });
+
+    expect(
+      screen.queryByRole("region", { name: "価値と実現可能性の2軸マップ" }),
     ).not.toBeInTheDocument();
   });
 

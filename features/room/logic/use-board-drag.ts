@@ -46,6 +46,12 @@ export type UseBoardDragArgs = {
     clientY: number,
   ) => CanvasPoint | null;
   privateToolbarRef: RefObject<HTMLDivElement | null>;
+  // 2軸マップは付箋の中心を座標で表すため、ツールバー内で掴んだ位置の差分を
+  // 持ち込まず、ポインター位置そのものを配置点にする。
+  preservePrivateGrabOffset?: boolean;
+  // 通常キャンバスは広い連続座標、2軸マップは0〜100の連続座標とするため、
+  // 配置先が座標系に応じた上限を渡す。
+  clampCoordinate?: (coordinate: number) => number;
   canPublish?: boolean;
   onPublishBlocked?: () => void;
   onNoteDragStart: (noteId: string) => void;
@@ -75,6 +81,29 @@ function placePrivateNote(source: Note[], noteId: string, index: number) {
   return next;
 }
 
+function getPositionFromPointer({
+  pointerPosition,
+  drag,
+  preservePrivateGrabOffset,
+  clampCoordinate,
+}: {
+  pointerPosition: CanvasPoint;
+  drag: BoardDrag;
+  preservePrivateGrabOffset: boolean;
+  clampCoordinate: (coordinate: number) => number;
+}): CanvasPoint {
+  const preservesGrabOffset =
+    drag.status === "shared" || preservePrivateGrabOffset;
+  return {
+    x: clampCoordinate(
+      pointerPosition.x - (preservesGrabOffset ? drag.grabOffsetX : 0),
+    ),
+    y: clampCoordinate(
+      pointerPosition.y - (preservesGrabOffset ? drag.grabOffsetY : 0),
+    ),
+  };
+}
+
 /**
  * ホワイトボードとマイ付箋ツールバー間の付箋ドラッグ状態を管理するカスタムフックです。
  *
@@ -90,6 +119,8 @@ export function useBoardDrag({
   boardScrollerRef,
   worldPointFromClient,
   privateToolbarRef,
+  preservePrivateGrabOffset = true,
+  clampCoordinate = clampCanvasCoordinate,
   canPublish = true,
   onPublishBlocked,
   onNoteDragStart,
@@ -317,10 +348,12 @@ export function useBoardDrag({
 
       const position = boardPositionFromPointer(event.clientX, event.clientY);
       if (!position) return;
-      const nextPosition = {
-        x: clampCanvasCoordinate(position.x - current.grabOffsetX),
-        y: clampCanvasCoordinate(position.y - current.grabOffsetY),
-      };
+      const nextPosition = getPositionFromPointer({
+        pointerPosition: position,
+        drag: current,
+        preservePrivateGrabOffset,
+        clampCoordinate,
+      });
       if (current.status === "private" || current.status === "returning") {
         if (!canPublish) {
           if (!hasNotifiedBlockedRef.current) {
@@ -340,11 +373,21 @@ export function useBoardDrag({
       // publish と同じ WebSocket 接続で送るため、publish のあとに届く drag は
       // RoomDO 側でも公開後の付箋として処理される。
       onNoteDragMove(current.note.id, nextPosition.x, nextPosition.y);
-      updateDrag({ ...current, status: "shared", ...nextPosition });
+      updateDrag({
+        ...current,
+        status: "shared",
+        ...nextPosition,
+        // マイ付箋から2軸マップへ初めて出した後も、ドロップ確定時に
+        // ツールバー由来の差分を再適用しない。
+        ...(!preservePrivateGrabOffset && current.status !== "shared"
+          ? { grabOffsetX: 0, grabOffsetY: 0 }
+          : {}),
+      });
     },
     [
       boardPositionFromPointer,
       canPublish,
+      clampCoordinate,
       currentUserId,
       isPointerOverPrivateToolbar,
       privateDropIndexFromPointer,
@@ -353,6 +396,7 @@ export function useBoardDrag({
       onPrivateNotePublish,
       onPrivateNoteUnpublish,
       onPublishBlocked,
+      preservePrivateGrabOffset,
       updateDrag,
     ],
   );
@@ -368,10 +412,12 @@ export function useBoardDrag({
           event.clientY,
         );
         const position = pointerPosition
-          ? {
-              x: clampCanvasCoordinate(pointerPosition.x - current.grabOffsetX),
-              y: clampCanvasCoordinate(pointerPosition.y - current.grabOffsetY),
-            }
+          ? getPositionFromPointer({
+              pointerPosition,
+              drag: current,
+              preservePrivateGrabOffset,
+              clampCoordinate,
+            })
           : { x: current.x, y: current.y };
         onNoteDragEnd(current.note.id, position.x, position.y);
       } else if (current.privateDropIndex !== null) {
@@ -407,8 +453,10 @@ export function useBoardDrag({
     [
       boardPositionFromPointer,
       boardRootRef,
+      clampCoordinate,
       onNoteDragEnd,
       privateNotes,
+      preservePrivateGrabOffset,
       updateDrag,
     ],
   );

@@ -682,7 +682,10 @@ describe("サーバーメッセージ → 画面反映", () => {
     });
 
     const note = screen.getByTestId("note-card");
-    const surface = within(note).getByRole("button", { name: "付箋" });
+    const surface = within(note).getByRole("button", {
+      name: "付箋",
+      hidden: true,
+    });
     fireEvent.pointerDown(surface, {
       pointerId: 1,
       clientX: 100,
@@ -1204,5 +1207,176 @@ describe("Step 3-1（アイデア個人執筆）", () => {
       type: "note:create",
       content: "もっと簡単に",
     });
+  });
+});
+
+describe("Step 3-2〜3-5（2軸マッピング）", () => {
+  it("Step 3-2で共有付箋を2軸平面内に描画し、ドラッグ位置を0〜100座標で送る", () => {
+    const { socket } = connectWithSnapshot([protocolNote({ x: 25, y: 75 })], {
+      phase: buildPhaseStep(2, 3),
+    });
+    const canvas = screen.getByTestId("board-canvas");
+    const scroller = canvas.parentElement;
+    if (!scroller) throw new Error("ボードスクローラーがありません");
+    Object.defineProperty(scroller, "getBoundingClientRect", {
+      value: () => ({
+        left: 0,
+        top: 0,
+        right: 600,
+        bottom: 600,
+        width: 600,
+        height: 600,
+      }),
+    });
+    const plane = screen.getByTestId("idea-value-feasibility-map-plane");
+    Object.defineProperty(plane, "getBoundingClientRect", {
+      value: () => ({
+        left: 100,
+        top: 100,
+        right: 500,
+        bottom: 500,
+        width: 400,
+        height: 400,
+      }),
+    });
+
+    const mappedNote = within(plane).getByTestId(
+      "idea-value-feasibility-map-note-cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    );
+    expect(mappedNote).toHaveStyle({
+      left: "25%",
+      bottom: "75%",
+    });
+    const note = within(mappedNote).getByTestId("note-card");
+
+    const surface = within(note).getByRole("button", { name: "付箋" });
+    fireEvent.pointerDown(surface, {
+      pointerId: 1,
+      clientX: 200,
+      clientY: 200,
+    });
+    fireEvent.pointerMove(surface, {
+      pointerId: 1,
+      clientX: 210,
+      clientY: 210,
+    });
+    const root = screen.getByTestId("room-board-view-root");
+    fireEvent.pointerMove(root, {
+      pointerId: 1,
+      clientX: 310,
+      clientY: 310,
+    });
+    fireEvent.pointerUp(root, {
+      pointerId: 1,
+      clientX: 310,
+      clientY: 310,
+    });
+
+    expect(socket.sent.map((message) => JSON.parse(message))).toContainEqual({
+      type: "note:move",
+      noteId: NOTE_ID,
+      x: 50,
+      y: 50,
+    });
+  });
+
+  it("Step 3-2でマイ付箋を2軸マップへ共有し、正規化した位置で公開する", () => {
+    const privateNote = protocolNote({ visibility: "private" });
+    const { socket } = connectWithSnapshot([privateNote], {
+      phase: buildPhaseStep(2, 3),
+    });
+    const canvas = screen.getByTestId("board-canvas");
+    const scroller = canvas.parentElement;
+    if (!scroller) throw new Error("ボードスクローラーがありません");
+    Object.defineProperty(scroller, "getBoundingClientRect", {
+      value: () => ({
+        left: 0,
+        top: 0,
+        right: 600,
+        bottom: 600,
+        width: 600,
+        height: 600,
+      }),
+    });
+    const plane = screen.getByTestId("idea-value-feasibility-map-plane");
+    Object.defineProperty(plane, "getBoundingClientRect", {
+      value: () => ({
+        left: 100,
+        top: 100,
+        right: 500,
+        bottom: 500,
+        width: 400,
+        height: 400,
+      }),
+    });
+
+    const toolbar = screen.getByTestId("private-notes-toolbar");
+    const handle = within(toolbar).getByRole("button", { name: "付箋" });
+    Object.defineProperty(handle, "getBoundingClientRect", {
+      value: () => ({
+        left: 500,
+        top: 0,
+        right: 700,
+        bottom: 150,
+        width: 200,
+        height: 150,
+      }),
+    });
+    fireEvent.pointerDown(handle, {
+      pointerId: 1,
+      clientX: 600,
+      clientY: 20,
+    });
+    fireEvent.pointerMove(handle, {
+      pointerId: 1,
+      clientX: 605,
+      clientY: 25,
+    });
+    const root = screen.getByTestId("room-board-view-root");
+    fireEvent.pointerMove(root, {
+      pointerId: 1,
+      clientX: 300,
+      clientY: 300,
+    });
+
+    expect(socket.sent.map((message) => JSON.parse(message))).toContainEqual({
+      type: "note:publish",
+      noteId: NOTE_ID,
+      x: 50,
+      y: 50,
+    });
+  });
+
+  it.each([
+    4, 5,
+  ])("Step 3-%iではマップ上の付箋をドラッグしても移動メッセージを送らない", (step) => {
+    const { socket } = connectWithSnapshot([protocolNote({ x: 25, y: 75 })], {
+      phase: buildPhaseStep(step, 3),
+    });
+    const note = within(
+      screen.getByTestId("idea-value-feasibility-map-plane"),
+    ).getByTestId("note-card");
+    const surface = within(note).getByRole("button", {
+      name: "付箋",
+      hidden: true,
+    });
+
+    fireEvent.pointerDown(surface, {
+      pointerId: 1,
+      clientX: 200,
+      clientY: 200,
+    });
+    fireEvent.pointerMove(surface, {
+      pointerId: 1,
+      clientX: 210,
+      clientY: 210,
+    });
+    fireEvent.pointerUp(surface, {
+      pointerId: 1,
+      clientX: 210,
+      clientY: 210,
+    });
+
+    expect(socket.sent).toHaveLength(0);
   });
 });

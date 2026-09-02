@@ -137,6 +137,40 @@ describe("useBoardDrag", () => {
     expect(result.current.drag?.status).toBe("shared");
   });
 
+  it("2軸マップへ共有するとマイ付箋をポインター位置の連続座標で配置する", () => {
+    const mapCoordinateOptions = {
+      preservePrivateGrabOffset: false,
+      clampCoordinate: (coordinate: number) =>
+        Math.min(100, Math.max(0, coordinate)),
+    } as Partial<Parameters<typeof useBoardDrag>[0]>;
+    const { args, result } = setup({
+      worldPointFromClient: () => ({ x: 50, y: 50 }),
+      ...mapCoordinateOptions,
+    });
+    const event = pointerEvent(1, 400, 560);
+    Object.defineProperty(event, "currentTarget", {
+      value: {
+        getBoundingClientRect: () => ({
+          left: 300,
+          top: 500,
+          right: 500,
+          bottom: 650,
+          width: 200,
+          height: 150,
+        }),
+      },
+    });
+
+    act(() => {
+      result.current.handlePrivateDragStart("private-1", event);
+      result.current.handlePointerMove(pointerEvent(1, 300, 200));
+      result.current.handlePointerEnd(pointerEvent(1, 300, 200));
+    });
+
+    expect(args.onPrivateNotePublish).toHaveBeenCalledWith("private-1", 50, 50);
+    expect(args.onNoteDragEnd).toHaveBeenCalledWith("private-1", 50, 50);
+  });
+
   it("マイ付箋エリア内でドラッグした付箋の並び順を変更する", () => {
     const { args, result } = setup({
       privateNotes: [

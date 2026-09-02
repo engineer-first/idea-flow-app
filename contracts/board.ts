@@ -2,6 +2,20 @@
 // 異常な入力でCSS transformやD1/DOの値が壊れないよう、境界で共有する。
 export const CANVAS_COORDINATE_LIMIT = 1_000_000;
 
+// アイデアフェーズの2軸マップで使う連続座標。横軸は実現可能性、縦軸は価値を
+// 表し、どちらも低=0・高=100 として保存・同期する。
+export const IDEA_VALUE_FEASIBILITY_MAP_RANGE = { min: 0, max: 100 } as const;
+
+export function isIdeaValueFeasibilityMapCoordinate(
+  coordinate: number,
+): boolean {
+  return (
+    Number.isFinite(coordinate) &&
+    coordinate >= IDEA_VALUE_FEASIBILITY_MAP_RANGE.min &&
+    coordinate <= IDEA_VALUE_FEASIBILITY_MAP_RANGE.max
+  );
+}
+
 export const NOTE_WIDTH = 200;
 export const NOTE_HEIGHT = 150;
 

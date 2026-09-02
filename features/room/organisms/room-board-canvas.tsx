@@ -38,6 +38,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { BoardPermissions } from "../logic/board-permissions";
 import type { CanvasCamera } from "../logic/canvas-camera";
+import { getIdeaValueFeasibilityMapPosition } from "../logic/idea-value-feasibility-map";
 import type { Decision } from "../logic/room-reducer";
 import { CanvasZoomControls } from "../molecules/canvas-zoom-controls";
 import {
@@ -45,6 +46,7 @@ import {
   DECIDE_NOTE_ACTION_SIZE,
   DecideNoteAction,
 } from "../molecules/decide-note-action";
+import { IdeaValueFeasibilityMap } from "../molecules/idea-value-feasibility-map";
 
 export type RoomBoardCanvasProps = {
   notes: Note[];
@@ -65,6 +67,7 @@ export type RoomBoardCanvasProps = {
   // フェーズ2から持ち越した決定HMW。null なら非表示。
   decidedHmw: string | null;
   boardScrollerRef: RefObject<HTMLDivElement | null>;
+  ideaMapPlaneRef: RefObject<HTMLDivElement | null>;
   privateToolbarRef: RefObject<HTMLDivElement | null>;
   permissions: BoardPermissions;
   camera: CanvasCamera;
@@ -116,6 +119,7 @@ export function RoomBoardCanvas({
   hmwDecidedIssue,
   decidedHmw,
   boardScrollerRef,
+  ideaMapPlaneRef,
   privateToolbarRef,
   permissions,
   camera,
@@ -155,6 +159,10 @@ export function RoomBoardCanvas({
       isResultStep(phase) &&
       decision?.noteId !== selectedNote.id,
   );
+  // アイデア個人執筆中は2軸マップを表示せず、共有する Step3-2 から表示する。
+  // 付箋の共有・操作可否は引き続き permissions と RoomDO が権威。
+  const isIdeaValueFeasibilityMapVisible =
+    phase.kind === "step" && phase.phase === 3 && phase.step >= 2;
 
   function handleBoardPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     // 付箋の上のpointerdownはバブリングしてくるので、ボード背景を
@@ -180,20 +188,103 @@ export function RoomBoardCanvas({
     onNoteDelete(noteId);
   }
 
+  function renderNoteCard(note: Note, isOnIdeaMap = false) {
+    return (
+      <NoteCard
+        key={note.id}
+        note={note}
+        isOwnDrag={draggingNoteId === note.id}
+        isSelected={selectedNoteId === note.id}
+        editingDisabled={isResultStep(phase)}
+        canDeleteNote={permissions.canDeleteNote}
+        canEditNote={permissions.canEditNote}
+        canMoveNote={permissions.canMoveNote}
+        canShowVote={permissions.canShowVote}
+        canVote={permissions.canVote}
+        isDecided={decision?.noteId === note.id}
+        disabled={isDisconnected}
+        onSelect={onSelect}
+        onDragStart={onNoteDragStart}
+        onContentChange={onNoteContentChange}
+        onDelete={handleNoteDelete}
+        voteRemaining={voteRemaining}
+        onVote={onNoteVote}
+        onVoteReset={onNoteVoteReset}
+        className={isOnIdeaMap ? "relative pointer-events-auto" : undefined}
+        style={isOnIdeaMap ? {} : undefined}
+      />
+    );
+  }
+
+  function renderIdeaMapNote(note: Note) {
+    const position = getIdeaValueFeasibilityMapPosition({
+      value: note.y,
+      feasibility: note.x,
+    });
+    const isSelectedDecidableNote = canDecide && selectedNote?.id === note.id;
+
+    return (
+      <div
+        key={note.id}
+        className="pointer-events-auto absolute z-10"
+        data-testid={`idea-value-feasibility-map-note-${note.id}`}
+        style={{ ...position, transform: "translate(-50%, 50%)" }}
+      >
+        {renderNoteCard(note, true)}
+        {isSelectedDecidableNote ? (
+          <DecideNoteAction
+            x={NOTE_WIDTH - DECIDE_NOTE_ACTION_SIZE - DECIDE_NOTE_ACTION_INSET}
+            y={DECIDE_NOTE_ACTION_INSET}
+            onDecide={() => onNoteDecide(note.id)}
+          />
+        ) : null}
+      </div>
+    );
+  }
+
+  function renderIdeaMapDragGhost() {
+    if (!dragGhost) return null;
+    const position = getIdeaValueFeasibilityMapPosition({
+      value: dragGhost.y,
+      feasibility: dragGhost.x,
+    });
+
+    return (
+      <StickyNote
+        noteId={dragGhost.note.id}
+        isLifted
+        color={dragGhost.note.color}
+        className="pointer-events-none absolute z-20"
+        style={{ ...position, transform: "translate(-50%, 50%)" }}
+      >
+        <p className="min-h-0 flex-1 overflow-hidden p-2 text-sm text-slate-900 dark:text-slate-50">
+          {dragGhost.note.content || "メモを入力..."}
+        </p>
+      </StickyNote>
+    );
+  }
+
   return (
     <div className="min-h-0 flex-1">
       <div className="relative h-full min-h-80" data-testid="board-frame">
         <div
           ref={boardScrollerRef}
-          className={`relative h-full overflow-hidden bg-muted/20 ${
+          className={`relative h-full overflow-hidden bg-muted/20 [container-type:size] ${
             isPanning ? "cursor-grabbing" : "cursor-grab"
           }`}
+          data-testid="board-scroller"
           style={gridStyle}
           onPointerDown={handleViewportPointerDown}
           onPointerMove={onCanvasPointerMove}
           onPointerUp={onCanvasPointerEnd}
           onPointerCancel={onCanvasPointerEnd}
         >
+          {isIdeaValueFeasibilityMapVisible ? (
+            <IdeaValueFeasibilityMap planeRef={ideaMapPlaneRef}>
+              {notes.map(renderIdeaMapNote)}
+              {renderIdeaMapDragGhost()}
+            </IdeaValueFeasibilityMap>
+          ) : null}
           <div
             data-testid="board-canvas"
             data-canvas-background="true"
@@ -225,30 +316,10 @@ export function RoomBoardCanvas({
               );
             })}
 
-            {notes.map((note) => (
-              <NoteCard
-                key={note.id}
-                note={note}
-                isOwnDrag={draggingNoteId === note.id}
-                isSelected={selectedNoteId === note.id}
-                editingDisabled={isResultStep(phase)}
-                canDeleteNote={permissions.canDeleteNote}
-                canEditNote={permissions.canEditNote}
-                canMoveNote={permissions.canMoveNote}
-                canShowVote={permissions.canShowVote}
-                canVote={permissions.canVote}
-                isDecided={decision?.noteId === note.id}
-                disabled={isDisconnected}
-                onSelect={onSelect}
-                onDragStart={onNoteDragStart}
-                onContentChange={onNoteContentChange}
-                onDelete={handleNoteDelete}
-                voteRemaining={voteRemaining}
-                onVote={onNoteVote}
-                onVoteReset={onNoteVoteReset}
-              />
-            ))}
-            {canDecide && selectedNote ? (
+            {!isIdeaValueFeasibilityMapVisible
+              ? notes.map((note) => renderNoteCard(note))
+              : null}
+            {!isIdeaValueFeasibilityMapVisible && canDecide && selectedNote ? (
               <DecideNoteAction
                 x={
                   selectedNote.x +
@@ -260,7 +331,7 @@ export function RoomBoardCanvas({
                 onDecide={() => onNoteDecide(selectedNote.id)}
               />
             ) : null}
-            {dragGhost ? (
+            {!isIdeaValueFeasibilityMapVisible && dragGhost ? (
               <StickyNote
                 noteId={dragGhost.note.id}
                 isLifted
