@@ -33,8 +33,10 @@ describe("IdeaValueFeasibilityMap", () => {
       name: "実現可能性: 低から高",
     });
 
-    expect(valueScale).toHaveTextContent(/^高.*価値.*低$/s);
-    expect(feasibilityScale).toHaveTextContent(/^低.*実現可能性.*高$/s);
+    expect(valueScale).toHaveTextContent(/^高[\s\S]*価値[\s\S]*低$/);
+    expect(feasibilityScale).toHaveTextContent(
+      /^低[\s\S]*実現可能性[\s\S]*高$/,
+    );
     expect(
       screen.getByTestId("idea-value-feasibility-map-y-scale-bar"),
     ).toHaveClass("bg-linear-to-t");
