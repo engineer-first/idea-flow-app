@@ -6,8 +6,13 @@ import type {
   RefObject,
 } from "react";
 import { useRef } from "react";
-import { isPublishAllowedStep, type RoomPhase } from "@/contracts/phase";
+import {
+  isPhaseStep,
+  isPublishAllowedStep,
+  type RoomPhase,
+} from "@/contracts/phase";
 import type { Note } from "@/features/notes";
+import { getBoardPermissions } from "./board-permissions";
 import type { CanvasCamera } from "./canvas-camera";
 import { clampIdeaValueFeasibilityMapCoordinate } from "./idea-value-feasibility-map";
 import { roomNotify } from "./room-notify";
@@ -100,6 +105,12 @@ export function useRoomBoardInteractions({
     phase,
     fallbackPointFromClient: worldPointFromClient,
   });
+  // 2軸マップの配置ステップは明示的に移動を許可する。その他の通常ボードは
+  // 既存のボード権限に従い、投票・結果ステップでは共有付箋を操作させない。
+  const canMoveSharedNotes =
+    isPhaseStep(phase, 3, 2) ||
+    isPhaseStep(phase, 3, 3) ||
+    getBoardPermissions(phase).canMoveNote;
 
   const {
     drag,
@@ -121,6 +132,7 @@ export function useRoomBoardInteractions({
     clampCoordinate: isIdeaValueFeasibilityMappingStep
       ? clampIdeaValueFeasibilityMapCoordinate
       : undefined,
+    canMoveSharedNotes,
     canPublish: isPublishAllowedStep(phase),
     onPublishBlocked: roomNotify.cannotPublishNote,
     onNoteDragStart,
