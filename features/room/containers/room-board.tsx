@@ -19,6 +19,7 @@ import { notify } from "@/lib/notify";
 import type { RoomSocketFactory } from "@/lib/room-client/room-client";
 import type { Member } from "../logic/room-reducer";
 import { useLeaveRoom } from "../logic/use-leave-room";
+import { useRoomBoardInteractions } from "../logic/use-room-board-interactions";
 import { useRoomConnection } from "../logic/use-room-connection";
 import { useRoomState } from "../logic/use-room-state";
 import { ForceNextPhaseDialog } from "../molecules/force-next-phase-dialog";
@@ -177,6 +178,25 @@ export function RoomBoard({
           ?.content ?? null)
       : null;
 
+  const boardNotes = atHmwWritingStep
+    ? []
+    : notes.notes.filter((note) => note.visibility === "shared");
+  const boardPrivateNotes = notes.notes.filter(
+    (note) => note.visibility === "private",
+  );
+  const boardInteractions = useRoomBoardInteractions({
+    notes: boardNotes,
+    privateNotes: boardPrivateNotes,
+    currentUserId,
+    draggingNoteId: notes.draggingNoteId,
+    phase: roomState.phase,
+    onNoteDragStart: notes.startNoteDrag,
+    onNoteDragMove: notes.moveNote,
+    onNoteDragEnd: notes.endNoteDrag,
+    onPrivateNotePublish: notes.publishNote,
+    onPrivateNoteUnpublish: notes.unpublishNote,
+  });
+
   return (
     <>
       <ForceNextPhaseDialog
@@ -185,14 +205,7 @@ export function RoomBoard({
         onConfirm={handleForceNextPhase}
       />
       <RoomBoardView
-        notes={
-          atHmwWritingStep
-            ? []
-            : notes.notes.filter((note) => note.visibility === "shared")
-        }
-        privateNotes={notes.notes.filter(
-          (note) => note.visibility === "private",
-        )}
+        notes={boardNotes}
         groups={atHmwWritingStep ? [] : noteGroups.groups}
         hmwDecidedIssue={hmwDecidedIssue}
         decidedHmw={decidedHmw}
@@ -210,22 +223,18 @@ export function RoomBoard({
         hostUserId={hostUserId}
         isNextPhasePending={isNextPhasePending}
         signOutAction={signOutAction}
+        interactions={boardInteractions}
         onAddPrivateNote={handleAddPrivateNote}
         onHmwTemplateSelect={handleHmwTemplateSelect}
         onIdeaHintSelect={handleIdeaHintSelect}
         onPrivateNoteContentChange={notes.changeNoteContent}
         onPrivateNoteDelete={notes.deleteNote}
-        onPrivateNotePublish={notes.publishNote}
-        onPrivateNoteUnpublish={notes.unpublishNote}
         onNextPhase={handleNextPhase}
         onTimerStart={handleTimerStart}
         onTimerPause={handleTimerPause}
         onTimerResume={handleTimerResume}
         onTimerExtend={handleTimerExtend}
         onTimerStop={handleTimerStop}
-        onNoteDragStart={notes.startNoteDrag}
-        onNoteDragMove={notes.moveNote}
-        onNoteDragEnd={notes.endNoteDrag}
         onNoteContentChange={notes.changeNoteContent}
         onNoteDelete={notes.deleteNote}
         onGroupCreate={noteGroups.createGroup}

@@ -11,8 +11,10 @@ describe("IdeaValueFeasibilityMap", () => {
     });
 
     expect(map).toBeInTheDocument();
-    expect(map).toHaveClass("aspect-square");
-    expect(map).toHaveClass("size-[min(90cqh,90cqw)]");
+    expect(map).toHaveClass("w-[90cqw]");
+    expect(map).toHaveClass("h-[90cqh]");
+    expect(map).not.toHaveClass("aspect-square");
+    expect(map).not.toHaveClass("size-[min(90cqh,90cqw)]");
     expect(map).toHaveClass("grid-cols-[4rem_minmax(0,1fr)]");
     expect(map).toHaveClass("grid-rows-[minmax(0,1fr)_4rem]");
     expect(map).toHaveClass("gap-3");

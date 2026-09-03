@@ -192,6 +192,24 @@ describe("RoomBoardCanvas", () => {
     ).toBeInTheDocument();
   });
 
+  it("2軸マップを無限キャンバスの世界レイヤー内に描画する", () => {
+    const phase = buildPhaseStep(2, 3);
+
+    setup({
+      phase,
+      permissions: getBoardPermissions(phase),
+      camera: { x: 30, y: -20, zoom: 2 },
+    });
+
+    const boardCanvas = screen.getByTestId("board-canvas");
+    const map = screen.getByTestId("idea-value-feasibility-map");
+
+    expect(boardCanvas).toContainElement(map);
+    expect(boardCanvas).toHaveStyle({
+      transform: "translate3d(30px, -20px, 0) scale(2)",
+    });
+  });
+
   it.each([
     { id: "bottom-left", x: 0, y: 0 },
     { id: "bottom-right", x: 100, y: 0 },

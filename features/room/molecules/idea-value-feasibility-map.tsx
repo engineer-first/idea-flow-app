@@ -24,7 +24,7 @@ export function IdeaValueFeasibilityMap({
   return (
     <section
       aria-label={labels.ariaLabel}
-      className="pointer-events-none absolute left-1/2 top-1/2 z-10 grid size-[min(90cqh,90cqw)] -translate-x-1/2 -translate-y-1/2 aspect-square grid-cols-[4rem_minmax(0,1fr)] grid-rows-[minmax(0,1fr)_4rem] gap-3 select-none"
+      className="pointer-events-none absolute left-1/2 top-1/2 z-10 grid h-[90cqh] w-[90cqw] -translate-x-1/2 -translate-y-1/2 grid-cols-[4rem_minmax(0,1fr)] grid-rows-[minmax(0,1fr)_4rem] gap-3 select-none"
       data-testid="idea-value-feasibility-map"
     >
       <span className="sr-only absolute">{labels.title}</span>

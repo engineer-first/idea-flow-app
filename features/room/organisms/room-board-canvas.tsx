@@ -279,12 +279,6 @@ export function RoomBoardCanvas({
           onPointerUp={onCanvasPointerEnd}
           onPointerCancel={onCanvasPointerEnd}
         >
-          {isIdeaValueFeasibilityMapVisible ? (
-            <IdeaValueFeasibilityMap planeRef={ideaMapPlaneRef}>
-              {notes.map(renderIdeaMapNote)}
-              {renderIdeaMapDragGhost()}
-            </IdeaValueFeasibilityMap>
-          ) : null}
           <div
             data-testid="board-canvas"
             data-canvas-background="true"
@@ -295,6 +289,13 @@ export function RoomBoardCanvas({
               willChange: "transform",
             }}
           >
+            {/* マップも世界レイヤーに含め、付箋と同じカメラ変換で拡大縮小・パンする。 */}
+            {isIdeaValueFeasibilityMapVisible ? (
+              <IdeaValueFeasibilityMap planeRef={ideaMapPlaneRef}>
+                {notes.map(renderIdeaMapNote)}
+                {renderIdeaMapDragGhost()}
+              </IdeaValueFeasibilityMap>
+            ) : null}
             {renderGroups.map((rg) => {
               const handleUpdateName = (newName: string) => {
                 if (rg.isTemp && rg.representativeNoteId) {
