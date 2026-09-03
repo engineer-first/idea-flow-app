@@ -137,6 +137,40 @@ describe("useBoardDrag", () => {
     expect(result.current.drag?.status).toBe("shared");
   });
 
+  it("2軸マップへ共有するとマイ付箋をポインター位置の連続座標で配置する", () => {
+    const mapCoordinateOptions = {
+      preservePrivateGrabOffset: false,
+      clampCoordinate: (coordinate: number) =>
+        Math.min(100, Math.max(0, coordinate)),
+    } as Partial<Parameters<typeof useBoardDrag>[0]>;
+    const { args, result } = setup({
+      worldPointFromClient: () => ({ x: 50, y: 50 }),
+      ...mapCoordinateOptions,
+    });
+    const event = pointerEvent(1, 400, 560);
+    Object.defineProperty(event, "currentTarget", {
+      value: {
+        getBoundingClientRect: () => ({
+          left: 300,
+          top: 500,
+          right: 500,
+          bottom: 650,
+          width: 200,
+          height: 150,
+        }),
+      },
+    });
+
+    act(() => {
+      result.current.handlePrivateDragStart("private-1", event);
+      result.current.handlePointerMove(pointerEvent(1, 300, 200));
+      result.current.handlePointerEnd(pointerEvent(1, 300, 200));
+    });
+
+    expect(args.onPrivateNotePublish).toHaveBeenCalledWith("private-1", 50, 50);
+    expect(args.onNoteDragEnd).toHaveBeenCalledWith("private-1", 50, 50);
+  });
+
   it("マイ付箋エリア内でドラッグした付箋の並び順を変更する", () => {
     const { args, result } = setup({
       privateNotes: [
@@ -308,6 +342,42 @@ describe("useBoardDrag", () => {
     });
 
     expect(args.onPrivateNoteUnpublish).not.toHaveBeenCalled();
+  });
+
+  it("共有付箋の移動が許可されていないステップではドラッグを開始しない", () => {
+    const { args, result } = setup({ canMoveSharedNotes: false });
+
+    act(() => {
+      result.current.handleSharedNoteDragStart(
+        "shared-1",
+        pointerEvent(1, 100, 100),
+      );
+    });
+
+    expect(result.current.drag).toBeNull();
+    expect(args.onNoteDragStart).not.toHaveBeenCalled();
+  });
+
+  it("ドラッグ中に共有付箋の移動が禁止された場合は移動・確定を送信しない", () => {
+    const { args, result, rerender } = setup();
+
+    act(() => {
+      result.current.handleSharedNoteDragStart(
+        "shared-1",
+        pointerEvent(1, 100, 100),
+      );
+    });
+    args.canMoveSharedNotes = false;
+    rerender();
+
+    act(() => {
+      result.current.handlePointerMove(pointerEvent(1, 250, 180));
+      result.current.handlePointerEnd(pointerEvent(1, 250, 180));
+    });
+
+    expect(args.onNoteDragMove).not.toHaveBeenCalled();
+    expect(args.onNoteDragEnd).not.toHaveBeenCalled();
+    expect(result.current.drag).toBeNull();
   });
 
   it("shared 状態でポインターを離すと最終座標で onNoteDragEnd を呼び、状態を解放する", () => {

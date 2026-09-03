@@ -16,6 +16,7 @@ const STEP_1_2 = buildPhaseStep(2);
 const STEP_1_3 = buildPhaseStep(3);
 const STEP_1_4 = buildPhaseStep(4);
 const STEP_1_5 = buildPhaseStep(5);
+const STEP_3_2 = buildPhaseStep(2, 3);
 
 const meta = {
   title: "Room/RoomBoardCanvas",
@@ -40,6 +41,7 @@ const meta = {
     hmwDecidedIssue: null,
     decidedHmw: null,
     boardScrollerRef: createRef<HTMLDivElement>(),
+    ideaMapPlaneRef: createRef<HTMLDivElement>(),
     privateToolbarRef: createRef<HTMLDivElement>(),
     camera: { x: 0, y: 0, zoom: 1 },
     gridStyle: {},
@@ -256,5 +258,14 @@ export const Step1Result: Story = {
     phase: STEP_1_5,
     permissions: getBoardPermissions(STEP_1_5),
     selectedNoteId: "note-1",
+  },
+};
+
+// Step3-2: 共有する段階から表示する連続的な2軸マップを確認する状態。
+export const Step3IdeaMap: Story = {
+  args: {
+    phase: STEP_3_2,
+    permissions: getBoardPermissions(STEP_3_2),
+    notes: [],
   },
 };

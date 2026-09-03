@@ -208,5 +208,79 @@ export function getBoardPermissions(phase: RoomPhase): BoardPermissions {
     };
   }
 
+  // フェーズ3は、2軸マップでのグループ化を除き、フェーズ1の後半と同じ
+  // 操作の流れを暫定的に使う。
+  if (phase.phase === 3 && phase.step === 2) {
+    return {
+      showPrivateToolbar: true,
+
+      canCreateNote: false,
+      canEditNote: true,
+      canDeleteNote: false,
+      canMoveNote: true,
+
+      canGroupNote: false,
+
+      canShowVote: false,
+      canVote: false,
+
+      canDecide: false,
+    };
+  }
+
+  if (phase.phase === 3 && phase.step === 3) {
+    return {
+      showPrivateToolbar: false,
+
+      canCreateNote: false,
+      canEditNote: false,
+      canDeleteNote: false,
+      canMoveNote: true,
+
+      canGroupNote: false,
+
+      canShowVote: false,
+      canVote: false,
+
+      canDecide: false,
+    };
+  }
+
+  if (phase.phase === 3 && phase.step === 4) {
+    return {
+      showPrivateToolbar: false,
+
+      canCreateNote: false,
+      canEditNote: false,
+      canDeleteNote: false,
+      canMoveNote: false,
+
+      canGroupNote: false,
+
+      canShowVote: true,
+      canVote: true,
+
+      canDecide: false,
+    };
+  }
+
+  if (phase.phase === 3 && phase.step === 5) {
+    return {
+      showPrivateToolbar: false,
+
+      canCreateNote: false,
+      canEditNote: false,
+      canDeleteNote: false,
+      canMoveNote: false,
+
+      canGroupNote: false,
+
+      canShowVote: true,
+      canVote: false,
+
+      canDecide: true,
+    };
+  }
+
   return ALL_DISABLED;
 }

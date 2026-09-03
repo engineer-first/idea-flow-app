@@ -9,17 +9,46 @@ import {
   buildNotes,
 } from "@/contracts/room-protocol.fixture";
 import { HMW_TEMPLATES } from "@/features/hmw";
-import { RoomBoardView } from "./room-board-view";
-
-const notifyMocks = vi.hoisted(() => ({
-  cannotPublishNote: vi.fn(),
-}));
-
-vi.mock("../logic/room-notify", () => ({
-  roomNotify: notifyMocks,
-}));
+import type { Note } from "@/features/notes";
+import type { RoomBoardInteractions } from "../logic/use-room-board-interactions";
+import { RoomBoardView, type RoomBoardViewProps } from "./room-board-view";
 
 const ME = "11111111-1111-4111-8111-111111111111";
+
+function buildInteractions(
+  notes: Note[],
+  privateNotes: Note[],
+): RoomBoardInteractions {
+  return {
+    boardRootRef: { current: null },
+    boardScrollerRef: { current: null },
+    ideaMapPlaneRef: { current: null },
+    privateToolbarRef: { current: null },
+    notes,
+    privateNotes,
+    dragGhost: null,
+    isReturnDropTarget: false,
+    camera: { x: 0, y: 0, zoom: 1 },
+    gridStyle: {
+      backgroundImage:
+        "radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--foreground) 30%, transparent) 1px, transparent 1.5px)",
+      backgroundPosition: "0 0",
+      backgroundSize: "20px 20px",
+    },
+    isPanning: false,
+    onCanvasPointerDown: vi.fn(),
+    onCanvasPointerMove: vi.fn(),
+    onCanvasPointerEnd: vi.fn(),
+    onZoomIn: vi.fn(),
+    onZoomOut: vi.fn(),
+    onResetZoom: vi.fn(),
+    onFitToNotes: vi.fn(),
+    onPointerMove: vi.fn(),
+    onPointerEnd: vi.fn(),
+    onNoteDragStart: vi.fn(),
+    onPrivateNoteDragStart: vi.fn(),
+  };
+}
 
 function setup(overrides: Partial<Parameters<typeof RoomBoardView>[0]> = {}) {
   const props = {
@@ -32,7 +61,6 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardView>[0]> = {}) {
     timerServerOffsetMs: 0,
     isHost: false,
     isNextPhasePending: false,
-    privateNotes: [],
     hmwDecidedIssue: null,
     decidedHmw: null,
     onHmwTemplateSelect: vi.fn(),
@@ -50,11 +78,6 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardView>[0]> = {}) {
     onAddPrivateNote: vi.fn(),
     onPrivateNoteContentChange: vi.fn(),
     onPrivateNoteDelete: vi.fn(),
-    onPrivateNotePublish: vi.fn(),
-    onPrivateNoteUnpublish: vi.fn(),
-    onNoteDragStart: vi.fn(),
-    onNoteDragMove: vi.fn(),
-    onNoteDragEnd: vi.fn(),
     onNoteContentChange: vi.fn(),
     onNoteDelete: vi.fn(),
     onGroupCreate: vi.fn(),
@@ -67,11 +90,15 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardView>[0]> = {}) {
     connectionStatus: "open" as const,
     groups: [],
     ...overrides,
+  } as RoomBoardViewProps;
+  const resolvedProps: RoomBoardViewProps = {
+    ...props,
+    interactions: props.interactions ?? buildInteractions(props.notes, []),
   };
 
-  render(<RoomBoardView {...props} />);
+  render(<RoomBoardView {...resolvedProps} />);
 
-  return props;
+  return resolvedProps;
 }
 
 function openRoomMenu() {

@@ -1002,6 +1002,207 @@ describe("RoomDO phase:next", () => {
     ws.close();
   });
 
+  it("フェーズ3を共有・2軸配置・投票・集計確認まで順に進められる", async () => {
+    const roomName = "room-phase3-provisional-flow";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(1, 3), USER_A);
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify({ type: "note:create", content: "新しいアイデア" }));
+    const created = (await nextJson(ws)) as { note: { id: string } };
+
+    ws.send(JSON.stringify({ type: "phase:next" }));
+    expect(await nextJsonWithin(ws)).toMatchObject({
+      type: "phase:updated",
+      phase: buildPhaseStep(2, 3),
+    });
+
+    ws.send(
+      JSON.stringify({
+        type: "note:publish",
+        noteId: created.note.id,
+        x: 16,
+        y: 12,
+      }),
+    );
+    expect(await nextJson(ws)).toMatchObject({ type: "note:inserted" });
+
+    ws.send(JSON.stringify({ type: "phase:next" }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "snapshot",
+      phase: buildPhaseStep(3, 3),
+    });
+    expect(await nextJson(ws)).toMatchObject({
+      type: "phase:updated",
+      phase: buildPhaseStep(3, 3),
+    });
+
+    ws.send(
+      JSON.stringify({
+        type: "note:move",
+        noteId: created.note.id,
+        x: 24,
+        y: 80,
+      }),
+    );
+    expect(await nextJson(ws)).toMatchObject({ type: "note:updated" });
+
+    ws.send(JSON.stringify({ type: "phase:next" }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "phase:updated",
+      phase: buildPhaseStep(4, 3),
+    });
+
+    ws.send(
+      JSON.stringify({
+        type: "note:vote",
+        noteId: created.note.id,
+        kind: "subjective",
+      }),
+    );
+    expect(await nextJson(ws)).toMatchObject({ type: "note:updated" });
+    for (let count = 0; count < 3; count++) {
+      ws.send(
+        JSON.stringify({
+          type: "note:vote",
+          noteId: created.note.id,
+          kind: "objective",
+        }),
+      );
+      expect(await nextJson(ws)).toMatchObject({ type: "note:updated" });
+    }
+
+    ws.send(JSON.stringify({ type: "phase:next" }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "snapshot",
+      phase: buildPhaseStep(5, 3),
+    });
+    expect(await nextJson(ws)).toMatchObject({
+      type: "phase:updated",
+      phase: buildPhaseStep(5, 3),
+    });
+
+    ws.send(JSON.stringify({ type: "note:decide", noteId: created.note.id }));
+    expect(await nextJson(ws)).toMatchObject({
+      type: "decision:updated",
+      phase: 3,
+      noteId: created.note.id,
+    });
+    ws.close();
+  });
+
+  it.each([
+    {
+      step: 2,
+      message: {
+        type: "note:publish" as const,
+        noteId: "99999999-9999-4999-8999-999999999999",
+        x: 101,
+        y: 50,
+      },
+    },
+    {
+      step: 2,
+      message: {
+        type: "note:move" as const,
+        noteId: "99999999-9999-4999-8999-999999999999",
+        x: 50,
+        y: -1,
+      },
+    },
+    {
+      step: 3,
+      message: {
+        type: "note:drag" as const,
+        noteId: "99999999-9999-4999-8999-999999999999",
+        x: 100.1,
+        y: 50,
+      },
+    },
+  ])("フェーズ3 Step3-$stepでは2軸マップ外の配置を拒否する", async ({
+    step,
+    message,
+  }) => {
+    const roomName = `room-phase3-map-range-${step}-${message.type}`;
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(step, 3), USER_A);
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    ws.send(JSON.stringify(message));
+
+    expect(await nextJson(ws)).toMatchObject({
+      type: "error",
+      code: "forbidden",
+    });
+    ws.close();
+  });
+
+  it.each([
+    4, 5,
+  ])("フェーズ3 Step3-%iでは直接送られた配置移動を拒否する", async (step) => {
+    const roomName = `room-phase3-map-move-forbidden-${step}`;
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.setPhase(buildPhaseStep(step, 3), USER_A);
+
+    const ws = await connectDirectly(roomName, USER_A, USER_A);
+    for (const type of ["note:move", "note:drag"] as const) {
+      ws.send(
+        JSON.stringify({
+          type,
+          noteId: "99999999-9999-4999-8999-999999999999",
+          x: 50,
+          y: 50,
+        }),
+      );
+      expect(await nextJson(ws)).toMatchObject({
+        type: "error",
+        code: "forbidden",
+      });
+    }
+    ws.close();
+  });
+
+  it("フェーズ3の2軸マップ配置を別セッションへリアルタイム配信する", async () => {
+    const roomName = "room-phase3-map-realtime";
+    const noteId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    const stub = roomStub(roomName);
+    await stub.initializeNewRoom(USER_A, "Host");
+    await stub.upsertMember(USER_B, "Member");
+    await stub.setPhase(buildPhaseStep(2, 3), USER_A);
+    await runInRoomDO(roomName, (_instance, state) => {
+      const now = new Date().toISOString();
+      state.storage.sql.exec(
+        `INSERT INTO notes
+           (id, author_id, content, visibility, color, x, y, created_at, updated_at, phase)
+         VALUES (?1, ?2, '共有アイデア', 'shared', 'yellow', 25, 75, ?3, ?3, 3)`,
+        noteId,
+        USER_A,
+        now,
+      );
+    });
+
+    const authorWs = await connectDirectly(roomName, USER_A, USER_A);
+    const memberWs = await connectDirectly(roomName, USER_B, USER_A);
+    authorWs.send(JSON.stringify({ type: "note:drag", noteId, x: 40, y: 60 }));
+    expect(await nextJson(memberWs)).toMatchObject({
+      type: "note:drag",
+      noteId,
+      x: 40,
+      y: 60,
+    });
+
+    authorWs.send(JSON.stringify({ type: "note:move", noteId, x: 50, y: 50 }));
+    expect(await nextJson(memberWs)).toMatchObject({
+      type: "note:updated",
+      note: { id: noteId, x: 50, y: 50 },
+    });
+    authorWs.close();
+    memberWs.close();
+  });
+
   it("host は phase を進められる", async () => {
     const stub = roomStub("room-phase-host");
 

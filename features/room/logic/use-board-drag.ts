@@ -46,6 +46,15 @@ export type UseBoardDragArgs = {
     clientY: number,
   ) => CanvasPoint | null;
   privateToolbarRef: RefObject<HTMLDivElement | null>;
+  // 2軸マップは付箋の中心を座標で表すため、ツールバー内で掴んだ位置の差分を
+  // 持ち込まず、ポインター位置そのものを配置点にする。
+  preservePrivateGrabOffset?: boolean;
+  // 通常キャンバスは広い連続座標、2軸マップは0〜100の連続座標とするため、
+  // 配置先が座標系に応じた上限を渡す。
+  clampCoordinate?: (coordinate: number) => number;
+  // 共有済み付箋の移動を許可するか。公開（publish）の可否とは別に、
+  // フェーズごとの既存付箋の移動権限を指定する。
+  canMoveSharedNotes?: boolean;
   canPublish?: boolean;
   onPublishBlocked?: () => void;
   onNoteDragStart: (noteId: string) => void;
@@ -75,6 +84,29 @@ function placePrivateNote(source: Note[], noteId: string, index: number) {
   return next;
 }
 
+function getPositionFromPointer({
+  pointerPosition,
+  drag,
+  preservePrivateGrabOffset,
+  clampCoordinate,
+}: {
+  pointerPosition: CanvasPoint;
+  drag: BoardDrag;
+  preservePrivateGrabOffset: boolean;
+  clampCoordinate: (coordinate: number) => number;
+}): CanvasPoint {
+  const preservesGrabOffset =
+    drag.status === "shared" || preservePrivateGrabOffset;
+  return {
+    x: clampCoordinate(
+      pointerPosition.x - (preservesGrabOffset ? drag.grabOffsetX : 0),
+    ),
+    y: clampCoordinate(
+      pointerPosition.y - (preservesGrabOffset ? drag.grabOffsetY : 0),
+    ),
+  };
+}
+
 /**
  * ホワイトボードとマイ付箋ツールバー間の付箋ドラッグ状態を管理するカスタムフックです。
  *
@@ -90,6 +122,9 @@ export function useBoardDrag({
   boardScrollerRef,
   worldPointFromClient,
   privateToolbarRef,
+  preservePrivateGrabOffset = true,
+  clampCoordinate = clampCanvasCoordinate,
+  canMoveSharedNotes = true,
   canPublish = true,
   onPublishBlocked,
   onNoteDragStart,
@@ -226,6 +261,7 @@ export function useBoardDrag({
 
   const handleSharedNoteDragStart = useCallback(
     (noteId: string, event: ReactPointerEvent<HTMLButtonElement>) => {
+      if (!canMoveSharedNotes) return;
       const note = notes.find((n) => n.id === noteId);
       if (!note) return;
       hasNotifiedBlockedRef.current = false;
@@ -250,6 +286,7 @@ export function useBoardDrag({
       boardPositionFromPointer,
       notes,
       boardRootRef,
+      canMoveSharedNotes,
       onNoteDragStart,
       updateDrag,
     ],
@@ -288,6 +325,7 @@ export function useBoardDrag({
     (event: ReactPointerEvent<HTMLDivElement>) => {
       const current = dragRef.current;
       if (!current || current.pointerId !== event.pointerId) return;
+      if (current.status === "shared" && !canMoveSharedNotes) return;
 
       if (isPointerOverPrivateToolbar(event.clientX, event.clientY)) {
         if (
@@ -317,10 +355,12 @@ export function useBoardDrag({
 
       const position = boardPositionFromPointer(event.clientX, event.clientY);
       if (!position) return;
-      const nextPosition = {
-        x: clampCanvasCoordinate(position.x - current.grabOffsetX),
-        y: clampCanvasCoordinate(position.y - current.grabOffsetY),
-      };
+      const nextPosition = getPositionFromPointer({
+        pointerPosition: position,
+        drag: current,
+        preservePrivateGrabOffset,
+        clampCoordinate,
+      });
       if (current.status === "private" || current.status === "returning") {
         if (!canPublish) {
           if (!hasNotifiedBlockedRef.current) {
@@ -340,11 +380,22 @@ export function useBoardDrag({
       // publish と同じ WebSocket 接続で送るため、publish のあとに届く drag は
       // RoomDO 側でも公開後の付箋として処理される。
       onNoteDragMove(current.note.id, nextPosition.x, nextPosition.y);
-      updateDrag({ ...current, status: "shared", ...nextPosition });
+      updateDrag({
+        ...current,
+        status: "shared",
+        ...nextPosition,
+        // マイ付箋から2軸マップへ初めて出した後も、ドロップ確定時に
+        // ツールバー由来の差分を再適用しない。
+        ...(!preservePrivateGrabOffset && current.status !== "shared"
+          ? { grabOffsetX: 0, grabOffsetY: 0 }
+          : {}),
+      });
     },
     [
       boardPositionFromPointer,
       canPublish,
+      canMoveSharedNotes,
+      clampCoordinate,
       currentUserId,
       isPointerOverPrivateToolbar,
       privateDropIndexFromPointer,
@@ -353,6 +404,7 @@ export function useBoardDrag({
       onPrivateNotePublish,
       onPrivateNoteUnpublish,
       onPublishBlocked,
+      preservePrivateGrabOffset,
       updateDrag,
     ],
   );
@@ -363,17 +415,21 @@ export function useBoardDrag({
       if (!current || current.pointerId !== event.pointerId) return;
       hasNotifiedBlockedRef.current = false;
       if (current.status === "shared") {
-        const pointerPosition = boardPositionFromPointer(
-          event.clientX,
-          event.clientY,
-        );
-        const position = pointerPosition
-          ? {
-              x: clampCanvasCoordinate(pointerPosition.x - current.grabOffsetX),
-              y: clampCanvasCoordinate(pointerPosition.y - current.grabOffsetY),
-            }
-          : { x: current.x, y: current.y };
-        onNoteDragEnd(current.note.id, position.x, position.y);
+        if (canMoveSharedNotes) {
+          const pointerPosition = boardPositionFromPointer(
+            event.clientX,
+            event.clientY,
+          );
+          const position = pointerPosition
+            ? getPositionFromPointer({
+                pointerPosition,
+                drag: current,
+                preservePrivateGrabOffset,
+                clampCoordinate,
+              })
+            : { x: current.x, y: current.y };
+          onNoteDragEnd(current.note.id, position.x, position.y);
+        }
       } else if (current.privateDropIndex !== null) {
         const privateDropIndex = current.privateDropIndex;
         setPrivateOrder((order) =>
@@ -407,8 +463,11 @@ export function useBoardDrag({
     [
       boardPositionFromPointer,
       boardRootRef,
+      canMoveSharedNotes,
+      clampCoordinate,
       onNoteDragEnd,
       privateNotes,
+      preservePrivateGrabOffset,
       updateDrag,
     ],
   );

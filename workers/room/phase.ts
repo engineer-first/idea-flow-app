@@ -1,4 +1,5 @@
 // 進行状態（lobby / 課題整理のステップ）の真実と、進行操作・境界ゲート。
+import { isIdeaValueFeasibilityMapCoordinate } from "../../contracts/board";
 import {
   getRoomPhaseLabel,
   isLobby,
@@ -60,6 +61,9 @@ function nextRoomPhase(current: RoomPhase): RoomPhase {
   }
   if (current.phase === 2 && current.step === 4) {
     return { kind: "step", phase: 3, step: 1 };
+  }
+  if (current.phase === 3 && current.step < 5) {
+    return { ...current, step: current.step + 1 };
   }
   return current;
 }
@@ -161,12 +165,39 @@ const allowedBoardMutationsByPhase: {
   },
   3: {
     1: ["note:create", "note:update-content", "note:delete"],
-    2: [],
-    3: [],
-    4: [],
-    5: [],
+    2: [
+      "note:publish",
+      "note:unpublish",
+      "note:update-content",
+      "note:move",
+      "note:drag",
+    ],
+    3: ["note:move", "note:drag"],
+    4: ["note:vote", "note:vote-reset"],
+    5: ["note:decide"],
   },
 };
+
+function isIdeaValueFeasibilityMapPositionMessage(
+  message: ClientMessage,
+): message is Extract<
+  ClientMessage,
+  { type: "note:publish" | "note:move" | "note:drag" }
+> {
+  return (
+    message.type === "note:publish" ||
+    message.type === "note:move" ||
+    message.type === "note:drag"
+  );
+}
+
+function isIdeaValueFeasibilityMappingStep(phase: RoomPhase): boolean {
+  return (
+    !isLobby(phase) &&
+    phase.phase === 3 &&
+    (phase.step === 2 || phase.step === 3)
+  );
+}
 
 // 変更系メッセージをハンドラより前に判定する。null は許可、文字列は拒否理由。
 // author / 可視性の認可は、このゲート通過後に各ハンドラで検証する。
@@ -176,6 +207,14 @@ export function getBoardMutationForbiddenMessage(
 ): string | null {
   if (!isBoardMutation(message)) return null;
   if (isLobby(phase)) return "ボード開始前はボードを変更できません。";
+  if (
+    isIdeaValueFeasibilityMappingStep(phase) &&
+    isIdeaValueFeasibilityMapPositionMessage(message) &&
+    (!isIdeaValueFeasibilityMapCoordinate(message.x) ||
+      !isIdeaValueFeasibilityMapCoordinate(message.y))
+  ) {
+    return `${getRoomPhaseLabel(phase)}では2軸マップ内（0〜100）の位置を指定してください。`;
+  }
   const allowed = allowedBoardMutationsByPhase[phase.phase]?.[phase.step] ?? [];
   if (allowed.includes(message.type)) return null;
   return `${getRoomPhaseLabel(phase)}ではこの操作を行えません。`;

@@ -28,6 +28,7 @@ function setup(overrides: Partial<Parameters<typeof RoomBoardCanvas>[0]> = {}) {
     hmwDecidedIssue: null,
     decidedHmw: null,
     boardScrollerRef: createRef<HTMLDivElement>(),
+    ideaMapPlaneRef: createRef<HTMLDivElement>(),
     privateToolbarRef: createRef<HTMLDivElement>(),
     camera: { x: 0, y: 0, zoom: 1 },
     gridStyle: {},
@@ -154,6 +155,133 @@ describe("RoomBoardCanvas", () => {
 
     expect(
       screen.queryByRole("button", { name: "発想支援を開く" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("Step3-1では価値×実現可能性の2軸マップを表示しない", () => {
+    const phase = buildPhaseStep(1, 3);
+
+    setup({
+      phase,
+      permissions: getBoardPermissions(phase),
+      notes: [],
+    });
+
+    expect(
+      screen.queryByRole("region", { name: "価値と実現可能性の2軸マップ" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("board-scroller")).toHaveClass(
+      "[container-type:size]",
+    );
+    expect(screen.getByTestId("board-canvas")).not.toHaveClass(
+      "[container-type:size]",
+    );
+  });
+
+  it.each([
+    2, 3, 4, 5,
+  ])("Step3-%iでも価値×実現可能性の2軸マップを表示する", (step) => {
+    const phase = buildPhaseStep(step, 3);
+
+    setup({ phase, permissions: getBoardPermissions(phase) });
+
+    expect(
+      screen.getByRole("region", {
+        name: "価値と実現可能性の2軸マップ",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("2軸マップを無限キャンバスの世界レイヤー内に描画する", () => {
+    const phase = buildPhaseStep(2, 3);
+
+    setup({
+      phase,
+      permissions: getBoardPermissions(phase),
+      camera: { x: 30, y: -20, zoom: 2 },
+    });
+
+    const boardCanvas = screen.getByTestId("board-canvas");
+    const map = screen.getByTestId("idea-value-feasibility-map");
+
+    expect(boardCanvas).toContainElement(map);
+    expect(boardCanvas).toHaveStyle({
+      transform: "translate3d(30px, -20px, 0) scale(2)",
+    });
+  });
+
+  it.each([
+    { id: "bottom-left", x: 0, y: 0 },
+    { id: "bottom-right", x: 100, y: 0 },
+    { id: "top-left", x: 0, y: 100 },
+    { id: "top-right", x: 100, y: 100 },
+  ])("2軸マップの四隅（$id）でも共有付箋を平面内に完全表示し、操作できる", ({
+    id,
+    x,
+    y,
+  }) => {
+    const phase = buildPhaseStep(2, 3);
+    const onNoteDragStart = vi.fn();
+    setup({
+      phase,
+      permissions: getBoardPermissions(phase),
+      notes: [buildNote({ id, x, y })],
+      onNoteDragStart,
+    });
+
+    const mappedNote = screen.getByTestId(
+      `idea-value-feasibility-map-note-${id}`,
+    );
+    expect(mappedNote).toHaveStyle({ left: `${x}%`, bottom: `${y}%` });
+    expect(mappedNote).toHaveStyle({
+      transform: `translate(${x === 0 ? 0 : -100}%, ${y === 0 ? 0 : 100}%)`,
+    });
+
+    const surface = within(mappedNote).getByRole("button", { name: "付箋" });
+    fireEvent.pointerDown(surface, {
+      pointerId: 1,
+      clientX: 200,
+      clientY: 200,
+    });
+    fireEvent.pointerMove(surface, {
+      pointerId: 1,
+      clientX: 210,
+      clientY: 210,
+    });
+    expect(onNoteDragStart).toHaveBeenCalledWith(id, expect.anything());
+  });
+
+  it("2軸マップの端でもドラッグゴーストを平面内に完全表示する", () => {
+    const phase = buildPhaseStep(2, 3);
+    setup({
+      phase,
+      permissions: getBoardPermissions(phase),
+      dragGhost: {
+        note: buildNote({ id: "map-ghost", content: "移動中のアイデア" }),
+        x: 0,
+        y: 100,
+      },
+    });
+
+    const ghost = screen
+      .getByText("移動中のアイデア")
+      .closest<HTMLElement>("[data-slot='sticky-note']");
+    if (!ghost) throw new Error("ドラッグゴーストがありません");
+
+    expect(ghost).toHaveStyle({
+      left: "0%",
+      bottom: "100%",
+      transform: "translate(0%, 100%)",
+    });
+  });
+
+  it("アイデアフェーズ以外では2軸マップを表示しない", () => {
+    const phase = buildPhaseStep(2, 2);
+
+    setup({ phase, permissions: getBoardPermissions(phase) });
+
+    expect(
+      screen.queryByRole("region", { name: "価値と実現可能性の2軸マップ" }),
     ).not.toBeInTheDocument();
   });
 
