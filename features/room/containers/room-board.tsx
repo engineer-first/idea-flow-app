@@ -93,7 +93,7 @@ export function RoomBoard({
     if (message.type === "phase:updated" || message.type === "snapshot") {
       setIsNextPhasePending(false);
       // 進行が確定（別タブ等）・復元（再接続）されたら、開いていた
-      // 強制進行の確認は Step 1-4 のゲート前提が崩れているため閉じる。
+      // 強制進行の確認はフェーズ1・2の投票ステップのゲート前提が崩れているため閉じる。
       setIsForceNextPhaseDialogOpen(false);
     }
 
